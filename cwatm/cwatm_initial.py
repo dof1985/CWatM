@@ -31,8 +31,9 @@ from cwatm.hydrological_modules.waterbalance import waterbalance
 from cwatm.hydrological_modules.environflow import environflow
 from cwatm.hydrological_modules.routing_reservoirs.routing_kinematic import routing_kinematic
 from cwatm.hydrological_modules.lakes_reservoirs import lakes_reservoirs
-from cwatm.hydrological_modules.waterquality1 import waterquality1
+#from cwatm.hydrological_modules.waterquality1 import waterquality1
 
+from cwatm.hydrological_modules.water_quality.waterquality_main import water_quality
 
 from cwatm.management_modules.output import *
 from cwatm.management_modules.data_handling import *
@@ -115,7 +116,8 @@ class CWATModel_ini(DynamicModel):
         self.lakes_res_small_module = lakes_res_small(self)
         self.routing_kinematic_module = routing_kinematic(self)
         self.lakes_reservoirs_module = lakes_reservoirs(self)
-        self.waterquality1 = waterquality1(self)
+        #self.waterquality1 = waterquality1(self)
+        self.waterquality_module = water_quality(self)
         self.waterbalance = waterbalance(self)
 
         # ----------------------------------------
@@ -166,6 +168,7 @@ class CWATModel_ini(DynamicModel):
 
         self.output_module.initial()
         self.environflow_module.initial()
-        self.waterquality1.initial()
+        #self.waterquality1.initial()
+        self.waterquality_module.initial()
 
 
