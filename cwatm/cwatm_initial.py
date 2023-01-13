@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------
 # Name:       CWATM Initial
-# Purpose:
+# Purpose: Adding purpose for testing GitHub
 #
 # Author:      PB
 #
