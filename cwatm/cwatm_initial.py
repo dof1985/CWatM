@@ -1,7 +1,6 @@
 # -------------------------------------------------------------------------
 # Name:       CWATM Initial
 # Purpose: 
-# another line
 # Author:      PB
 #
 # Created:     16/05/2016
