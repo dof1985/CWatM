@@ -43,23 +43,26 @@ class waterquality_phosphorus(object):
 	
     def initial(self):
         
+        # load initial inactive soil p concentration
+        self.var.inactive_Soil_PConc = globals.inZero.copy()
+        if 'inactive_Soil_PConc_initial' in binding:
+           self.var.inactive_Soil_PConc += loadmap('inactive_Soil_PConc_initial') #[mg P/kg soil]
+        
+        
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
         # dynamic -> load inputs and ground cover adjustment
         # dynamic_soil, dynamic_...
         
-        self.var.includeWaterQuality =  False
-        if checkOption('includeWaterQuality'):
-            self.var.includeWaterQuality =  True
-        
+     
         ###############################
         # soil properties
         # load bulkdensity for each soil layer
         
         #create for each soil layer soilmass1 =  bulkdensity1 * cellarea * (thickness of the layer)
         ################################
-        
+        '''
         # variable names for P balance items inputs - all inputs should be provided as total KG phosphrous input
         self.var.P_fertIn_varName = "PFert"
         self.var.P_manureIn_varName = "Pmanure"
@@ -75,14 +78,14 @@ class waterquality_phosphorus(object):
         else:
             self.var.gwPConc_dissolvedIni = global.inZero.copy()
         
-        '''  
+        
         # MAYBE AS a pre process - or contiue later to calculate the p_kf
         ## read in organic matter content to calculate P partitioning coefficient
         # load soil organic matter by layer
         self.var.soilOrganicM0 = loadmap('soil_organic0')
         self.var.soilOrganicM1 = loadmap('soil_organic1')
         self.var.soilOrganicM2 = loadmap('soil_organic2')
-        '''
+        
         # P partitioning constant - check number - can also be dynamic with soil organic matter
         self.var.soilP_kf = 0.2 # this can be loaded from settings file
         #self.var.waterP_kf = 0.2 # this can be loaded from settings file
@@ -95,10 +98,10 @@ class waterquality_phosphorus(object):
         # calculate P inactive - p. 5 documenation - note forests, natural grasslands only have inactive - so the divission of active is split proprotionally to relative area of all other landcoves ( except of water and sealed areas )
         # calculate initial EPC0 from labile mass
         
-        '''
+     
         e.g layer1
         epc0 = self.var.soilPConc_labileIni  /  kf 
-        '''
+        
         
     
         
@@ -130,9 +133,10 @@ class waterquality_phosphorus(object):
 
                 self.var.soilPConc_labile = soilPConc_active / ( 1 + self.var.soilP_kf)
                 self.var.soilPConc_dissolved = soilPConc_active * ((self.var.soilP_kf) / ( 1 + self.var.soilP_kf))
-            
+        '''   
     def dynamic(self):
-    
+        print("p dyn")
+        '''
         if dateVar['newStart'] or dateVar['newYear']:
             timediv = globals.dateVar['daysInYear']
             
@@ -145,11 +149,4 @@ class waterquality_phosphorus(object):
         
             ## load share of managed grassland (out of all grasslands) -> change to readnetcdf2
             self.var.fractionGrasslandCropGraze = loadmap('grasslandsShare_crop_and_graze')
-            
-    def soil_P(self):
-        
-        # calculate mass input per landcoverType 
-        # Partition to P type
-        # Split between soil layers
-        # calcualte TDP-labille balance
-        
+        '''

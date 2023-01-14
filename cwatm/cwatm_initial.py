@@ -6,7 +6,7 @@
 # Created:     16/05/2016
 # Copyright:   (c) PB 2016
 # -------------------------------------------------------------------------
-# water quality test change
+
 from cwatm.hydrological_modules.miscInitial import miscInitial
 from cwatm.hydrological_modules.initcondition import initcondition
 
@@ -33,6 +33,7 @@ from cwatm.hydrological_modules.lakes_reservoirs import lakes_reservoirs
 #from cwatm.hydrological_modules.waterquality1 import waterquality1
 
 from cwatm.hydrological_modules.water_quality.waterquality_main import water_quality
+
 
 from cwatm.management_modules.output import *
 from cwatm.management_modules.data_handling import *
@@ -169,5 +170,4 @@ class CWATModel_ini(DynamicModel):
         self.environflow_module.initial()
         #self.waterquality1.initial()
         self.waterquality_module.initial()
-
 

@@ -12,6 +12,8 @@
 from cwatm.management_modules.data_handling import *
 from cwatm.management_modules.globals import *
 
+# define water quality sub-modules
+from cwatm.hydrological_modules.water_quality.phosphorus import waterquality_phosphorus
 
 class water_quality(object):
     """
@@ -40,21 +42,39 @@ class water_quality(object):
     def __init__(self, model):
         self.var = model.var
         self.model = model
+        
+        # define water quality sub-modules
+        self.waterquality_p = waterquality_phosphorus(self)
 	
     def initial(self):
-        print("wq init.")
-
+        
+        # soil calculation - e.g., water quality soil layers
+        # soil depths for water quality
+        # soil masses for water quality
+        
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
         # dynamic -> load inputs and ground cover adjustment
         # dynamic_soil, dynamic_...
         
+        # check if water quality is included
         self.var.includeWaterQuality =  False
-        if checkOption('includeWaterQuality'):
-            self.var.includeWaterQuality =  True
-        
-        ## load relevant modules - call and timing initial and dynamic
+        if 'includeWaterQuality' in option:
+            self.var.includeWaterQuality =  checkOption('includeWaterQuality')
+
+        if self.var.includeWaterQuality:
+            # load sub-modules
+             
+            self.var.includePhosphorus = False
+            if 'includePhosphorus' in binding:
+                self.var.includePhosphorus = returnBool('includePhosphorus')
+            
+            
+            # run initial sub-modules
+            
+            if self.var.includePhosphorus:
+                self.waterquality_p.initial()
         
             
     def dynamic(self):
