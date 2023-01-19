@@ -11,6 +11,7 @@
 from cwatm.management_modules.data_handling import *
 from cwatm.management_modules.messages import *
 
+
 import time
 
 
@@ -99,7 +100,7 @@ class CWATModel_dyn(DynamicModel):
         self.routing_kinematic_module.dynamic()
         timemeasure("Routing_Kin")  # 10. timing
 
-        self.waterquality1.dynamic()
+        self.waterquality_module.dynamic()
 
         # calculate Total water storage (tws) [m] as a sum of
         # Groundwater [m] + soil [m] + lake and reservoir storage [m3] + channel storage [m3]
