@@ -1772,3 +1772,23 @@ def divideValues(x,y, default = 0.):
     # have to solve this without err handler to get the error message back
 
     return z
+    
+def divideArrays(x,y, default = 0.):
+    """
+    returns the result of a division that possibly involves a zero
+
+    :param x:
+    :param y: divisor
+    :param default: return value if y =0
+    :return: result of :math:`x/y` or default if y = 0
+    """
+    y1 = y.copy()
+    y1[y1 == 0.] = 1.0
+    z = x / y1
+    z * np.where(y == 0., default, 1.)
+
+    #with np.errstate(invalid='ignore', divide='ignore'):
+    #    z = np.where(y > 0., x/y, default)
+    # have to solve this without err handler to get the error message back
+
+    return z

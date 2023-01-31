@@ -43,12 +43,58 @@ class waterquality_phosphorus(object):
 	
     def initial(self):
         
+        ''' 
+        All soil P compartment are numpy arrays nested in lists. 
+        The list has 4 elements correspondeing with the following landcover classes:
+            * Forest No.0   (Natural)
+            * Grasland/managed grassland| non irrigated land No.1 (Semi natural)
+            * Paddy irrigation No.2 (cropland)
+            * non-Paddy irrigation No.3 (cropland)
+        '''
+        # load initial total soil p concentration
+        self.var.soil_PConc_total = loadmap('total_Soil_PConc')
+        
         # load initial inactive soil p concentration
-        self.var.inactive_Soil_PConc = globals.inZero.copy()
-        if 'inactive_Soil_PConc_initial' in binding:
-           self.var.inactive_Soil_PConc += loadmap('inactive_Soil_PConc_initial') #[mg P/kg soil]
+        self.var.soil_PConc_inactive = globals.inZero.copy()
+        if 'inactive_Soil_PConc' in binding:
+           self.var.soil_PConc_inactive += loadmap('inactive_Soil_PConc') #[mg P/kg soil]
+        
+        # load soil absorption coefficient Kf 
+        self.var.Kf = globals.inZero.copy() + loadmap('Kf')
         
         
+        # inactive soil P [kg P / m2]
+        self.var.soil_P_inactive1 += self.var.soil_PConc_inactive * 1e-06 * self.var.soilM1
+        self.var.soil_P_inactive2 += self.var.soil_PConc_inactive * 1e-06 * self.var.soilM2
+        
+        # labile soil P [kg P / m2]
+        # natural landcover (forests) initial labile is assumed to be 0.
+        self.var.soil_P_labile1[1:4] += self.var.soil_PConc_total * 1e-06 * self.var.soilM1 - self.var.soil_P_inactive1[1:4]
+        self.var.soil_P_labile2[1:4] += self.var.soil_PConc_total * 1e-06 * self.var.soilM2 - self.var.soil_P_inactive2[1:4]
+        # calculate dissolved soil P [kg P /m2]
+        '''
+            For each landcover i and WQ soil layer j, the soil equilibrium TDP concentration of zero sorption is
+            EPC_ij = soil_P_labile_ij / (Kf * soilM_j)
+            
+            Whereas Kf is Soil P adsorption coefficient, default – 1.1*10-4
+
+            later the TDP is
+            self.var.soil_P_dissovled_ij = EPC_ij * wq_soilMoisture_ij * 1000
+            
+            Where wq_soilMoisture_ij is the mositure content of land cover i and soil layer j  in meters
+        '''
+        
+        # calculate  soil equilibrium TDP concentration of zero sorption 
+        self.var.EPC1 = divideArrays(self.var.soil_P_labile1, self.var.Kf)
+        self.var.EPC2 = divideArrays(self.var.soil_P_labile2, self.var.Kf)
+        
+        # calculate TDP [kg P /m2]
+        self.var.soil_P_dissolved1 = self.var.EPC1 * self.var.wq_soilMoisture1 * 1000
+        self.var.soil_P_dissolved2 = self.var.EPC2 * self.var.wq_soilMoisture2 * 1000
+        
+        
+        #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
+
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
