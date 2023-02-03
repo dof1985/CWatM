@@ -84,7 +84,10 @@ class CWATModel_dyn(DynamicModel):
         # *********  Soil splitted in different land cover fractions *************
         self.landcoverType_module.dynamic()
         timemeasure("Soil main")  # 5. timing
-
+        
+        if self.var.includeWaterQuality:
+            self.waterquality_module.dynamic()
+        
         if self.var.modflow:
             self.groundwater_modflow_module.dynamic()
         else:
@@ -96,11 +99,11 @@ class CWATModel_dyn(DynamicModel):
 
         self.lakes_res_small_module.dynamic()
         timemeasure("Small lakes")  # 9. timing
-
+        
         self.routing_kinematic_module.dynamic()
         timemeasure("Routing_Kin")  # 10. timing
 
-        self.waterquality_module.dynamic()
+        
 
         # calculate Total water storage (tws) [m] as a sum of
         # Groundwater [m] + soil [m] + lake and reservoir storage [m3] + channel storage [m3]
