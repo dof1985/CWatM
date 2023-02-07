@@ -70,12 +70,14 @@ class water_quality(object):
 
             # Create sub-modules variables
 
-            #  - needed to be split to general_wq and phosphorus. create phosphoruse conditionaly
+            waterqualityVars = ['wq_Transpiration1', 'wq_Transpiration2', 'wq_capRise1', 'wq_capRiseFromGW1', 'wq_capRiseFromGW2', \
+                                'wq_Percolation1to2', 'wq_Percolation2toGW', 'wq_Interflow2']
+
+            for variable in waterqualityVars: vars(self.var)[variable] = np.tile(globals.inZero, (4, 1))
+
             if self.var.includePhosphorus:
                 phosphorusVars = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_labile1', 'soil_P_labile2', \
-                                'soil_P_dissolved1', 'soil_P_dissolved2', 'EPC1', 'EPC2', 'wq_Transpiration1', \
-                                'wq_Transpiration2', 'wq_capRise1', 'wq_capRiseFromGW1', 'wq_capRiseFromGW2', \
-                                'wq_Percolation1to2', 'wq_Percolation2toGW', 'wq_Interflow2', 'runoff_P']
+                                'soil_P_dissolved1', 'soil_P_dissolved2', 'EPC1', 'EPC2', 'runoff_P']
                 phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_dissolved1', 'soil_P_dissolved2']
         
@@ -98,7 +100,7 @@ class water_quality(object):
             m_2 = (rho_1 * D_1 * (1 - self.var.wq_relSoilDepth1) + D_2 * rho_2 + D_3 * rho_3) 
     
             '''
-        
+
             self.var.gCm3TokgM3 = 1000
         
             self.var.wq_SoilDepth1 = 0.01 # [soil depth 1 for WQ in meters; default to 0.01; 10 mm)
@@ -107,10 +109,23 @@ class water_quality(object):
             # soil depth [m]
             self.var.wq_soilDepth1 = self.var.soildepth[0] * self.var.wq_relSoilDepth1
             self.var.wq_soilDepth2 = self.var.soildepth[0] * (1 - self.var.wq_relSoilDepth1) + self.var.soildepth[1] + self.var.soildepth[2]
-        
+
             # soil mass [kg/m2]
-            self.var.soilM1 = self.var.wq_soilDepth1 * loadmap('rho1') * self.var.gCm3TokgM3
-            self.var.soilM2 = (self.var.soildepth[0] * loadmap('rho1')  * (1 - self.var.wq_relSoilDepth1) + self.var.soildepth[1] * loadmap('rho2') + self.var.soildepth[2] * loadmap('rho3')) * self.var.gCm3TokgM3 
+            rho1 = globals.inZero.copy() + 1.
+            rho2 = globals.inZero.copy() + 1.
+            rho3 = globals.inZero.copy() + 1.
+
+            if 'rho1' in binding:
+                rho1 = loadmap('rho1')
+
+            if 'rho2' in binding:
+                rho2 = loadmap('rho2')
+
+            if 'rho3' in binding:
+                rho3 = loadmap('rho3')
+
+            self.var.soilM1 = self.var.wq_soilDepth1 * rho1 * self.var.gCm3TokgM3
+            self.var.soilM2 = (self.var.soildepth[0] * rho1  * (1 - self.var.wq_relSoilDepth1) + self.var.soildepth[1] * rho2 + self.var.soildepth[2] * rho3) * self.var.gCm3TokgM3
         
             # calculate soil moisture content for WQ soil layers
             self.var.wq_soilMoisture1 = self.var.w1 * self.var.wq_relSoilDepth1
@@ -132,14 +147,11 @@ class water_quality(object):
             if self.var.includeErosed:
                 self.erosed.initial()
 
+            if self.var.includePhosphorus:
+                # sum total soil P stocks [kg / m2]
+                for variable in phosphorusVarsSum:
+                    vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0) * self.var.cellArea
 
-            # sum total soil P stocks [kg / m2] 
-            for variable in phosphorusVarsSum:
-                vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0) * self.var.cellArea
-            
-            
-
-            
     def dynamic(self): 
         if dateVar['newStart'] or dateVar['newYear']:
             current_year = globals.dateVar['currDate']
@@ -148,7 +160,9 @@ class water_quality(object):
             self.var.fracManagedGrassland = readnetcdf2('fractionManagedGrassland', current_year,\
             useDaily='yearly', value='fracManagedGrassland')
             '''
-            self.var.fracManagedGrassland = loadmap('fractionManagedGrassland')
+            self.var.fracManagedGrassland = globals.inZero.copy()
+            if 'fractionManagedGrassland' in binding:
+                self.var.fracManagedGrassland = loadmap('fractionManagedGrassland')
          
         # run initial sub-modules
         # Run the Erosion and Sediment Yield (EroSed) module
