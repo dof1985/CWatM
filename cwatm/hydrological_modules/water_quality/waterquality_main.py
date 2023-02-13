@@ -69,6 +69,19 @@ class water_quality(object):
             
 
             # Create sub-modules variables
+            
+            '''
+                Water flows adapated to the water quality soil layer strcuture: transpiration, capilary rise, percolation, GW recharge,
+                and inteflow
+                
+                Transpiration - assumed to 'pump' dissolved P proportionally to its concentration - should be dropped, Net P inputs partially account for P removal by plants,
+                    and the mechanism for nutrient uptake by plant is more complicated.
+                capRise - soil capillary rise between layer 2 to layer 1 takes nutrients with it.
+                capRiseFromGW - capillary rise from GW into soil layers can bring phosphorous from groundwater to soil layers (if accounted for).
+                Percolation1to2 - simulate dissolved P moving with soil percolation.
+                Percolation2toGW - simulate dissolved P 'losses' to groundwater. At this stage it doesn't affect groundwater P concetrations.
+                Interflow2 - simulate lateral flow from soil layer 2 of the water quality (and 3 of cwatm) to the runoff.
+            '''
 
             waterqualityVars = ['wq_Transpiration1', 'wq_Transpiration2', 'wq_capRise1', 'wq_capRiseFromGW1', 'wq_capRiseFromGW2', \
                                 'wq_Percolation1to2', 'wq_Percolation2toGW', 'wq_Interflow2']
@@ -101,32 +114,41 @@ class water_quality(object):
     
             '''
 
-            self.var.gCm3TokgM3 = 1000
+            
         
             self.var.wq_SoilDepth1 = 0.01 # [soil depth 1 for WQ in meters; default to 0.01; 10 mm)
-            self.var.wq_relSoilDepth1 = divideValues(self.var.wq_SoilDepth1, self.var.soildepth[0])
+            self.var.wq_relSoilDepth1 = divideValues(self.var.wq_SoilDepth1, self.var.soildepth[0])  # need to be revised
         
             # soil depth [m]
             self.var.wq_soilDepth1 = self.var.soildepth[0] * self.var.wq_relSoilDepth1
             self.var.wq_soilDepth2 = self.var.soildepth[0] * (1 - self.var.wq_relSoilDepth1) + self.var.soildepth[1] + self.var.soildepth[2]
 
             # soil mass [kg/m2]
+            
+            '''
+            CWatM-WQ global is based on bulk density data from openLandMap (Hengl, 2018; https://zenodo.org/record/2525665#.Y-NjZi_TVD_)
+            The input includes three soil depths (0 cm, 30 cm, and 100 cm) corresponding to the CWatM three soil layers.
+            
+            Raw data available, at 250 meters spatial resolution, was aggregated to 10,000 meters and downloaded from 
+            GoogleEarth Engine (GEE). It was later resampled and rectified to the global CWatM extent and resolution (5'), 
+            and exported as a layered NetCDF.
+            '''
+            # loaded as bulkDensity g/cm3
+            self.var.gCm3TokgM3 = 1000
+            
             rho1 = globals.inZero.copy() + 1.
             rho2 = globals.inZero.copy() + 1.
             rho3 = globals.inZero.copy() + 1.
 
-            if 'rho1' in binding:
-                rho1 = loadmap('rho1')
-
-            if 'rho2' in binding:
-                rho2 = loadmap('rho2')
-
-            if 'rho3' in binding:
-                rho3 = loadmap('rho3')
-
+            if 'bulkDensity' in binding:
+                rho1 = readnetcdf2('bulkDensity', value= 'rho1')
+                rho2 = readnetcdf2('bulkDensity', value= 'rho2')
+                rho3 = readnetcdf2('bulkDensity', value= 'rho3')
+               
             self.var.soilM1 = self.var.wq_soilDepth1 * rho1 * self.var.gCm3TokgM3
             self.var.soilM2 = (self.var.soildepth[0] * rho1  * (1 - self.var.wq_relSoilDepth1) + self.var.soildepth[1] * rho2 + self.var.soildepth[2] * rho3) * self.var.gCm3TokgM3
-        
+
+
             # calculate soil moisture content for WQ soil layers
             self.var.wq_soilMoisture1 = self.var.w1 * self.var.wq_relSoilDepth1
             self.var.wq_soilMoisture2 = self.var.w1 * (1 - self.var.wq_relSoilDepth1) + self.var.w2 + self.var.w3

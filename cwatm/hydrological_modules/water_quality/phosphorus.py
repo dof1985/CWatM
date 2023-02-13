@@ -1,5 +1,4 @@
 # -------------------------------------------------------------------------
-# -------------------------------------------------------------------------
 # Name:        Water quality - phosphrous module
 # Purpose:
 #
@@ -51,8 +50,8 @@ class waterquality_phosphorus(object):
             * Paddy irrigation No.2 (cropland)
             * non-Paddy irrigation No.3 (cropland)
         '''
-        # load initial total soil p concentration
-        self.var.soil_PConc_total = loadmap('total_Soil_PConc')
+        # load initial total soil p concentration [mg P / m2] -> [kg P / m2]
+        self.var.soil_PConc_total = loadmap('total_Soil_PConc') * 1e-06
         
         # load initial inactive soil p concentration
         self.var.soil_PConc_inactive = globals.inZero.copy()
@@ -67,10 +66,14 @@ class waterquality_phosphorus(object):
         self.var.soil_P_inactive1 += self.var.soil_PConc_inactive * 1e-06 * self.var.soilM1
         self.var.soil_P_inactive2 += self.var.soil_PConc_inactive * 1e-06 * self.var.soilM2
         
+        # Used to split total_soil_P between soil layers
+        # Division between landcovers is assumed proportional to their relative area fraction
+        soil_depthRatio1 = divideValues(self.var.wq_soilDepth1, self.var.wq_soilDepth1 + self.var.wq_soilDepth2)
+
         # labile soil P [kg P / m2]
-        # natural landcover (forests) initial labile is assumed to be 0.
-        self.var.soil_P_labile1[1:4] += self.var.soil_PConc_total * 1e-06 * self.var.soilM1 - self.var.soil_P_inactive1[1:4]
-        self.var.soil_P_labile2[1:4] += self.var.soil_PConc_total * 1e-06 * self.var.soilM2 - self.var.soil_P_inactive2[1:4]
+        # Applied to land cover [1, 2, 3] - natural landcover (forests) initial labile is assumed to be 0. 
+        self.var.soil_P_labile1[1:4] += self.var.soil_PConc_total * soil_depthRatio1 - self.var.soil_P_inactive1[1:4]
+        self.var.soil_P_labile2[1:4] += self.var.soil_PConc_total * (1 - soil_depthRatio1)- self.var.soil_P_inactive2[1:4]
         # calculate dissolved soil P [kg P /m2]
         '''
             For each landcover i and WQ soil layer j, the soil equilibrium TDP concentration of zero sorption is
@@ -102,6 +105,12 @@ class waterquality_phosphorus(object):
         self.var.runoff_Padj = globals.inZero.copy() + 1.
         if 'runoff_Padj' in binding:
             self.var.runoff_Padj = loadmap('runoff_Padj')
+        
+        
+        # channel phsophorus [kg]
+        self.var.channel_P = globals.inZero.copy()
+        self.var.channel_PConc = globals.inZero.copy()
+        
         
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
@@ -213,9 +222,11 @@ class waterquality_phosphorus(object):
                 self.var.soil_P_weathering - POut1
         P_netInput2 =  PIn2 + self.var.soil_PConc_total * (1 - soil_depthRatio1) - delta_fromManure2 - POut2
         
-        # Update dissolved P mass in soils 
-        dissolvedtoRunoff1 = self.var.runoff_Padj * np.maximum(self.var.soil_P_dissolved1 + P_netInput1, 0.)
-        self.var.soil_P_dissolved1 = (1 - self.var.runoff_Padj) * np.maximum(self.var.soil_P_dissolved1 + P_netInput1, 0.)
+        # Update dissolved P mass in soils  - runoff TDP is allowed only when directRunoff > 0
+        # to be improved - self.var.runoff_Padj should be also accompanied by max runoff concentration, e.g., how much phosphrous can be removed by the surfacerunoff as a function of runoff volume
+        # now we get negative TDP in layer 1
+        dissolvedtoRunoff1 = (self.var.directRunoff[0:4] > 0) * self.var.runoff_Padj * np.maximum(self.var.soil_P_dissolved1 + P_netInput1, 0.)
+        self.var.soil_P_dissolved1 = np.maximum(self.var.soil_P_dissolved1 + P_netInput1 - dissolvedtoRunoff1, 0.)
         self.var.soil_P_dissolved2 = np.maximum(self.var.soil_P_dissolved2 + P_netInput2, 0.)
         
         # Update soil Moisture
@@ -232,7 +243,7 @@ class waterquality_phosphorus(object):
         self.var.runoff_P = np.nansum((dissolvedtoRunoff1 + self.var.wq_Interflow2 * self.var.soil_P_dissolved2) * self.var.fracVegCover[0:4], axis = 0) * \
                 self.var.cellArea
         
-        # to groundwater
+        # to groundwater [kg]
         self.var.toGroundwater_P =  np.nansum(self.var.wq_Percolation2toGW * self.var.soil_P_dissolved2 * self.var.fracVegCover[0:4], axis = 0) * \
                 self.var.cellArea
         
@@ -261,8 +272,7 @@ class waterquality_phosphorus(object):
     
         # calculate soil moisture content for WQ soil layers
         
-        print(self.var.runoff_P)
-        print(self.var.toGroundwater_P)
+
         # calculate inputs to dissloved P
         # balance labile/active using EPC
         
