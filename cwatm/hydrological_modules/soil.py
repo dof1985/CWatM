@@ -236,7 +236,7 @@ class soil(object):
             preStor3 = self.var.w3[No].copy()
             pretopwater = self.var.topwater
 
-
+        
         # -----------------------------------------------------------
         # from evaporation
         # calculate potential bare soil evaporation and transpiration
@@ -251,6 +251,13 @@ class soil(object):
 
         #if (dateVar['curr'] == 130) and (No==2):
         #    ii=1
+        
+        # for the water quality modules
+        self.var.pre_w1 = self.var.w1.copy() # divideArrays(self.var.w1, self.var.cellArea) # 
+        self.var.pre_w2 = self.var.w2.copy() # divideArrays(self.var.w2, self.var.cellArea) # 
+        self.var.pre_w3 = self.var.w3.copy() # divideArrays(self.var.w3, self.var.cellArea) #
+
+
 
         availWaterInfiltration = self.var.availWaterInfiltration[No].copy()
         availWaterInfiltration = availWaterInfiltration + self.var.act_irrConsumption[No]
@@ -296,8 +303,6 @@ class soil(object):
             self.var.w2[No] = self.var.w2[No] + np.where(self.var.w3[No] > self.var.ws3[No], self.var.w3[No] - self.var.ws3[No], 0)
             self.var.w3[No] = np.minimum(self.var.ws3[No], self.var.w3[No])
             
-            # capilar rise for water quality - layer wq1
-            self.var.wq_capRiseFromGW1[No] = np.where(self.var.w2[No] > self.var.ws2[No], self.var.w2[No] - self.var.ws2[No], 0)
             # CAPRISE from GW to soilayer 2 , if this is full it is send to soil layer 1
             self.var.w1[No] = self.var.w1[No] + np.where(self.var.w2[No] > self.var.ws2[No], self.var.w2[No] - self.var.ws2[No], 0)
             self.var.w2[No] = np.minimum(self.var.ws2[No], self.var.w2[No])
@@ -305,10 +310,6 @@ class soil(object):
             saverunofffromGW = + np.where(self.var.w1[No] > self.var.ws1[No], self.var.w1[No] - self.var.ws1[No], 0)
             self.var.w1[No]= np.minimum(self.var.ws1[No], self.var.w1[No])
             
-            # capilar rise for water quality - layer wq2
-            self.var.wq_capRiseFromGW1[No] -= saverunofffromGW
-            self.var.wq_capRiseFromGW2[No] = (1 - self.var.wq_relSoilDepth1) * self.var.wq_capRiseFromGW1[No] + (self.var.capillar - self.var.wq_capRiseFromGW1[No])
-            self.var.wq_capRiseFromGW1[No] = self.var.wq_relSoilDepth1 * self.var.wq_capRiseFromGW1[No]
             # Now, we need to add transfer between soil layers # MODIF LUCA TO IMPROVE MODFLOW COUPLING
 
             # Percolation -----------------------------------------------
@@ -344,7 +345,6 @@ class soil(object):
             capRise1 = np.minimum(np.maximum(0., (1 - satTermFC1) * kUnSat2), self.var.kunSatFC12[No])
             capRise2 = np.minimum(np.maximum(0., (1 - satTermFC2) * kUnSat3), self.var.kunSatFC23[No])
             
-            self.var.wq_capRise1[No] = capRise1 * self.var.wq_relSoilDepth1
             self.var.w1[No] = self.var.w1[No] + capRise1
             self.var.w2[No] = self.var.w2[No] - capRise1 + capRise2
             self.var.w3[No] = self.var.w3[No] - capRise2  # GW capillary rise has already been added to the soil
@@ -417,9 +417,6 @@ class soil(object):
         self.var.w2[No] = self.var.w2[No] - ta2
         self.var.w3[No] = self.var.w3[No] - ta3
 
-        # FOR WATER QUALITY CALCULATION - Transpiration from water quality soil layers 1 & 2
-        self.var.wq_Transpiration1[No] = self.var.wq_relSoilDepth1 * ta1
-        self.var.wq_Transpiration2[No] = (1 - self.var.wq_relSoilDepth1) * ta1 + ta2 + ta3
         # -------------------------------------------------------------
         # Actual potential bare soil evaporation - upper layer
         self.var.actBareSoilEvap[No] = np.minimum(self.var.potBareSoilEvap,np.maximum(0.,self.var.w1[No] - self.var.wres1[No]))
@@ -553,12 +550,10 @@ class soil(object):
             self.var.capRiseFromGW[No] = np.maximum(0., (1 - satTermFC3) * np.sqrt(self.var.KSat3[NoSoil] * kUnSat3))
             self.var.capRiseFromGW[No] = 0.5 * self.var.capRiseFrac * self.var.capRiseFromGW[No]
             self.var.capRiseFromGW[No] = np.minimum(np.maximum(0., self.var.storGroundwater), self.var.capRiseFromGW[No])
-            self.var.wq_capRiseFromGW2[No] = self.var.capRiseFromGW[No].copy()
             
         self.var.w1[No] = self.var.w1[No] + capRise1
         self.var.w2[No] = self.var.w2[No] - capRise1 + capRise2
         
-        self.var.wq_capRise1[No] += capRise1 * self.var.wq_relSoilDepth1
         if self.var.modflow:
             self.var.w3[No] = self.var.w3[No] - capRise2
             # GW capillary rise has already been added to the soil
@@ -675,9 +670,6 @@ class soil(object):
         self.var.perc1to2[No] = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0,self.var.perc1to2[No])
         self.var.perc2to3[No] = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0,self.var.perc2to3[No])
         
-        self.var.wq_Percolation1to2[No] = self.var.perc1to2[No] * self.var.wq_relSoilDepth1
-        self.var.wq_Percolation2toGW[No] = self.var.perc3toGW[No]
-        
         # Update soil moisture
         self.var.w1[No] = self.var.w1[No] - self.var.perc1to2[No]
         self.var.w2[No] = self.var.w2[No] + self.var.perc1to2[No] - self.var.perc2to3[No]
@@ -760,9 +752,7 @@ class soil(object):
         toGWorInterflow = self.var.perc3toGW[No] + self.var.prefFlow[No]
         self.var.interflow[No] = self.var.percolationImp * toGWorInterflow
         
-        # calculate interflow for water quality
-        self.var.wq_Interflow2[No] = self.var.interflow[No] * divideValues(self.var.perc3toGW[No], toGWorInterflow)
-        
+        # calculate interflow for water quality        
         if self.var.modflow:
             self.var.gwRecharge[No] = (1 - self.var.percolationImp) * toGWorInterflow
         else:
