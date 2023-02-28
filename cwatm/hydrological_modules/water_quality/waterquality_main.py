@@ -63,10 +63,6 @@ class water_quality(object):
             waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'norm_w1', 'norm_w2', 'norm_w3']
             for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))            
             
-            # to delete
-            self.var.norm_w1 = divideArrays(self.var.w1, self.var.cellArea) 
-            self.var.norm_w2 = divideArrays(self.var.w2, self.var.cellArea) 
-            self.var.norm_w3 = divideArrays(self.var.w3, self.var.cellArea) 
             # load sub-modules
             self.var.includePhosphorus = False
             if 'includePhosphorus' in binding:
@@ -188,9 +184,9 @@ class water_quality(object):
                 vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
             
             # TDP soil concentration [mg / liter]
-            self.var.sum_soil_P_dissolvedConc1 = divideValues(self.var.sum_soil_P_dissolved1, self.var.sum_w1) * 10**3
-            self.var.sum_soil_P_dissolvedConc2 = divideValues(self.var.sum_soil_P_dissolved2, self.var.sum_w2) * 10**3
-            self.var.sum_soil_P_dissolvedConc3 = divideValues(self.var.sum_soil_P_dissolved3, self.var.sum_w3) * 10**3
+            self.var.sum_soil_P_dissolvedConc1 = divideValues(self.var.sum_soil_P_dissolved1, self.var.sum_w1 * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc2 = divideValues(self.var.sum_soil_P_dissolved2, self.var.sum_w2 * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc3 = divideValues(self.var.sum_soil_P_dissolved3, self.var.sum_w3 * self.var.cellArea) * 10**3
             
             # PP soil concentration [mg / kg soil] - miligram
             self.var.sum_soil_P_labileConc1 = divideValues(self.var.sum_soil_P_labile1, self.var.soilM1) * 10**6
