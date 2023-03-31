@@ -84,16 +84,16 @@ class CWATModel_dyn(DynamicModel):
         # *********  Soil splitted in different land cover fractions *************
         self.landcoverType_module.dynamic()
         timemeasure("Soil main")  # 5. timing
-        
-        if self.var.includeWaterQuality:
-            self.waterquality_module.dynamic()
-        
+         
         if self.var.modflow:
             self.groundwater_modflow_module.dynamic()
         else:
             self.groundwater_module.dynamic()
         timemeasure("Groundwater")  # 7. timing
-
+        
+        if self.var.includeWaterQuality:
+            self.waterquality_module.dynamic()
+            
         self.runoff_concentration_module.dynamic()
         timemeasure("Runoff conc.")  # 8. timing
 
