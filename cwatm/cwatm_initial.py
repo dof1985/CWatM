@@ -156,13 +156,15 @@ class CWATModel_ini(DynamicModel):
         self.runoff_concentration_module.initial()
         self.lakes_res_small_module.initial()
         
-        self.waterquality_module.initial()
+
         
         self.routing_kinematic_module.initial()
         if checkOption('includeWaterBodies'):
             self.lakes_reservoirs_module.initWaterbodies()
             self.lakes_reservoirs_module.initial_lakes()
             self.lakes_reservoirs_module.initial_reservoirs()
+
+        self.waterquality_module.initial()
 
         self.waterdemand_module.initial()
         self.waterbalance_module.initial()
