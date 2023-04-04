@@ -123,7 +123,24 @@ class initcondition(object):
 
 		Reads the parameter *save_initial* and *save_initial* to know if to save or load initial values
         """
+        ### Check Options - all modules ###
+        
+        # Water Quality ####
+        self.var.includeWaterQuality =  False
+        if 'includeWaterQuality' in option:
+            self.var.includeWaterQuality =  checkOption('includeWaterQuality')
+        
+        if self.var.includeWaterQuality:
+            # Phosphorus, EroSed
+            self.var.includePhosphorus = False
+            self.var.includeErosed = False
+            
+            if 'includePhosphorus' in binding:
+                self.var.includePhosphorus = returnBool('includePhosphorus')
 
+            if 'includeErosed' in binding:
+                self.var.includeErosed = returnBool('includeErosed')
+                
         # list all initiatial variables
         # Snow & Frost
         number = int(loadmap('NumberSnowLayers'))

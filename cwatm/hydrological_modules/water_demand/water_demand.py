@@ -977,6 +977,8 @@ class water_demand:
 
                 minlake = np.maximum(0., 0.98 * lakeResStorageC)  # reasonable but arbitrary limit
                 act_bigLakeAbstC = np.minimum(minlake, remainNeedBigC)
+                if self.var.includeWaterQuality:
+                    self.var.act_bigLakeAbstC = act_bigLakeAbstC.copy() * self.var.MtoM3C
                 # substract from both, because it is sorted by self.var.waterBodyTypCTemp
                 self.var.lakeStorageC = self.var.lakeStorageC - act_bigLakeAbstC * self.var.MtoM3C
                 self.var.lakeVolumeM3C = self.var.lakeVolumeM3C - act_bigLakeAbstC * self.var.MtoM3C

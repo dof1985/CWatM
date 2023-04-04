@@ -103,6 +103,7 @@ class waterquality_vars(object):
         #TravelTime = downstreamdist(Ldd) * (ChanLength/PixelLength) / FlowVelocity
         self.var.travelTime = self.var.chanLength / flowVelocity
         self.var.travelTime = np.where(self.var.travelTime > 200000, 200000, self.var.travelTime)
+
               # Traveltime through gridcell (sec)
               # further calculation with pc raster: l2.map = ldddist(ldd.map,p1.map,ttime1.map/cell.map)/86400
               # / cell.map (here 0.8333 deg is necessary because it is multiplied again in the ldddist command

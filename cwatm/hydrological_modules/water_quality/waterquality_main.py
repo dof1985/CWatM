@@ -50,33 +50,13 @@ class water_quality(object):
         self.erosed = waterquality_erosed(model)
 	
     def initial(self):
-        
-        
-        # check settings file, if water quality should be included
-        self.var.includeWaterQuality =  False
-        if 'includeWaterQuality' in option:
-            self.var.includeWaterQuality =  checkOption('includeWaterQuality')
 
         if self.var.includeWaterQuality:
             
             # create water quality variables
-            waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'norm_w1', 'norm_w2', 'norm_w3']
+            waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'naturalLandFrac']
             for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))            
             
-            # to delete
-            self.var.norm_w1 = divideArrays(self.var.w1, self.var.cellArea) 
-            self.var.norm_w2 = divideArrays(self.var.w2, self.var.cellArea) 
-            self.var.norm_w3 = divideArrays(self.var.w3, self.var.cellArea) 
-            # load sub-modules
-            self.var.includePhosphorus = False
-            if 'includePhosphorus' in binding:
-                self.var.includePhosphorus = returnBool('includePhosphorus')
-
-            self.var.includeErosed = False
-            if 'includeErosed' in binding:
-                self.var.includeErosed = returnBool('includeErosed')
-            
-
             # Create sub-modules variables
             
             '''
@@ -96,9 +76,18 @@ class water_quality(object):
                 phosphorusVars = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3',\
                                   'soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3',\
                                   'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3',\
-                                  'EPC1', 'EPC2', 'EPC3', 'runoff_P', 'toGroundwater_P']
+                                  'EPC1', 'EPC2', 'EPC3', 'runoff_P', 'toGroundwater_P',\
+                                  'soil_P_input1', 'soil_P_input2']
+                                  
                 phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
-                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3']
+                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
+                                'soil_P_input1', 'soil_P_input2']
+                                
+                phosphorusVarsSumCat = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
+                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
+                                'w1', 'w2', 'w3', 'soilM1_f', 'soilM2_f', 'soilM3_f']    
+            
+            
         
                 # only applied to landcovers with soil underneath (grassland and managed grasslands are treated has one landcover
                 for variable in phosphorusVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))
@@ -155,15 +144,36 @@ class water_quality(object):
             self.var.soilM1 = self.var.soildepth[0] * rho1 * self.var.gCm3TokgM3 * self.var.cellArea
             self.var.soilM2 = self.var.soildepth[1] * rho2 * self.var.gCm3TokgM3 * self.var.cellArea
             self.var.soilM3 = self.var.soildepth[2] * rho3 * self.var.gCm3TokgM3 * self.var.cellArea
-
+            
+            self.var.soilM1_f = np.tile(self.var.soilM1, (4, 1))
+            self.var.soilM2_f = np.tile(self.var.soilM2, (4, 1))
+            self.var.soilM3_f = np.tile(self.var.soilM3, (4, 1))
      
             # Load managed grassland fraction ###
         
             self.var.managedGrassland = globals.inZero.copy()
             if 'fracManagedGrassland' in binding:
                 self.var.managedGrassland = loadmap('fracManagedGrassland')
-
-
+            
+            # multidimensional array of ones with  managed grasslands as feractions and forest land as 0.
+            self.var.naturalLandFrac[1] += 1.#self.var.managedGrassland 
+            self.var.naturalLandFrac[2:4] += 1.
+            self.var.naturalLandFrac[0] += 1.
+            # create lakesRes sub-compartments
+            if checkOption('includeWaterBodies'):
+                self.var.ResLake_PConc_LRC = np.compress(self.var.compress_LR, globals.inZero.copy())
+                # create sub-compartments with dimensions number of lakes X number of routing sub-steps
+                self.var.resLakeSubcompartments_P = np.tile(1., (self.var.waterBodyOutC.shape[0], self.var.noRoutingSteps))
+                
+                self.var.resLakeSubcompartments_wtr = np.tile(1., (self.var.waterBodyOutC.shape[0], self.var.noRoutingSteps))
+                
+                # Initial sub-compartments storage = initial resLakeStorage * initial resLakePConcentration divided by number of routing sub-steps  [kg]
+                self.var.resLakeSubcompartments_P = self.var.resLakeSubcompartments_P * np.transpose(np.tile(self.var.lakeResStorageC * self.var.ResLake_PConc_LRC / self.var.noRoutingSteps, (self.var.noRoutingSteps, 1)))
+                
+                # Initital sub-compartments storage water [m3]
+                #self.var.resLakeSubcompartments_wtr = self.var.resLakeSubcompartments_wtr * np.transpose(np.tile(self.var.lakeResStorageC / self.var.noRoutingSteps, (self.var.noRoutingSteps, 1)))
+                
+                
             # Run initial sub-modules
             if self.var.includePhosphorus:
                 self.waterquality_p.initial()
@@ -180,6 +190,10 @@ class water_quality(object):
                 # sum total soil P stocks [kg / m2]
                 for variable in phosphorusVarsSum:
                     vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
+                
+                for variable in phosphorusVarsSumCat:
+                    vars(self.var)["sum_" + variable + "_natural"] = vars(self.var)[variable][0] * self.var.fracVegCover[0] + vars(self.var)[variable][1] * (1 - self.var.managedGrassland) * self.var.fracVegCover[1]
+                    vars(self.var)["sum_" + variable + "_managed"] = vars(self.var)[variable][1] * self.var.managedGrassland * self.var.fracVegCover[1] + np.nansum(vars(self.var)[variable][2:4] * self.var.fracVegCover[2:4], axis = 0)
 
     def dynamic(self): 
         if dateVar['newStart'] or dateVar['newYear']:
@@ -192,8 +206,19 @@ class water_quality(object):
             self.var.fracManagedGrassland = globals.inZero.copy()
             if 'fractionManagedGrassland' in binding:
                 self.var.fracManagedGrassland = loadmap('fractionManagedGrassland')
+
          
         # Erosion and Sediment Yield (EroSed) dynamic part
+
+        
+        
+        # Calculate gross GW recharge from 3rd soil layer for water quality
+        self.var.grossGWrechargeFromSoil =  (self.var.gwRecharge + self.var.capRiseFromGW) * divideArrays(self.var.perc3toGW, self.var.perc3toGW + self.var.prefFlow)
+        self.var.grossGWrechargeFromPrefFlow = (self.var.gwRecharge + self.var.capRiseFromGW) * divideArrays(self.var.prefFlow, self.var.perc3toGW + self.var.prefFlow)
+        
+        # run initial sub-modules
+        # Run the Erosion and Sediment Yield (EroSed) module
+
         if self.var.includeErosed:
 
             # erosedVarsSum = ['runoff_energy_term']
@@ -214,20 +239,60 @@ class water_quality(object):
             
             # sum total soil P stocks [kg / m2] 
             phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
-                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3']
+                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
+                                'soil_P_input1', 'soil_P_input2']
                                 
             for variable in phosphorusVarsSum:
                 vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
             
+            
+            phosphorusVarsSumCat = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
+                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
+                                'w1', 'w2', 'w3', 'soilM1_f', 'soilM2_f', 'soilM3_f']
+            
+            for variable in phosphorusVarsSumCat:
+                vars(self.var)["sum_" + variable + "_natural"] = vars(self.var)[variable][0] * self.var.fracVegCover[0] + vars(self.var)[variable][1] * (1 - self.var.managedGrassland) * self.var.fracVegCover[1]
+                vars(self.var)["sum_" + variable + "_managed"] = vars(self.var)[variable][1] * self.var.managedGrassland * self.var.fracVegCover[1] + np.nansum(vars(self.var)[variable][2:4] * self.var.fracVegCover[2:4], axis = 0)
+
+            
+            # EPC [liter /mg]
+            self.var.sum_EPC1 = self.var.sum_EPC1 / 10**3
+            self.var.sum_EPC2 = self.var.sum_EPC2 / 10**3
+            self.var.sum_EPC3 = self.var.sum_EPC3 / 10**3
+            
             # TDP soil concentration [mg / liter]
-            self.var.sum_soil_P_dissolvedConc1 = divideValues(self.var.sum_soil_P_dissolved1, self.var.sum_w1) * 10**3
-            self.var.sum_soil_P_dissolvedConc2 = divideValues(self.var.sum_soil_P_dissolved2, self.var.sum_w2) * 10**3
-            self.var.sum_soil_P_dissolvedConc3 = divideValues(self.var.sum_soil_P_dissolved3, self.var.sum_w3) * 10**3
+            self.var.sum_soil_P_dissolvedConc1 = divideValues(self.var.sum_soil_P_dissolved1, self.var.sum_w1 * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc2 = divideValues(self.var.sum_soil_P_dissolved2, self.var.sum_w2 * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc3 = divideValues(self.var.sum_soil_P_dissolved3, self.var.sum_w3 * self.var.cellArea) * 10**3
+            
+            # natural landcovers
+            self.var.sum_soil_P_dissolvedConc1_natural =  divideValues(self.var.sum_soil_P_dissolved1_natural, self.var.sum_w1_natural * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc2_natural =  divideValues(self.var.sum_soil_P_dissolved2_natural, self.var.sum_w2_natural * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc3_natural =  divideValues(self.var.sum_soil_P_dissolved3_natural, self.var.sum_w3_natural * self.var.cellArea) * 10**3
+            
+            # managed landcovers
+            self.var.sum_soil_P_dissolvedConc1_managed =  divideValues(self.var.sum_soil_P_dissolved1_managed, self.var.sum_w1_managed * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc2_managed =  divideValues(self.var.sum_soil_P_dissolved2_managed, self.var.sum_w2_managed * self.var.cellArea) * 10**3
+            self.var.sum_soil_P_dissolvedConc3_managed =  divideValues(self.var.sum_soil_P_dissolved3_managed, self.var.sum_w3_managed * self.var.cellArea) * 10**3
             
             # PP soil concentration [mg / kg soil] - miligram
             self.var.sum_soil_P_labileConc1 = divideValues(self.var.sum_soil_P_labile1, self.var.soilM1) * 10**6
             self.var.sum_soil_P_labileConc2 = divideValues(self.var.sum_soil_P_labile2, self.var.soilM2) * 10**6
             self.var.sum_soil_P_labileConc3 = divideValues(self.var.sum_soil_P_labile3, self.var.soilM3) * 10**6
-
             
+            # natural landcovers
+            self.var.sum_soil_P_labileConc1_natural =  divideValues(self.var.sum_soil_P_labile1_natural, self.var.sum_soilM1_f_natural) * 10**6
+            self.var.sum_soil_P_labileConc2_natural =  divideValues(self.var.sum_soil_P_labile2_natural, self.var.sum_soilM2_f_natural) * 10**6
+            self.var.sum_soil_P_labileConc3_natural =  divideValues(self.var.sum_soil_P_labile3_natural, self.var.sum_soilM3_f_natural) * 10**6
+            
+            # natural landcovers
+            self.var.sum_soil_P_labileConc1_managed =  divideValues(self.var.sum_soil_P_labile1_managed, self.var.sum_soilM1_f_managed) * 10**6
+            self.var.sum_soil_P_labileConc2_managed =  divideValues(self.var.sum_soil_P_labile2_managed, self.var.sum_soilM2_f_managed) * 10**6
+            self.var.sum_soil_P_labileConc3_managed =  divideValues(self.var.sum_soil_P_labile3_managed, self.var.sum_soilM3_f_managed) * 10**6
+            
+            # sum soil P  [kg]
+            self.var.tot_soil_P_dissolved = self.var.sum_soil_P_dissolved1 + self.var.sum_soil_P_dissolved2 + self.var.sum_soil_P_dissolved3
+            self.var.tot_soil_P_labile = self.var.sum_soil_P_labile1 + self.var.sum_soil_P_labile2 + self.var.sum_soil_P_labile3
 
+            # sum soil P input [kg]
+            self.var.tot_soil_P_input = self.var.sum_soil_P_input1 + self.var.sum_soil_P_input2
