@@ -91,9 +91,29 @@ class water_quality(object):
         
                 # only applied to landcovers with soil underneath (grassland and managed grasslands are treated has one landcover
                 for variable in phosphorusVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))
+
             
             
             # Define depth of top soil from which nutrients leaks to runoff: 10 mm###
+
+
+            # Soil layers in the water quality module ###
+            '''
+            CWatM has three soil layers, and the water quality modules uses only two layers. 
+            Soil depth of the water quality layers are: 
+            d_1 = D_1 * self.var.wq_relSoilDepth1 (where as D is CWatM layer, and d is for the water quality)
+            d_2 = D_1 * (1  -  self.var.wq_relSoilDepth1) + D_2 + D_3
+            
+            The mass of the soil layers is calculated as [kg / m2]
+            m_1 = d_1 * rho_1  (where rho_1 is bulk density in kg/m3)
+            m_2 = d_2 * rho_2' 
+            
+            rho_2' = (rho_1 * D_1 * (1 - self.var.wq_relSoilDepth1) + D_2 * rho_2 + D_3 * rho_3) / d_2
+            m_2 = (rho_1 * D_1 * (1 - self.var.wq_relSoilDepth1) + D_2 * rho_2 + D_3 * rho_3) 
+    
+            '''
+
+
             
             wq_SoilDepth1 = 0.01 
             self.var.wq_SoilDepthRunoff = divideValues(wq_SoilDepth1, self.var.soildepth[0]) 
@@ -155,11 +175,15 @@ class water_quality(object):
                 
                 
             # Run initial sub-modules
-            
             if self.var.includePhosphorus:
                 self.waterquality_p.initial()
-            
+
             if self.var.includeErosed:
+
+                #erosedVars = ['runoffEnergyMusle']
+                #
+                #for variable in erosedVars: vars(self.var)[variable] = np.title(globals.inZero, (4, 1))
+
                 self.erosed.initial()
 
             if self.var.includePhosphorus:
@@ -182,6 +206,10 @@ class water_quality(object):
             self.var.fracManagedGrassland = globals.inZero.copy()
             if 'fractionManagedGrassland' in binding:
                 self.var.fracManagedGrassland = loadmap('fractionManagedGrassland')
+
+         
+        # Erosion and Sediment Yield (EroSed) dynamic part
+
         
         
         # Calculate gross GW recharge from 3rd soil layer for water quality
@@ -190,8 +218,18 @@ class water_quality(object):
         
         # run initial sub-modules
         # Run the Erosion and Sediment Yield (EroSed) module
+
         if self.var.includeErosed:
+
+            # erosedVarsSum = ['runoff_energy_term']
+            #
+            # for variable in erosedVarsSum:
+            #     vars(self.var)[variable] = np.title(globals.inZero, (4, 1))
+
             self.erosed.dynamic()
+
+            # for variable in erosedVarsSum:
+            #     vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0) * self.var.cellArea
         
         # Run the  module        
         if self.var.includePhosphorus:

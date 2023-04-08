@@ -76,7 +76,7 @@ class waterquality_vars(object):
         Dynamic part of the waterquality1 module
         Read meteo input maps from netcdf files
         """
-
+        print('something')
 
         #crossArea = 0.34 * (self.var.discharge ** 0.341) * 1.22 * (self.var.discharge ** 0.557)
         dis = np.where (self.var.discharge < 0.0001, 0.0001, self.var.discharge)

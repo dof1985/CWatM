@@ -156,7 +156,10 @@ class CWATModel_ini(DynamicModel):
         self.runoff_concentration_module.initial()
         self.lakes_res_small_module.initial()
         
+
+
         
+
         
         self.routing_kinematic_module.initial()
         if checkOption('includeWaterBodies'):
@@ -166,6 +169,7 @@ class CWATModel_ini(DynamicModel):
         
         self.waterquality_module.initial()
         
+
         self.waterdemand_module.initial()
         self.waterbalance_module.initial()
         # calculate initial amount of water in the catchment
