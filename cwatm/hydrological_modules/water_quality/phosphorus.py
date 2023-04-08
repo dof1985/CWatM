@@ -133,6 +133,11 @@ class waterquality_phosphorus(object):
         self.var.resLake_PConc = globals.inZero.copy()
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
+        # abstraction [kg]
+        self.var.channel_P_Abstracted = globals.inZero.copy()
+        self.var.resLake_P_Abstracted = globals.inZero.copy()
+        self.var.groundwater_P_Abstracted = globals.inZero.copy()
+        
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
@@ -180,6 +185,22 @@ class waterquality_phosphorus(object):
         relMoisture2 = divideArrays(self.var.pre_w2, self.var.soildepth[1]) 
         relMoisture3 = divideArrays(self.var.pre_w3, self.var.soildepth[2]) 
         interflowDivider = divideArrays(relMoisture2, relMoisture2 + relMoisture3) #* 0
+        
+        # Water demand ###
+        
+        # channel
+        self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_PConc, self.var.channel_P), 0.)
+        
+        # lake/reservoir
+        resLake_P_compress = np.compress(self.var.compress_LR, self.var.resLake_P)
+        resLake_P_Abstracted_small = np.minimum(divideValues(resLake_P_compress, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC), resLake_P_compress)               
+        self.var.resLake_P_Abstracted = globals.inZero.copy()
+        np.put(self.var.resLake_P_Abstracted, self.var.decompress_LR, resLake_P_Abstracted_small)
+                            
+        # groundwater
+        self.var.groundwater_P_Abstracted = self.var.nonFossilGroundwaterAbs * self.var.cellArea * self.var.GW_P_Conc 
+        
+        
         
         # Calculate Plab Net Input - Currently only apply on managed grasslands and on irrigated agriculture
         
