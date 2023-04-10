@@ -98,7 +98,9 @@ class waterquality_erosed(object):
         #if self.var.a
         #self.var.runoffEnergyFactor = self.var.sum_directRunoff * 2
         '''
+
         self.waterquality_vars.dynamic()
+        
         # have tov in initial, check for land use change and only calculate in dynamic if change occurs
         tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
                            18 * np.power(self.var.tanslope, 0.3))
