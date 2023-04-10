@@ -55,7 +55,7 @@ class waterquality_erosed(object):
         self.var.fcfr = 1
 
         # K_usle: USLE soil erodibility factor
-        self.var.kFactor = self.var.Kf = loadmap('kFactor')
+        self.var.kFactor = loadmap('kFactor')
 
         # C_usle: USLE cover and management factor
         self.var.cFactor = loadmap('cFactor')
@@ -119,7 +119,6 @@ class waterquality_erosed(object):
         #if self.var.a
         #self.var.runoffEnergyFactor = self.var.sum_directRunoff * 2
         '''
-        self.waterquality_vars.dynamic()
         tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
                            18 * np.power(self.var.tanslope, 0.3))
         tch = self.var.travelTime / (60 * 60)  # converted from seconds to hours
