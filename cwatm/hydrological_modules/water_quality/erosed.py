@@ -8,6 +8,7 @@
 # Created:     20/01/2022
 # Copyright:   (c) TT, FS, PB, MS, DF 2022
 # -------------------------------------------------------------------------
+import numpy as np
 
 from cwatm.management_modules.data_handling import *
 from cwatm.management_modules.globals import *
@@ -49,13 +50,12 @@ class waterquality_erosed(object):
         Sediment yield per grid cell is calculated with the Modified Universal Soil Loss Equation (MUSLE)
         Williams (1995)
         """
-        self.waterquality_vars.initial()
         # load initial MUSLE maps
         # exponential function for fraction of rock (exp-0.053 * fcr)
         self.var.fcfr = 1
 
         # K_usle: USLE soil erodibility factor
-        self.var.kFactor = self.var.Kf = loadmap('kFactor')
+        self.var.kFactor = loadmap('kFactor')
 
         # C_usle: USLE cover and management factor
         self.var.cFactor = loadmap('cFactor')
@@ -64,6 +64,7 @@ class waterquality_erosed(object):
         self.var.lsFactor = loadmap('lsFactor')
 
         # manning overland rougness: values for landcoverclasses from settingsfile
+        # do not forget to add reference for chosen values
         overlandManningVars = ['manForest', 'manGrassland', 'manirrPaddy', 'manirrNonPaddy']
         self.var.manOverland = np.tile(globals.inZero, (4, 1))
         i = 0
@@ -76,33 +77,11 @@ class waterquality_erosed(object):
         tanslope = loadmap('tanslope')
 
         # setting slope >= 0.00001 to prevent 0 value
+        # underlying datasets for tanslope and slopelength are derived from different DEMS, to keep in mind
         self.var.tanslope = np.maximum(tanslope, 0.00001)
 
-        # tov: time of overland ocncentration
-        tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6), 18 * np.power(self.var.tanslope, 0.3))
-
-        # channel flow time of concentration
+        # channel flow time of concentration: unrealistic values. substituted wth. self.var.travelTime
         #tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))
-
-        #print('tch', np.nanmean(tch)
-        # tconc: time of concentration for the grid
-            # provides very high values:  axis = 0: [1930.83034355  363.97959098 1952.27786728 ... 1685.05161614 3080.56903285
-                                         #  2302.08594123]
-                                        # axis = 1: [3875.37793006 3875.34839299 3875.3501527  3875.3501527 ]
-
-        #print('tov:', np.nanmean(tov, axis=1))
-        #print('tch_min:', np.nanmin(tch), 'tch_max:', np.nanmax(tch), 'tch_mean', np.nanmean(tch))
-        #print('tconc:', np.nanmean(self.var.tconc, axis=1))
-        print('chanman min:', np.nanmin(self.var.chanMan), 'max:', np.nanmax(self.var.chanMan), 'mean:', np.nanmean(self.var.chanMan))
-        manningsFactor = loadmap('manningsN')
-        print('manningsFactor channel calibrated', manningsFactor)
-        channelmanning= loadmap('chanMan')
-        print('chanman uncalibrated .nc input min,max,mean', np.nanmin(channelmanning), np.nanmax(channelmanning),np.nanmean(channelmanning))
-        print('channel gradient min:', np.nanmin(self.var.chanGrad), 'max:', np.nanmax(self.var.chanGrad), 'mean:',
-              np.nanmean(self.var.chanGrad))
-        print('channel lenght min:', np.nanmin(self.var.chanLength), 'max:', np.nanmax(self.var.chanLength), 'mean:',
-              np.nanmean(self.var.chanLength))
-
 
     def dynamic(self):
         """
@@ -120,9 +99,10 @@ class waterquality_erosed(object):
         #self.var.runoffEnergyFactor = self.var.sum_directRunoff * 2
         '''
         self.waterquality_vars.dynamic()
+        # have tov in initial, check for land use change and only calculate in dynamic if change occurs
         tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
                            18 * np.power(self.var.tanslope, 0.3))
-        tch = self.var.travelTime / (60 * 60)  # converted from seconds to hours
+        tch = self.var.travelTime / (60. * 60.)  # converted from seconds to hours
         self.var.tconc = tov + tch  # [hours]
         # a05 load dummy value: fraction of daily rain falling in the half-hour highest intensity
         # if time series read netcdf2
@@ -135,12 +115,17 @@ class waterquality_erosed(object):
         self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff[0:4] * 1000 * self.var.cellArea, 3.6 * self.var.tconc) #[m3s-1]
 
         # MUSLE: sediment yield per day and grid in [1000 kg]
-        self.var.sedYieldLand = 11.8 * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, 0.56) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr
+        # read parameters from settingsfile
+        self.var.sedYieldLand = np.nansum(loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr,axis=0)
         #print(np.nanmean(self.var.sedYieldLand, axis=1))
         #print(np.nanmean(self.var.qpeak, axis=1))
         #print(self.var.discharge)
         #print(self.var.runoffEnergyFactor)
         #print("erosed dyn")
         #print(np.nanmean(self.var.travelTime)/3600)
-        print('tch_min:', np.nanmin(tch), 'tch_max:', np.nanmax(tch), 'tch_mean', np.nanmean(tch))
-        # print('tconc:', np.nanmean(self.var.tconc, axis=1))
+        #print('tconc_min:', np.nanmin(self.var.tconc), 'tconc_max:', np.nanmax(self.var.tconc), 'tconc_mean', np.nanmean(self.var.tconc))
+        #print('tch_min:', np.nanmin(tch), 'tch_max:', np.nanmax(tch), 'tch_mean', np.nanmean(tch))
+        print('sedYield min,max,mean:', np.nanmin(self.var.sedYieldLand), np.nanmax(self.var.sedYieldLand), np.nanmean(self.var.sedYieldLand))
+        #print('tconc:', np.nanmean(self.var.tconc, axis=1))
+        #print('tch_traveltime min,max,mean:', np.nanmin(self.var.travelTime), np.nanmax(self.var.travelTime), np.nanmean(self.var.travelTime))
+        #print('tch_traveltime min,max,mean:', np.nanmin(self.var.tch_man), np.nanmax(self.var.tch_man), np.nanmean(self.var.tch_man))

@@ -553,17 +553,18 @@ class routing_kinematic(object):
                     
                     if checkOption('includeWaterDemand'):
                         if checkOption('includeWaterBodies'):
-                            resLake_P_tmp = np.nansum(self.var.resLakeSubcompartments_P, axis = 1)
-                            resLake_P_Abstracted_small = np.minimum(divideValues(resLake_P_tmp, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC / self.var.noRoutingSteps), resLake_P_tmp)
-                            
-                            resLake_P_Abstracted = globals.inZero.copy()
-                            np.put(resLake_P_Abstracted, self.var.decompress_LR, resLake_P_Abstracted_small)
-                            
-                            resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
-                            self.var.resLakeSubcompartments_P -= np.transpose(np.tile(resLake_P_Abstracted_small, (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+                            if self.var.includePhosphorus:
+                                resLake_P_tmp = np.nansum(self.var.resLakeSubcompartments_P, axis = 1)
+                                resLake_P_Abstracted_small = np.minimum(divideValues(resLake_P_tmp, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC / self.var.noRoutingSteps), resLake_P_tmp)
 
-                            # update resLake_P_Abstracted
-                            self.var.resLake_P_Abstracted += resLake_P_Abstracted
+                                resLake_P_Abstracted = globals.inZero.copy()
+                                np.put(resLake_P_Abstracted, self.var.decompress_LR, resLake_P_Abstracted_small)
+
+                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
+                                self.var.resLakeSubcompartments_P -= np.transpose(np.tile(resLake_P_Abstracted_small, (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+
+                                # update resLake_P_Abstracted
+                                self.var.resLake_P_Abstracted += resLake_P_Abstracted
                             
                     outflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0, np.compress(self.var.compress_LR, self.var.DtSec * lakeOutflowDis)) # / self.var.noRoutingSteps 
                     inflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0,  self.var.DtSec * self.var.inflowC_LR)# / self.var.noRoutingSteps 
