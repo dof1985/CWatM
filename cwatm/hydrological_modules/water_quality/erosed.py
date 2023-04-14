@@ -99,12 +99,16 @@ class waterquality_erosed(object):
         #self.var.runoffEnergyFactor = self.var.sum_directRunoff * 2
         '''
 
-        self.waterquality_vars.dynamic()
+
+        self.waterquality_vars.dynamic() # TO FIX
+        directRunoff_m3sec = divideArrays(self.var.directRunoff[0:4] * self.var.cellArea, self.var.DtSec)
         
-        # have tov in initial, check for land use change and only calculate in dynamic if change occurs
-        tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
-                           18 * np.power(self.var.tanslope, 0.3))
-        tch = self.var.travelTime / (60. * 60.)  # converted from seconds to hours
+        #tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
+        #                   18 * np.power(self.var.tanslope, 0.3))
+        
+        tov = divideArrays(self.var.lsFactor * np.power(self.var.manOverland, 0.6), 3600 * np.power(directRunoff_m3sec, 0.4) * np.power(self.var.tanslope, 0.3))
+        tch = self.var.travelTime / 3600  # converted from seconds to hours
+
         self.var.tconc = tov + tch  # [hours]
         # a05 load dummy value: fraction of daily rain falling in the half-hour highest intensity
         # if time series read netcdf2
@@ -114,11 +118,13 @@ class waterquality_erosed(object):
         self.var.atc = 1 - np.exp(2 * self.var.tconc * np.log(1 - a05))
 
         # qpeak: peak runoffrate m3/s
-        self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff[0:4] * 1000 * self.var.cellArea, 3.6 * self.var.tconc) #[m3s-1]
+        self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff[0:4] * self.var.cellArea, 3600 * self.var.tconc) #[m3s-1]
 
         # MUSLE: sediment yield per day and grid in [1000 kg]
+
         # read parameters from settingsfile
         self.var.sedYieldLand = np.nansum(loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr,axis=0)
+
         #print(np.nanmean(self.var.sedYieldLand, axis=1))
         #print(np.nanmean(self.var.qpeak, axis=1))
         #print(self.var.discharge)
