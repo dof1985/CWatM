@@ -524,9 +524,9 @@ class routing_kinematic(object):
                 if checkOption('includeWaterBodies'):
                     sumresLakeP_inflow = np.compress(self.var.compress_LR, globals.inZero.copy())
                 
-                channel_P_Abstracted = self.var.channel_P_Abstracted / self.var.noRoutingSteps
-                resLake_P_Abstracted = self.var.resLake_P_Abstracted / self.var.noRoutingSteps
-                
+                channel_P_Abstracted_Dt  = self.var.channel_P_Abstracted / self.var.noRoutingSteps
+                resLake_P_Abstracted_Dt = self.var.resLake_P_Abstracted / self.var.noRoutingSteps
+                returnflowIrr_P_Dt = self.var.returnflowIrr_P /  self.var.noRoutingSteps
         for subrouting in range(self.var.noRoutingSteps):
 
             sideflowChanM3 = runoffM3.copy()
@@ -571,8 +571,7 @@ class routing_kinematic(object):
                                 self.var.resLake_P_Abstracted += resLake_P_Abstracted
 
                             resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
-                            self.var.resLakeSubcompartments_P -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_P_Abstracted), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
-
+                            self.var.resLakeSubcompartments_P -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_P_Abstracted_Dt), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
                             
                     outflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0, np.compress(self.var.compress_LR, self.var.DtSec * lakeOutflowDis)) # / self.var.noRoutingSteps 
                     inflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0,  self.var.DtSec * self.var.inflowC_LR)# / self.var.noRoutingSteps 
@@ -633,7 +632,7 @@ class routing_kinematic(object):
                 
                 if self.var.includePhosphorus: 
 
-                    self.var.channel_P = self.var.channel_P + runoff_P_Dt + lakeResOut_P_Dt - channel_P_Abstracted
+                    self.var.channel_P = self.var.channel_P + runoff_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - channel_P_Abstracted_Dt
                     gridCellTraveled = divideValues(self.var.DtSec, self.var.travelTime) / self.var.noRoutingSteps
                     tmp_channelP = self.var.channel_P.copy()
                     tmp_outletP = globals.inZero.copy()
