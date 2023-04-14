@@ -100,8 +100,9 @@ class waterquality_erosed(object):
         '''
 
 
+
         self.waterquality_vars.dynamic() # TO FIX
-        directRunoff_m3sec = divideArrays(self.var.directRunoff[0:4] * self.var.cellArea, self.var.DtSec)
+        directRunoff_m3sec = self.var.directRunoff[0:4] * self.var.cellArea / self.var.DtSec
         
         #tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
         #                   18 * np.power(self.var.tanslope, 0.3))
@@ -118,12 +119,18 @@ class waterquality_erosed(object):
         self.var.atc = 1 - np.exp(2 * self.var.tconc * np.log(1 - a05))
 
         # qpeak: peak runoffrate m3/s
-        self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff[0:4] * self.var.cellArea, 3600 * self.var.tconc) #[m3s-1]
+        self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff[0:4] * self.var.cellArea, 3600. * self.var.tconc) #[m3s-1]
 
         # MUSLE: sediment yield per day and grid in [1000 kg]
 
         # read parameters from settingsfile
-        self.var.sedYieldLand = np.nansum(loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr,axis=0)
+        #self.var.sedYieldLand = np.tile(globals.inZero, (4, 1))
+        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr
+        #self.var.sedYieldLand_sum = np.nansum(self.var.fracVegCover[0:4]*self.var.sedYieldLand, axis=0)
+        erosedVarsSum = ['sedYieldLand']
+        for variable in erosedVarsSum:
+            vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
+
 
         #print(np.nanmean(self.var.sedYieldLand, axis=1))
         #print(np.nanmean(self.var.qpeak, axis=1))
@@ -133,7 +140,8 @@ class waterquality_erosed(object):
         #print(np.nanmean(self.var.travelTime)/3600)
         #print('tconc_min:', np.nanmin(self.var.tconc), 'tconc_max:', np.nanmax(self.var.tconc), 'tconc_mean', np.nanmean(self.var.tconc))
         #print('tch_min:', np.nanmin(tch), 'tch_max:', np.nanmax(tch), 'tch_mean', np.nanmean(tch))
-        print('sedYield min,max,mean:', np.nanmin(self.var.sedYieldLand), np.nanmax(self.var.sedYieldLand), np.nanmean(self.var.sedYieldLand))
+        #print('sedYield min,max,mean:', np.nanmin(self.var.sedYieldLand), np.nanmax(self.var.sedYieldLand), np.nanmean(self.var.sedYieldLand))
+        print('sum_sedYield min,max,mean:', np.nanmin(self.var.sum_sedYieldLand), np.nanmax(self.var.sum_sedYieldLand), np.nanmean(self.var.sum_sedYieldLand))
         #print('tconc:', np.nanmean(self.var.tconc, axis=1))
         #print('tch_traveltime min,max,mean:', np.nanmin(self.var.travelTime), np.nanmax(self.var.travelTime), np.nanmean(self.var.travelTime))
         #print('tch_traveltime min,max,mean:', np.nanmin(self.var.tch_man), np.nanmax(self.var.tch_man), np.nanmean(self.var.tch_man))

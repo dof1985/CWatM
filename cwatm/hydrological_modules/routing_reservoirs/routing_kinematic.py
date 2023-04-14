@@ -570,9 +570,10 @@ class routing_kinematic(object):
                                 # update resLake_P_Abstracted
                                 self.var.resLake_P_Abstracted += resLake_P_Abstracted
 
-                            resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
-                            self.var.resLakeSubcompartments_P -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_P_Abstracted_Dt), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
-                            
+
+                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
+                                self.var.resLakeSubcompartments_P -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_P_Abstracted_Dt), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+
                     outflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0, np.compress(self.var.compress_LR, self.var.DtSec * lakeOutflowDis)) # / self.var.noRoutingSteps 
                     inflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0,  self.var.DtSec * self.var.inflowC_LR)# / self.var.noRoutingSteps 
                     
