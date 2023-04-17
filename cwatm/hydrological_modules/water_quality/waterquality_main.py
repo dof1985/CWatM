@@ -54,34 +54,21 @@ class water_quality(object):
         if self.var.includeWaterQuality:
             
             # create water quality variables
-            waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'naturalLandFrac']
+            waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'naturalLandFrac', 'onlyIrr', 'onlyIrrPaddy']
             for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))            
             
             # Create sub-modules variables
             
-            '''
-                Water flows adapated to the water quality soil layer strcuture: transpiration, capilary rise, percolation, GW recharge,
-                and inteflow
-                
-                Transpiration - assumed to 'pump' dissolved P proportionally to its concentration - should be dropped, Net P inputs partially account for P removal by plants,
-                    and the mechanism for nutrient uptake by plant is more complicated.
-                capRise - soil capillary rise between layer 2 to layer 1 takes nutrients with it.
-                capRiseFromGW - capillary rise from GW into soil layers can bring phosphorous from groundwater to soil layers (if accounted for).
-                Percolation1to2 - simulate dissolved P moving with soil percolation.
-                Percolation2toGW - simulate dissolved P 'losses' to groundwater. At this stage it doesn't affect groundwater P concetrations.
-                Interflow2 - simulate lateral flow from soil layer 2 of the water quality (and 3 of cwatm) to the runoff.
-            '''
-
             if self.var.includePhosphorus:
                 phosphorusVars = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3',\
                                   'soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3',\
                                   'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3',\
                                   'EPC1', 'EPC2', 'EPC3', 'runoff_P', 'toGroundwater_P',\
-                                  'soil_P_input1', 'soil_P_input2']
+                                  'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
                                   
                 phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
-                                'soil_P_input1', 'soil_P_input2']
+                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
                                 
                 phosphorusVarsSumCat = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
@@ -159,6 +146,9 @@ class water_quality(object):
             self.var.naturalLandFrac[1] += 1.#self.var.managedGrassland 
             self.var.naturalLandFrac[2:4] += 1.
             self.var.naturalLandFrac[0] += 1.
+            
+            self.var.onlyIrrPaddy[2] += 1.
+            self.var.onlyIrr[3] += 1.
             # create lakesRes sub-compartments
             if checkOption('includeWaterBodies'):
                 self.var.ResLake_PConc_LRC = np.compress(self.var.compress_LR, globals.inZero.copy())
@@ -240,7 +230,7 @@ class water_quality(object):
             # sum total soil P stocks [kg / m2] 
             phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
-                                'soil_P_input1', 'soil_P_input2']
+                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
                                 
             for variable in phosphorusVarsSum:
                 vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)

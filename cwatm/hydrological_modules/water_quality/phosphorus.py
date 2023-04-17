@@ -137,6 +137,11 @@ class waterquality_phosphorus(object):
         self.var.channel_P_Abstracted = globals.inZero.copy()
         self.var.resLake_P_Abstracted = globals.inZero.copy()
         self.var.groundwater_P_Abstracted = globals.inZero.copy()
+        self.var.domestic_P_Abstracted = globals.inZero.copy()
+        self.var.livestock_P_Abstracted = globals.inZero.copy()
+        self.var.industry_P_Abstracted = globals.inZero.copy()
+        self.var.irrigation_P_Abstracted = globals.inZero.copy()
+        self.var.returnflowIrr_P = globals.inZero.copy()
         
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
@@ -185,22 +190,6 @@ class waterquality_phosphorus(object):
         relMoisture2 = divideArrays(self.var.pre_w2, self.var.soildepth[1]) 
         relMoisture3 = divideArrays(self.var.pre_w3, self.var.soildepth[2]) 
         interflowDivider = divideArrays(relMoisture2, relMoisture2 + relMoisture3) #* 0
-        
-        # Water demand ###
-        
-        # channel
-        self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_PConc, self.var.channel_P), 0.)
-        
-        # lake/reservoir
-        resLake_P_compress = np.compress(self.var.compress_LR, self.var.resLake_P)
-        resLake_P_Abstracted_small = np.minimum(divideValues(resLake_P_compress, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC), resLake_P_compress)               
-        self.var.resLake_P_Abstracted = globals.inZero.copy()
-        np.put(self.var.resLake_P_Abstracted, self.var.decompress_LR, resLake_P_Abstracted_small)
-                            
-        # groundwater
-        self.var.groundwater_P_Abstracted = self.var.nonFossilGroundwaterAbs * self.var.cellArea * self.var.GW_P_Conc 
-        
-        
         
         # Calculate Plab Net Input - Currently only apply on managed grasslands and on irrigated agriculture
         
@@ -256,11 +245,16 @@ class waterquality_phosphorus(object):
         interflow3 = np.minimum(totalOut3, pre_TDP3) * divideArrays(interflow3, totalOut3)
         toGW = np.minimum(totalOut3, pre_TDP3) * divideArrays(toGW, totalOut3)
         
+        # Apply irrigation *****************
+        self.var.irrigation_P_Applied = self.var.irrigation_P_Abstracted * divideArrays(self.var.infiltration, self.var.availWaterInfiltration)[0:4] * self.var.onlyIrrPaddy
+        shareInfiltrationTopSoil = divideArrays(self.var.infiltration -  self.var.infiltration2, self.var.infiltration)[0:4]
+        
         # update TDP
-        self.var.soil_P_dissolved1 = self.var.soil_P_dissolved1 - directRunoff_P  - perc1to2_P
-        self.var.soil_P_dissolved2 = self.var.soil_P_dissolved2 + perc1to2_P  - interflow2 - perc2to3_P
+        self.var.soil_P_dissolved1 = self.var.soil_P_dissolved1 - directRunoff_P  - perc1to2_P + self.var.irrigation_P_Applied * shareInfiltrationTopSoil
+        self.var.soil_P_dissolved2 = self.var.soil_P_dissolved2 + perc1to2_P  - interflow2 - perc2to3_P  + self.var.irrigation_P_Applied * (1 - shareInfiltrationTopSoil)
         self.var.soil_P_dissolved3 = self.var.soil_P_dissolved3 + perc2to3_P - interflow3 - toGW
         
+
         # Calculate New TDP and Plabile
         # Discretizied soil water TDP - follow simplyP model.py lines 42 - 47 ; https://github.com/LeahJB/SimplyP/
         b1 = divideArrays(self.var.Kf * self.var.soilM1, self.var.w1)  # runoff + perc1to2
@@ -392,6 +386,40 @@ class waterquality_phosphorus(object):
         # calculate inputs to dissloved P
         # balance labile/active using EPC
         
+                # Water demand ### lift, reservoir type4 is currently excluded
+        # Only with self.var.sectorSourceAbstractionFractions = True
+        # channel
+        self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_PConc, self.var.channel_P), 0.)
         
+        # lake/reservoir
+        resLake_P_compress = np.compress(self.var.compress_LR, self.var.resLake_P)
+        resLake_P_Abstracted_small = np.minimum(divideValues(resLake_P_compress, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC), resLake_P_compress)               
+        self.var.resLake_P_Abstracted = globals.inZero.copy()
+        np.put(self.var.resLake_P_Abstracted, self.var.decompress_LR, resLake_P_Abstracted_small)
+                            
+        # groundwater
+        self.var.groundwater_P_Abstracted = self.var.nonFossilGroundwaterAbs * self.var.cellArea * self.var.GW_P_Conc 
         
-       
+        # domestic P 
+        self.var.domestic_P_Abstracted = self.var.channel_P_Abstracted * divideValues(self.var.Channel_Domestic, self.var.domesticDemand) +\
+            self.var.resLake_P_Abstracted * divideValues(self.var.Lake_Domestic + self.var.Res_Domestic, self.var.domesticDemand) +\
+            self.var.groundwater_P_Abstracted * divideValues(self.var.GW_Domestic, self.var.domesticDemand)
+        
+        # industry P 
+        self.var.industry_P_Abstracted = self.var.channel_P_Abstracted * divideValues(self.var.Channel_Industry, self.var.industryDemand) +\
+            self.var.resLake_P_Abstracted * divideValues(self.var.Lake_Industry + self.var.Res_Industry, self.var.industryDemand) +\
+            self.var.groundwater_P_Abstracted * divideValues(self.var.GW_Industry, self.var.industryDemand)
+            
+        # livestock P 
+        self.var.livestock_P_Abstracted = self.var.channel_P_Abstracted * divideValues(self.var.Channel_Livestock, self.var.livestockDemand) +\
+            self.var.resLake_P_Abstracted * divideValues(self.var.Lake_Livestock + self.var.Res_Livestock, self.var.livestockDemand) +\
+            self.var.groundwater_P_Abstracted * divideValues(self.var.GW_Livestock, self.var.livestockDemand)
+        
+        # irrigation P
+        self.var.irrigation_P_Abstracted = self.var.channel_P_Abstracted * divideValues(self.var.Channel_Irrigation, self.var.totalIrrDemand) +\
+            self.var.resLake_P_Abstracted * divideValues(self.var.Lake_Irrigation + self.var.Res_Irrigation, self.var.totalIrrDemand) +\
+            self.var.groundwater_P_Abstracted * divideValues(self.var.GW_Irrigation, self.var.totalIrrDemand)
+        
+        # irrigation returnFlows
+        self.var.returnflowIrr_P = divideValues(self.var.returnflowIrr, self.var.act_irrWithdrawal)
+        self.var.irrigation_P_Abstracted -= self.var.returnflowIrr_P

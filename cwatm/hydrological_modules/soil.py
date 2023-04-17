@@ -495,6 +495,7 @@ class soil(object):
 
         # infiltration to soilayer 1 , if this is full it is send to soil layer 2
         self.var.w1[No] = self.var.w1[No] + self.var.infiltration[No]
+        self.var.infiltration2[No] = self.var.infiltration[No] - np.where(self.var.w1[No] > self.var.ws1[No], self.var.w1[No] - self.var.ws1[No], 0)
         self.var.w2[No] = self.var.w2[No] + np.where(self.var.w1[No] > self.var.ws1[No], self.var.w1[No] - self.var.ws1[No], 0)
         self.var.w1[No] = np.minimum(self.var.ws1[No], self.var.w1[No])
 

@@ -123,15 +123,13 @@ class waterquality_erosed(object):
 
         # MUSLE: sediment yield per day and grid in [1000 kg]
 
-        # read parameters from settingsfile
-        #self.var.sedYieldLand = np.tile(globals.inZero, (4, 1))
-        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr
+        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) *\
+            self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr
         #self.var.sedYieldLand_sum = np.nansum(self.var.fracVegCover[0:4]*self.var.sedYieldLand, axis=0)
         erosedVarsSum = ['sedYieldLand']
         for variable in erosedVarsSum:
             vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
-
-
+            
         #print(np.nanmean(self.var.sedYieldLand, axis=1))
         #print(np.nanmean(self.var.qpeak, axis=1))
         #print(self.var.discharge)
