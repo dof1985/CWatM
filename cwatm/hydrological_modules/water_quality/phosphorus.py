@@ -35,7 +35,39 @@ class waterquality_phosphorus(object):
 
     **Functions**
     """
+    
+    def soilP(self, Plab, TDP, EPC0, Plab_in, TDP_in, Qr, Qi, Qp, Kf, soilmass, Vs):
+        
+        # Variables:
+        # Labile p stocks, Dissolved P stocks, Labile P inputs, TDP inputs, P outputs in runoff, interflow, and percolation/groundwater recharge,
+        # soil moisture content (t-1)
+        
+        
+        
+        # calculate out fluxes [kg]
+        
+        totalFlux = np.minimum((Qr + Qi + Qp) * divideArrays(TDP, Vs), TDP)
+        
+        P_Qr = divideArrays(Qr, Qr + Qi + Qp) * totalFlux
+        P_Qi = divideArrays(Qi, Qr + Qi + Qp) * totalFlux
+        P_Qp = divideArrays(Qp, Qr + Qi + Qp) * totalFlux
+        
+        # calculate intermediate TDP and Plab
+        TDP = TDP + TDP_in - P_Qr - P_Qi - P_Qp
+        Plab = Plab + Plab_in
+        
+        # calculate EPC0
+        EPC0 = divideArrays(Plab, Kf * soilmass)
+        
+        # calculate sorption
+        sorp =  Kf * (TDP -  EPC0)
+        
+        # Update variables
+        Plab = Plab + sorp
+        TDP = TDP - sorp
 
+        return Plab, TDP, EPC0, P_Qr, P_Qi, P_Qp
+        
     def __init__(self, model):
         self.var = model.var
         self.model = model
@@ -163,7 +195,7 @@ class waterquality_phosphorus(object):
         
         # soil depth ratio - layer 0 out of 0 + 1 : to split P inputs
         soil_depthRatio1 = divideValues(self.var.soildepth[0], self.var.soildepth[0] + self.var.soildepth[1])
-
+    
         # load daily net inputs 
         # should be at [kg P / m2]
         PSoil_Input1 = loadmap('P_netInput') * soil_depthRatio1 * self.var.cellArea
@@ -204,166 +236,75 @@ class waterquality_phosphorus(object):
         pre_lab1 = self.var.soil_P_labile1.copy()
         pre_lab2 = self.var.soil_P_labile2.copy()
         pre_lab3 = self.var.soil_P_labile3.copy()
-
-        # Only applied for non-natural land covers
-        self.var.soil_P_labile1 += self.var.soil_P_input1
-        self.var.soil_P_labile2 += self.var.soil_P_input2
-        self.var.soil_P_labile3 += 0
-        
         
         # pre TDP
         pre_TDP1 = self.var.soil_P_dissolved1.copy()
         pre_TDP2 = self.var.soil_P_dissolved2.copy()
         pre_TDP3 = self.var.soil_P_dissolved3.copy()
         
-        ## Calculate P outflows/inflows
         
-        # soil layer 1 - runoff
-        directRunoff_P = divideArrays(pre_TDP1, self.var.pre_w1) * self.var.directRunoff[0:4]
-        perc1to2_P = divideArrays(pre_TDP1, self.var.pre_w1) * self.var.perc1to2
-        
-        # max out is actual tdp
-        totalOut1 = directRunoff_P + perc1to2_P
-        directRunoff_P = np.minimum(totalOut1, pre_TDP1) * divideArrays(directRunoff_P, totalOut1)
-        perc1to2_P = np.minimum(totalOut1, pre_TDP1) * divideArrays(perc1to2_P, totalOut1)
-        
-        # soil layer 2 - interflow2
-        interflow2 =  divideArrays(pre_TDP2, self.var.pre_w2) * self.var.interflow[0:4] * interflowDivider
-        perc2to3_P = divideArrays(pre_TDP2, self.var.pre_w2) * self.var.perc2to3
-        
-        # max out is actual tdp
-        totalOut2 = interflow2 + perc2to3_P
-        interflow2 = np.minimum(totalOut2, pre_TDP2) * divideArrays(interflow2, totalOut2)
-        perc2to3_P = np.minimum(totalOut2, pre_TDP2) * divideArrays(perc2to3_P, totalOut2)
-        
-        # soil layer 3 - interflow 3 & gw
-        interflow3 =  divideArrays(pre_TDP3, self.var.pre_w3) * self.var.interflow[0:4] * (1 - interflowDivider)
-        toGW =  divideArrays(pre_TDP3, self.var.pre_w3) *  self.var.grossGWrechargeFromSoil[0:4]
-        
-        # max out is actual tdp
-        totalOut3 = interflow3 + toGW
-        interflow3 = np.minimum(totalOut3, pre_TDP3) * divideArrays(interflow3, totalOut3)
-        toGW = np.minimum(totalOut3, pre_TDP3) * divideArrays(toGW, totalOut3)
-        
-        # Apply irrigation *****************
-        self.var.irrigation_P_Applied = self.var.irrigation_P_Abstracted * divideArrays(self.var.infiltration, self.var.availWaterInfiltration)[0:4] * self.var.onlyIrrPaddy
+        # Apply irrigation 
+        self.var.irrigation_P_Applied = np.maximum(self.var.irrigation_P_Abstracted - self.var.returnflowIrr_P, 0.) * divideArrays(self.var.infiltration, self.var.availWaterInfiltration)[0:4] * (self.var.onlyIrrPaddy + self.var.onlyIrr)
         shareInfiltrationTopSoil = divideArrays(self.var.infiltration -  self.var.infiltration2, self.var.infiltration)[0:4]
         
-        # update TDP
-        self.var.soil_P_dissolved1 = self.var.soil_P_dissolved1 - directRunoff_P  - perc1to2_P + self.var.irrigation_P_Applied * shareInfiltrationTopSoil
-        self.var.soil_P_dissolved2 = self.var.soil_P_dissolved2 + perc1to2_P  - interflow2 - perc2to3_P  + self.var.irrigation_P_Applied * (1 - shareInfiltrationTopSoil)
-        self.var.soil_P_dissolved3 = self.var.soil_P_dissolved3 + perc2to3_P - interflow3 - toGW
+        #SoilP(Plab, TDP, EPC0,  Plab_in, TDP_in, Qr, Qi, Qp, Kf, soilmass, Vs)
+        # run dynamic soil P - layer 1 ######
         
+        # outputs =  [Plab, TDP, EPC0, P_Qr, P_Qi, P_Qp]
+        # self.var.directRunoff[0:4]
+        nonNaturalDirectRunoff = self.var.directRunoff[0:4].copy()
+        nonNaturalDirectRunoff[0:2] = globals.inZero.copy()
+        outputs = self.soilP(Plab = self.var.soil_P_labile1, TDP = self.var.soil_P_dissolved1,\
+            EPC0 =  self.var.EPC1, Plab_in = self.var.soil_P_input1, TDP_in = self.var.irrigation_P_Applied * shareInfiltrationTopSoil,\
+            Qr = nonNaturalDirectRunoff, Qi = globals.inZero, Qp = self.var.perc1to2,\
+            Kf = self.var.Kf, soilmass = self.var.soilM1, Vs = self.var.pre_w1)
 
-        # Calculate New TDP and Plabile
-        # Discretizied soil water TDP - follow simplyP model.py lines 42 - 47 ; https://github.com/LeahJB/SimplyP/
-        b1 = divideArrays(self.var.Kf * self.var.soilM1, self.var.w1)  # runoff + perc1to2
-        a_b1 = divideArrays(self.var.soil_P_labile1, b1) # a/b
-        self.var.soil_P_dissolved1 = (a_b1 + (self.var.soil_P_dissolved1 - a_b1) * np.exp(-1 * b1))
+        # update variables
+        self.var.soil_P_labile1 =  outputs[0].copy()
+        self.var.soil_P_dissolved1 =  outputs[1].copy()
+        self.var.EPC1 =  outputs[2].copy()
         
-        b2 = divideArrays(self.var.Kf * self.var.soilM2, self.var.w2) # interflow2 + perc2to3 #  - self.var.perc1to2 
-        a_b2 = divideArrays(self.var.soil_P_labile2, b2) # a/b
-        self.var.soil_P_dissolved2 = (a_b2 + (self.var.soil_P_dissolved2 - a_b2) * np.exp(-1 * b2)) 
+        # update fluxes - no interflow from layer 1
+        directRunoff_P =  outputs[3].copy()
+        perc1to2_P = outputs[5].copy()
         
-        b3 = divideArrays(self.var.Kf * self.var.soilM3, self.var.w3) # interflow 3 + grossGWrechargeFromSoil # - self.var.perc2to3
-        a_b3 = divideArrays(self.var.soil_P_labile3, b3) # a/b
-
-        self.var.soil_P_dissolved3 = (a_b3 + (self.var.soil_P_dissolved3 - a_b3) * np.exp(-1 * b3)) 
-        '''
+        # run dynamic soil P - layer 2 ######
+        outputs = self.soilP(Plab = self.var.soil_P_labile2, TDP = self.var.soil_P_dissolved2,\
+            EPC0 =  self.var.EPC2, Plab_in = self.var.soil_P_input2, TDP_in = perc1to2_P + self.var.irrigation_P_Applied * (1 - shareInfiltrationTopSoil),\
+            Qr = globals.inZero, Qi = self.var.interflow[0:4] * interflowDivider, Qp = self.var.perc2to3,\
+            Kf = self.var.Kf, soilmass = self.var.soilM2, Vs = self.var.pre_w2)
         
-        # Calculate New TDP and Plabile
-        # Discretizied soil water TDP - follow simplyP model.py lines 42 - 47 ; https://github.com/LeahJB/SimplyP/
-        b1 = divideArrays(self.var.Kf * self.var.soilM1 + self.var.perc1to2, self.var.w1)  # runoff + perc1to2
-        a_b1 = divideArrays(self.var.soil_P_labile1, b1) # a/b
-        self.var.soil_P_dissolved1 = (a_b1 + (self.var.soil_P_dissolved1 - a_b1) * np.exp(-1 * b1))
+        # update variables
+        self.var.soil_P_labile2 =  outputs[0].copy()
+        self.var.soil_P_dissolved2 =  outputs[1].copy()
+        self.var.EPC2 =  outputs[2].copy()
         
-        b2 = divideArrays(self.var.Kf * self.var.soilM2 + self.var.interflow[0:4] * interflowDivider + self.var.perc2to3, self.var.w2) # interflow2 + perc2to3 #  - self.var.perc1to2 
-        a_b2 = divideArrays(self.var.soil_P_labile2, b2) # a/b
-        self.var.soil_P_dissolved2 = (a_b2 + (self.var.soil_P_dissolved2 - a_b2) * np.exp(-1 * b2)) 
+        # update fluxes - no runoff from layer 2
+        interflow2_P =  outputs[4].copy()
+        perc2to3_P = outputs[5].copy()
         
-        b3 = divideArrays(self.var.Kf * self.var.soilM3 + self.var.interflow[0:4] * np.maximum((-1 * interflowDivider) + self.var.grossGWrechargeFromSoil[0:4], 0) , self.var.w3) # interflow 3 + grossGWrechargeFromSoil # - self.var.perc2to3
-        a_b3 = divideArrays(self.var.soil_P_labile3, b3) # a/b
-
-        self.var.soil_P_dissolved3 = (a_b3 + (self.var.soil_P_dissolved3 - a_b3) * np.exp(-1 * b3)) 
-        '''
+        # run dynamic soil P - layer 3 ######
+         #
+        outputs = self.soilP(Plab = self.var.soil_P_labile3, TDP = self.var.soil_P_dissolved3,\
+            EPC0 =  self.var.EPC3, Plab_in = globals.inZero, TDP_in = perc2to3_P,\
+            Qr = globals.inZero, Qi = self.var.interflow[0:4] * (1- interflowDivider), Qp = self.var.grossGWrechargeFromSoil[0:4],\
+            Kf = self.var.Kf, soilmass = self.var.soilM3, Vs = self.var.pre_w3)
         
+        # update variables
+        self.var.soil_P_labile3 =  outputs[0].copy()
+        self.var.soil_P_dissolved3 =  outputs[1].copy()
+        self.var.EPC3 =  outputs[2].copy()
         
-        
-        # Discretizied Plabile
-        b0_1 = b1 * self.var.w1
-        a_b0_1 = divideArrays(self.var.soil_P_labile1, b0_1) # a/b
-        dPLabile1 = self.var.Kf * self.var.soilM1 * (a_b0_1 - self.var.EPC1 + \
-            (divideArrays(globals.inZero.copy() + 1., b1) * \
-            (divideArrays(self.var.soil_P_dissolved1, self.var.w1) - a_b0_1) * \
-            (1 - np.exp(-1 * b1))))
-            
-        dPLabile1 = np.where(self.var.w1 == 0, 0., dPLabile1)
-
-            
-        b0_2 = b2 * self.var.w2
-        a_b0_2 = divideArrays(self.var.soil_P_labile2, b0_2) # a/b
-        dPLabile2 = self.var.Kf * self.var.soilM2 * (a_b0_2 - self.var.EPC2 + \
-            (divideArrays(globals.inZero.copy() + 1., b2) * \
-            (divideArrays(self.var.soil_P_dissolved2, self.var.w2) - a_b0_2) * \
-            (1 - np.exp(-1 * b2))))
-            
-        dPLabile2 = np.where(self.var.w2 == 0, 0., dPLabile2)
-        
-            
-        b0_3 = b3 * self.var.w3
-        a_b0_3 = divideArrays(self.var.soil_P_labile3, b0_3) # a/b
-        dPLabile3 = self.var.Kf * self.var.soilM3 * (a_b0_3 - self.var.EPC3 + \
-            (divideArrays(globals.inZero.copy() + 1., b3) * \
-            (divideArrays(self.var.soil_P_dissolved3, self.var.w3) - a_b0_3) * \
-            (1 - np.exp(-1 * b3))))
-            
-        dPLabile3 = np.where(self.var.w3 == 0, 0., dPLabile3)
-
-        # limit TDP to be >= 0
-        self.var.soil_P_dissolved1 = np.maximum(self.var.soil_P_dissolved1, 0.) * self.var.naturalLandFrac
-        self.var.soil_P_dissolved2 = np.maximum(self.var.soil_P_dissolved2, 0.) * self.var.naturalLandFrac
-        self.var.soil_P_dissolved3 = np.maximum(self.var.soil_P_dissolved3, 0.) * self.var.naturalLandFrac
-        
-        # Update labile P mass in soils
-        self.var.soil_P_labile1 = pre_lab1 + dPLabile1 * self.var.naturalLandFrac
-        self.var.soil_P_labile2 = pre_lab2 + dPLabile2 * self.var.naturalLandFrac
-        self.var.soil_P_labile3 = pre_lab3 + dPLabile3 * self.var.naturalLandFrac
-
-        # update  soil equilibrium TDP concentration of zero sorption  
-        self.var.EPC1 = divideArrays(self.var.soil_P_labile1, self.var.Kf * self.var.soilM1)
-        self.var.EPC2 = divideArrays(self.var.soil_P_labile2, self.var.Kf * self.var.soilM2)
-        self.var.EPC3 = divideArrays(self.var.soil_P_labile3, self.var.Kf * self.var.soilM3)
-        
-        # print balance for soil layer 1 -3 #############
-        '''
-        # s1 
-        in1 =  np.nansum(np.nansum(self.var.soil_P_input1 * self.var.fracVegCover[0:4], axis = 0))
-        out1 =   np.nansum(np.nansum((directRunoff_P + perc1to2_P)  * self.var.fracVegCover[0:4], axis = 0))
-        dSto1 =  np.nansum(np.nansum((self.var.soil_P_dissolved1 + self.var.soil_P_labile1 - pre_TDP1 - pre_lab1) * self.var.fracVegCover[0:4], axis = 0))
-        balance1 = (in1 - out1 - dSto1) /  (abs(in1) + abs(out1) + abs(dSto1))
-        print(balance1)
-        
-        # s2
-        in2 =  np.nansum(np.nansum((self.var.soil_P_input2 + perc1to2_P) * self.var.fracVegCover[0:4], axis = 0))
-        out2 =   np.nansum(np.nansum((interflow2 + perc2to3_P)  * self.var.fracVegCover[0:4], axis = 0))
-        dSto2 =  np.nansum(np.nansum((self.var.soil_P_dissolved2 + self.var.soil_P_labile2 - pre_TDP2 - pre_lab2) * self.var.fracVegCover[0:4], axis = 0))
-        balance2 = (in2 - out2 - dSto2) /  (abs(in2) + abs(out2) + abs(dSto2))
-        print(balance2)
-        
-        # s3
-        in3 =  np.nansum(np.nansum((perc2to3_P) * self.var.fracVegCover[0:4], axis = 0))
-        out3 =   np.nansum(np.nansum((interflow3 + toGW)  * self.var.fracVegCover[0:4], axis = 0))
-        dSto3 =  np.nansum(np.nansum((self.var.soil_P_dissolved3 + self.var.soil_P_labile3 - pre_TDP3 - pre_lab3) * self.var.fracVegCover[0:4], axis = 0))
-        balance3 = (in3 - out3 - dSto3) /  (abs(in3) + abs(out3) + abs(dSto3))
-        print(balance3)
-        '''
-        ##########
+        # update fluxes - no runoff from layer 2
+        interflow3_P =  outputs[4].copy()
+        toGW = outputs[5].copy()
+       
       
         # sum outflows
         
         # runoff [kg]
         self.var.directRunoff_P = np.nansum(directRunoff_P * self.var.fracVegCover[0:4], axis = 0)
-        self.var.interflow_P = np.nansum((interflow2 + interflow3) * self.var.fracVegCover[0:4], axis = 0)
+        self.var.interflow_P = np.nansum((interflow2_P + interflow3_P) * self.var.fracVegCover[0:4], axis = 0)
         self.var.baseflow_P = self.var.baseflow * self.var.cellArea * self.var.GW_P_Conc 
         
         self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, loadmap('P_sourcePoint'),0.)
@@ -422,4 +363,4 @@ class waterquality_phosphorus(object):
         
         # irrigation returnFlows
         self.var.returnflowIrr_P = divideValues(self.var.returnflowIrr, self.var.act_irrWithdrawal)
-        self.var.irrigation_P_Abstracted -= self.var.returnflowIrr_P
+        
