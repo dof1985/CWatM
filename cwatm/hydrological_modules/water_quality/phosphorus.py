@@ -60,7 +60,7 @@ class waterquality_phosphorus(object):
         EPC0 = divideArrays(Plab, Kf * soilmass)
         
         # calculate sorption
-        sorp =  Kf * (divideArrays(TDP, Vs)  -  EPC0)
+        sorp = Kf * soilmass * (divideArrays(TDP, Vs) - EPC0)
         
         # Update variables
         Plab = Plab + sorp
