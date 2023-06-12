@@ -186,37 +186,37 @@ class routing_kinematic(object):
         import numpy as np
         
     def routeMassDown(self, x, a, outletid, lakesCond, down):
-                        outlet = globals.inZero.copy()
-                        tmp_x = globals.inZero.copy()
-                        resLakeInflowTmp = globals.inZero.copy()
+                        outlet = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                        tmp_x = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                        resLakeInflowTmp = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                        
                         
                         # outlet to sea/endorheic lake
-                        outlet[outletid] = x[outletid]
-                        x[outletid] = 0.
+                        outlet[:, outletid] = x[:, outletid]
+                        x[:, outletid] = 0.
                         
                         if checkOption('includeWaterBodies'):
                            
                             resLakeInflowTmp = x * lakesCond
                             x -= resLakeInflowTmp
 
-
-                        tmp_x[down] = npareatotal(a * x, down)
+                        for i in range(self.var.n_fluxes):
+                            tmp_x[i, down] = npareatotal(a * x[i, :], down)
                         tmp_x -= a * x
 
                         return tmp_x, resLakeInflowTmp, outlet
                         
     def routeSubLakeMass(self, sublake, flowfrac, outflowBinary):
-                        outflow = np.tile(0., sublake.shape[0])
+                        outflow = np.tile(0., (sublake.shape[0], sublake.shape[1]))
                         while (flowfrac > 0).any():
                             # boundary
-                            
-                            outflow += sublake[: , -1] * outflowBinary
-                            sublake[: , -1] = sublake[: , -1] * (1 - outflowBinary)
+                            outflow += sublake[:, : , -1] * outflowBinary
+                            sublake[:, : , -1] = sublake[:, : , -1] * (1 - outflowBinary)
                             a = np.where(flowfrac > 1, 1., flowfrac)
                             # route mass
-                            dMassSubLake = sublake[: , :-1] * a[: , :-1]
-                            sublake[ :, 1:] += dMassSubLake
-                            sublake[: , :-1] -= dMassSubLake
+                            dMassSubLake = sublake[:, : , :-1] * a[: , :-1]
+                            sublake[:, :, 1:] += dMassSubLake
+                            sublake[:, : , :-1] -= dMassSubLake
 
                             # update flowfrac
                             flowfrac = np.where(flowfrac > 1, flowfrac - 1, 0)
@@ -366,8 +366,7 @@ class routing_kinematic(object):
         
         if self.var.includeWaterQuality:
             if checkOption('includeWaterBodies'):
-                if self.var.includePhosphorus:
-                    self.var.resLakeInflowTmp_P = globals.inZero.copy()
+                self.var.resLakeInflowTmp = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
             
 
 
@@ -513,20 +512,43 @@ class routing_kinematic(object):
                 resLakeInflowCondition = globals.inZero.copy()
             outletID = np.where(downdirID == downdirID.shape[0])[0]
             downdirID[outletID] = outletID
+            
+            # build flux arrarys [erosed, phosphorus]
+            massFluxArray = np.tile(globals.inZero.copy(), (self.var.n_fluxes,1))
+            if checkOption('includeWaterBodies'):
+                resLake_inflow =   np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                sumresLake_P_inflow = np.compress(self.var.compress_LR, globals.inZero.copy())
+            
+            lakeResOut_Dt = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
 
+            if self.var.includeErosed:
+                self.var.resLakeOutflow_sed = globals.inZero.copy()
+                self.var.resLakeInflow_sed = globals.inZero.copy()
+
+                self.var.outlet_sed = globals.inZero.copy()
+                if checkOption('includeWaterBodies'):
+                    sumresLake_sed_inflow = np.compress(self.var.compress_LR, globals.inZero.copy())
+                
+                channel_sed_Abstracted_Dt  = self.var.channel_sed_Abstracted / self.var.noRoutingSteps
+                returnflowIrr_sed_Dt = self.var.returnflowIrr_sed /  self.var.noRoutingSteps
+                
+                #self.var.resLake_sed_Abstracted = globals.inZero.copy()
+                
             if self.var.includePhosphorus:
-                lakeResOut_P_Dt = globals.inZero.copy()
                 self.var.resLakeOutflow_P = globals.inZero.copy()
                 self.var.resLakeInflow_P = globals.inZero.copy()
                 runoff_P_Dt = self.var.runoff_P / self.var.noRoutingSteps
 
                 self.var.outlet_P = globals.inZero.copy()
                 if checkOption('includeWaterBodies'):
-                    sumresLakeP_inflow = np.compress(self.var.compress_LR, globals.inZero.copy())
+                    sumresLake_P_inflow = np.compress(self.var.compress_LR, globals.inZero.copy())
                 
                 channel_P_Abstracted_Dt  = self.var.channel_P_Abstracted / self.var.noRoutingSteps
-                resLake_P_Abstracted_Dt = self.var.resLake_P_Abstracted / self.var.noRoutingSteps
                 returnflowIrr_P_Dt = self.var.returnflowIrr_P /  self.var.noRoutingSteps
+            
+                #self.var.resLake_P_Abstracted = globals.inZero.copy()
+                
+                
         for subrouting in range(self.var.noRoutingSteps):
 
             sideflowChanM3 = runoffM3.copy()
@@ -544,7 +566,11 @@ class routing_kinematic(object):
                 self.var.inflowDt = (self.var.QInM3Old + (subrouting + 1) * self.var.QDelta) / self.var.noRoutingSteps
                 # flow from inlets per sub step
                 sideflowChanM3 += self.var.inflowDt
-
+            
+            # in case water bodies are not activated
+            lakeResOut_P_Dt = globals.inZero.copy()
+            lakeResOut_sed_Dt = globals.inZero.copy()
+            
             if checkOption('includeWaterBodies'):
                 lakesResOut, lakeOutflowDis = self.lakes_reservoirs_module.dynamic_inloop(subrouting)
                 sideflowChanM3 += lakesResOut
@@ -556,24 +582,44 @@ class routing_kinematic(object):
                     
                     if checkOption('includeWaterDemand'):
                         if checkOption('includeWaterBodies'):
+                            # abstraction sediment = 0
+                            if self.var.includeErosed:
+                                resLake_sed_tmp = np.nansum(self.var.resLakeSubcompartments[0, :, :], axis = 1)
+                                resLake_sed_Abstracted_small = np.minimum(divideValues(resLake_sed_tmp, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC / self.var.noRoutingSteps), resLake_sed_tmp)
 
+                                resLake_sed_Abstracted = globals.inZero.copy()
+                                np.put(resLake_sed_Abstracted, self.var.decompress_LR, resLake_sed_Abstracted_small)
+
+                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments[0, :, :],  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments[0, :, :], axis = 1), (self.var.noRoutingSteps, 1))))
+                                self.var.resLakeSubcompartments[0, :, :] -= np.transpose(np.tile(resLake_sed_Abstracted_small, (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+
+                                # update resLake_sed_Abstracted
+                                self.var.resLake_sed_Abstracted += resLake_sed_Abstracted
+                            
+
+                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments[0, :, :],  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments[0, :, :], axis = 1), (self.var.noRoutingSteps, 1))))
+                                self.var.resLakeSubcompartments[0, :, :] -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_sed_Abstracted), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+                            
+                            # abstraction phosphorus = 1
                             if self.var.includePhosphorus:
-                                resLake_P_tmp = np.nansum(self.var.resLakeSubcompartments_P, axis = 1)
+                                resLake_P_tmp = np.nansum(self.var.resLakeSubcompartments[1, :, :], axis = 1)
+
                                 resLake_P_Abstracted_small = np.minimum(divideValues(resLake_P_tmp, self.var.lakeResStorageC + self.var.act_bigLakeAbstC) * (self.var.act_bigLakeAbstC / self.var.noRoutingSteps), resLake_P_tmp)
+                                
 
                                 resLake_P_Abstracted = globals.inZero.copy()
                                 np.put(resLake_P_Abstracted, self.var.decompress_LR, resLake_P_Abstracted_small)
 
-                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
-                                self.var.resLakeSubcompartments_P -= np.transpose(np.tile(resLake_P_Abstracted_small, (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments[1, :, :],  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments[1, :, :], axis = 1), (self.var.noRoutingSteps, 1))))
+                                self.var.resLakeSubcompartments[1, :, :] -= np.transpose(np.tile(resLake_P_Abstracted_small, (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
 
                                 # update resLake_P_Abstracted
                                 self.var.resLake_P_Abstracted += resLake_P_Abstracted
+                            
 
-
-                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments_P,  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments_P, axis = 1), (self.var.noRoutingSteps, 1))))
-                                self.var.resLakeSubcompartments_P -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_P_Abstracted_Dt), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
-
+                                resLakeCompartments_wghts = divideArrays(self.var.resLakeSubcompartments[1, :, :],  np.transpose(np.tile(np.nansum(self.var.resLakeSubcompartments[1, :, :], axis = 1), (self.var.noRoutingSteps, 1))))
+                                self.var.resLakeSubcompartments[1, :, :] -= np.transpose(np.tile(np.compress(self.var.compress_LR, resLake_P_Abstracted), (self.var.noRoutingSteps, 1))) * resLakeCompartments_wghts
+                            
                     outflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0, np.compress(self.var.compress_LR, self.var.DtSec * lakeOutflowDis)) # / self.var.noRoutingSteps 
                     inflows_tmp = np.where(self.var.waterBodyTypCTemp == 4, 0,  self.var.DtSec * self.var.inflowC_LR)# / self.var.noRoutingSteps 
                     
@@ -586,26 +632,54 @@ class routing_kinematic(object):
                     fracChange = np.transpose(np.tile(fracChange, (self.var.noRoutingSteps, 1)))
                     fracChange = np.where(fracChange > self.var.noRoutingSteps, self.var.noRoutingSteps, fracChange)
                     
+                    
+                    outlake = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                    
+                    if self.var.includeErosed:
+                        # Sediment = 0
+                        resLake_inflow[0, :] =  npareatotal(self.var.resLakeInflowTmp[0, :], self.var.waterBodyID)
+                        sumresLake_sed_inflow += np.compress(self.var.compress_LR, resLake_inflow[0, :])
+
                     if self.var.includePhosphorus:
-
-                        outlakeP = globals.inZero.copy()
-                        ## Take care - the inflow collected are not sent to the lake properly.
-
-                        resLakeP_inflow =  npareatotal(self.var.resLakeInflowTmp_P, self.var.waterBodyID) + np.where(resLakeInflowCondition == 1, runoff_P_Dt, 0.)
+                        # Phosphorus = 1
+                        resLake_inflow[1, :] =  npareatotal(self.var.resLakeInflowTmp[1, :], self.var.waterBodyID) + np.where(resLakeInflowCondition == 1, runoff_P_Dt, 0.)
                         runoff_P_Dt = np.where(resLakeInflowCondition == 1, 0., runoff_P_Dt)
-                        sumresLakeP_inflow +=  np.compress(self.var.compress_LR, resLakeP_inflow)
+                        sumresLake_P_inflow +=  np.compress(self.var.compress_LR, resLake_inflow[1, :])
 
-                        #sumresLakeP_inflow +=  np.compress(self.var.compress_LR, resLakeP_inflow)
-                        self.var.resLakeSubcompartments_P[:, 0] += np.compress(self.var.compress_LR, resLakeP_inflow)
-                        self.var.resLakeSubcompartments_P, outlakeP_LRC = self.routeSubLakeMass(sublake = self.var.resLakeSubcompartments_P, flowfrac = fracChange, outflowBinary = outflowsBinary)
-                        np.put(outlakeP, self.var.decompress_LR, outlakeP_LRC)
-                        # set input from channel to lakes/reservoirs to zero
-                        self.var.resLakeInflowTmp_P = globals.inZero.copy()
-                        lakeResOut_P_Dt += outlakeP
-                        self.var.resLakeOutflow_P += outlakeP
-                        lakeResOut_P_Dt = np.where(self.var.waterBodyTypTemp > 0, lakeResOut_P_Dt, 0)
-                        lakeResOut_P_Dt = upstream1(self.var.downstruct, lakeResOut_P_Dt)
-
+                    
+                    for i in range(self.var.n_fluxes):
+                        self.var.resLakeSubcompartments[i, :, 0] += np.compress(self.var.compress_LR, resLake_inflow[i,:])
+                        
+                    self.var.resLakeSubcompartments, outlake_LRC = self.routeSubLakeMass(sublake = self.var.resLakeSubcompartments, flowfrac = fracChange, outflowBinary = outflowsBinary)
+                    
+                    if self.var.includeErosed: 
+                        np.put(outlake[0, :], self.var.decompress_LR, outlake_LRC[0, :])
+                        
+                    if self.var.includePhosphorus: 
+                        np.put(outlake[1, :], self.var.decompress_LR, outlake_LRC[1, :])
+                    
+                    # set input from channel to lakes/reservoirs to zero
+                    self.var.resLakeInflowTmp = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                    
+                    
+                    # sum sub-steps outflows
+                    if self.var.includeErosed:
+                        self.var.resLakeOutflow_sed += outlake[0, :]
+                        
+                    if self.var.includePhosphorus:
+                        self.var.resLakeOutflow_P += outlake[1, :]
+                        
+                    # move outflows to channel
+                    lakeResOut_Dt = outlake
+                    lakeResOut_Dt = np.where(self.var.waterBodyTypTemp > 0, lakeResOut_Dt, 0)
+                    for i in range(self.var.n_fluxes):
+                        lakeResOut_Dt[i, :] = upstream1(self.var.downstruct, lakeResOut_Dt[i, :])
+                    
+                    if self.var.includeErosed:
+                        lakeResOut_sed_Dt = lakeResOut_Dt[0, :].copy()
+                    
+                    if self.var.includePhosphorus:
+                        lakeResOut_P_Dt = lakeResOut_Dt[1, :].copy()
             else:
                 lakesResOut = 0
             
@@ -631,39 +705,63 @@ class routing_kinematic(object):
             if self.var.includeWaterQuality:
                 self.waterquality_vars.dynamic()
                 
+                if self.var.includeErosed:
+                    self.var.channel_sed = self.var.channel_sed + (self.var.sum_sedYieldLand * 1000) / self.var.noRoutingSteps
+                    massFluxArray[0, :] = self.var.channel_sed
+                    
                 if self.var.includePhosphorus: 
 
                     self.var.channel_P = self.var.channel_P + runoff_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - channel_P_Abstracted_Dt
-                    gridCellTraveled = divideValues(self.var.DtSec, self.var.travelTime) / self.var.noRoutingSteps
-                    tmp_channelP = self.var.channel_P.copy()
-                    tmp_outletP = globals.inZero.copy()
-                    outlet = globals.inZero.copy()
-                    j = 1
-                    while (gridCellTraveled > 0).any():
-                        fracDown = np.maximum(np.where(gridCellTraveled - 1 < 0, gridCellTraveled, 1.), 0.)
-                        channel, resLakeInflowTmp_P, outlet = self.routeMassDown(x = tmp_channelP, a = fracDown, outletid = outletID,\
-                        lakesCond = resLakeInflowCondition, down = downdirID)
-                        if checkOption('includeWaterBodies'):
-                            self.var.resLakeInflowTmp_P += resLakeInflowTmp_P
-                        tmp_channelP += channel
-                        tmp_outletP += outlet
-                        
-                        gridCellTraveled -= 1
-                        gridCellTraveled = np.where(gridCellTraveled < 0, 0, gridCellTraveled)
-                        j += 1
+                    massFluxArray[1, :] = self.var.channel_P
+                
+                gridCellTraveled = divideValues(self.var.DtSec, self.var.travelTime) / self.var.noRoutingSteps
+                tmp_massFlux = massFluxArray.copy()
+                tmp_massOutlet = np.tile(globals.inZero.copy(), (2, 1))
+                outlet = np.tile(globals.inZero.copy(), (2, 1))
+                
+                j = 1
+                while (gridCellTraveled > 0).any():
+                    fracDown = np.maximum(np.where(gridCellTraveled - 1 < 0, gridCellTraveled, 1.), 0.)
+                    channel, resLakeInflowTmp, outlet = self.routeMassDown(x = tmp_massFlux, a = fracDown, outletid = outletID,\
+                    lakesCond = resLakeInflowCondition, down = downdirID)
+                    if checkOption('includeWaterBodies'):
+                        self.var.resLakeInflowTmp += resLakeInflowTmp
+                    tmp_massFlux += channel
+                    tmp_massOutlet += outlet
                     
-                    self.var.outlet_P += tmp_outletP
-
-                    # add in P
-                    self.var.channel_P = tmp_channelP.copy()
+                    gridCellTraveled -= 1
+                    gridCellTraveled = np.where(gridCellTraveled < 0, 0, gridCellTraveled)
+                    j += 1
+                    
+                    
+                
+                if self.var.includeErosed: 
+                    # flux = 0
+                    self.var.outlet_sed += tmp_massOutlet[0, :]
+                    self.var.channel_sed = tmp_massFlux[0, :].copy() 
+                
+                if self.var.includePhosphorus:
+                    # flux = 1
+                    self.var.outlet_P += tmp_massOutlet[1, :]
+                    self.var.channel_P = tmp_massFlux[1, :].copy()
+        
+        
         if self.var.includeWaterQuality:
+            if self.var.includeErosed: 
+                self.var.channel_sedConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_sed, self.var.channelStorage), 0.)
+                if checkOption('includeWaterBodies'):
+                    np.put(self.var.resLake_sed, self.var.decompress_LR, np.nansum(self.var.resLakeSubcompartments[0, :, :], axis = 1))
+                    # sediment Lake concentration mg per liter
+                    self.var.resLake_sedConc = divideValues(self.var.resLake_sed, self.var.lakeResStorage) * 10**3
+                    np.put(self.var.resLakeInflow_sed, self.var.decompress_LR, sumresLake_sed_inflow)
+            
             if self.var.includePhosphorus:
-                self.var.channel_PConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_P, self.var.channelStorage), 0.)
+                self.var.channel_PConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
                 if checkOption('includeWaterBodies'): 
-                    np.put(self.var.resLake_P, self.var.decompress_LR, np.nansum(self.var.resLakeSubcompartments_P, axis = 1))
+                    np.put(self.var.resLake_P, self.var.decompress_LR, np.nansum(self.var.resLakeSubcompartments[1, :, :], axis = 1))
                     # TDP Lake concentration mg per liter
                     self.var.resLake_PConc = divideValues(self.var.resLake_P, self.var.lakeResStorage) * 10**3
-                    np.put(self.var.resLakeInflow_P, self.var.decompress_LR, sumresLakeP_inflow)
+                    np.put(self.var.resLakeInflow_P, self.var.decompress_LR, sumresLake_P_inflow)
         # -- end substeping ---------------------
    
 
