@@ -152,8 +152,6 @@ class waterquality_erosed(object):
         for variable in erosedVarsSum:
             vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
         
-        
-        
         # channel
         self.var.channel_sed_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_sedConc, self.var.channel_sed), 0.)
         

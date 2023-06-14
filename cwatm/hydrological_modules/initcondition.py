@@ -129,7 +129,7 @@ class initcondition(object):
         self.var.includeWaterQuality =  False
         if 'includeWaterQuality' in option:
             self.var.includeWaterQuality =  checkOption('includeWaterQuality')
-            self.var.n_fluxes = 2
+            self.var.n_fluxes = 3
         if self.var.includeWaterQuality:
             # Phosphorus, EroSed
             self.var.includePhosphorus = False
