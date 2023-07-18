@@ -214,6 +214,9 @@ class waterquality_phosphorus(object):
         self.var.irrigation_P_Abstracted = globals.inZero.copy()
         self.var.returnflowIrr_P = globals.inZero.copy()
         
+        # P retention [fraction]
+        self.var.channelLake_P_retention = globals.inZero.copy()
+        self.var.avg_channelLake_P_retention = globals.inZero.copy()
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
@@ -227,7 +230,33 @@ class waterquality_phosphorus(object):
         
         #create for each soil layer soilmass1 =  bulkdensity1 * cellarea * (thickness of the layer)
         ################################
-       
+    
+    def dynamic_P_retention(self):
+        '''
+            Retention is applied as a fraction proportionally to PP, TDP and inactive P in channels, reservoirs and lakes/reservoirs
+            
+            R = 1 - exp(-(Vf/Hl))
+            
+            where R is retention fraction, Vf is nutrient uptake velocity  and Hl is hydrological loading
+        '''
+        
+        # calculate water bodies volume (live storage) and depth
+        if checkOption('includeWaterBodies'):
+            wb_volume = np.where(self.var.waterBodyTypTemp > 0, self.var.lakeResStorage, self.var.substepChannelStorage)
+            wb_depth = np.where(self.var.waterBodyTypTemp > 0, divideValues(self.var.lakeResStorage , self.var.lakeArea), self.var.waterLevel)
+        else:
+            wb_volume = self.var.substepChannelStorage.copy()
+            wb_depth = self.var.waterLevel.copy()
+            
+        # calculate residence time
+        r_t = divideValues(wb_volume, self.var.discharge)
+        hl = divideValues(wb_depth, r_t)
+        vf = 1.411E-06 * 1.06 ** (self.var.waterTemperature - 20)
+        
+        r_f = 1 - np.exp(-1 * (divideValues(vf, hl)))
+        r_f = np.where(self.var.discharge < 0.01, 0., r_f)
+        return(r_f)
+        
     def dynamic(self):
         # phosphrous dynamic part ###
         day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
@@ -344,9 +373,12 @@ class waterquality_phosphorus(object):
         interflow3_P =  outputs[4].copy()
         toGW = outputs[5].copy()
       
-        # soil flux from EroSed + attched labile (PP into channel)
-        sedYieldLand_PP = np.minimum(divideArrays(self.var.soil_P_labile1, self.var.soilM1) * self.var.sedYieldLand * 1000, self.var.soil_P_labile1)
+        # PP Delivery to channel: soil flux from EroSed + attched labile
         
+        # Enrichment factors based on finer soil praticles
+        E_pp = np.exp(2.00 - 0.16 * np.log(self.var.sedYieldLand * 1000))
+        
+        sedYieldLand_PP = np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1)
         # update soil layer 1 - erosion is only allowed from the top soil
         self.var.soil_P_labile1 -= sedYieldLand_PP
         
