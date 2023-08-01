@@ -316,11 +316,21 @@ class groundwater_modflow:
                 self.thickness[np.isnan(self.thickness)] = 50
                 self.thickness[self.thickness == 0] = 50
                 self.thickness[self.thickness < 0] = 50
+            
+            ## load reduced drainange parameter
+         
+            self.reducedDrainage = cbinding('reduceDrainange')  # default = 0.1
 
+            if is_float(self.reducedDrainage):  # aquifer porosity is constant
+                self.reducedDrainage = float(self.reducedDrainage)
+                self.reducedDrainage = np.full((nlay, self.domain['nrow'], self.domain['ncol']), self.reducedDrainage,
+                                         dtype=np.float32)
+            else:
+                msg = "Error xxx: reduceDrainange requires input of type float "
+                raise CWATMDirError(directory_mf6dll, msg, sname='path_mf6dll')  
             # Converting the CWatM soil thickness into ModFlow map, then soil thickness will be removed from
             # topography if there is a lake or a reservoir soil depth should be replace (instead of 0) by the
             # averaged soil depth (if not the topography under the lake is above neighboring cells)
-
             soildepth_as_GWtop = False
             if 'use_soildepth_as_GWtop' in binding:
                 soildepth_as_GWtop = returnBool('use_soildepth_as_GWtop')
@@ -374,7 +384,8 @@ class groundwater_modflow:
                                                                          self.layer_boundaries[0] - 1,
                                                                          self.layer_boundaries[0]),
                                                 self.layer_boundaries[0])
-
+            
+            self.layer_boundaries[0] = self.layer_boundaries[0] - self.reducedDrainage[0]
             # saving soil thickness at modflow resolution to compute water table depth in postprocessing
             self.var.modflowtotalSoilThickness = soildepth_modflow
 
@@ -638,13 +649,16 @@ class groundwater_modflow:
                 self.modflow2CWATM(self.var.groundwater_storage_top_layer))
 
             assert self.permeability.ndim == 3
+
             # computing the groundwater outflow by re-computing water outflowing the aquifer through the DRAIN ModFlow package
+            
+    
             groundwater_outflow = np.where(head - self.layer_boundaries[0] >= 0,
                                            (head - self.layer_boundaries[0]) * self.coefficient * self.permeability[0],
                                            0)  # in m/day per ModFlow cell
             groundwater_outflow2 = np.where(head - self.layer_boundaries[0] >= 0, 1.0,
                                             0.0)  # For the next step, it will prevent recharge where ModFlow cells are saturated, even if there is no capillary rise (where h==topo)
-
+        
             # capillary rise and baseflow from groundwater are allocated in function of the river percentage of each ModFlow cell
             capillar = groundwater_outflow * (1 - self.var.channel_ratio)  # We are still in ModFlow coordinate
             baseflow = groundwater_outflow * self.var.channel_ratio  # We are still in ModFlow coordinate
