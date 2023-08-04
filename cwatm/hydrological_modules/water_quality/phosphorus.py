@@ -36,7 +36,7 @@ class waterquality_phosphorus(object):
     **Functions**
     """
     
-    def discretizeSoilP(self, Plab, TDP, EPC0, P_in, Qr, Qi, Qp, Kf, soilmass, Vs):
+    def discretizeSoilP(self, Plab, TDP, EPC0, P_in, Qr, Qi, Qp, Kf, soilmass, Vs, runoff_adj):
         
         # Variables:
         # Labile p stocks, Dissolved P stocks, Labile P inputs, P outputs in runoff, interflow, and percolation/groundwater recharge,
@@ -68,7 +68,7 @@ class waterquality_phosphorus(object):
         
         
         # calculate fluxes (in kg)
-        P_Qr = Qr * divideArrays(preTDP, Vs)
+        P_Qr = (Qr * (divideArrays(preTDP , Vs))) * runoff_adj # calibration parameter runoff_adj > 0 
         P_Qi = Qi * divideArrays(preTDP, Vs)
         P_Qp = Qp * divideArrays(preTDP, Vs)
         
@@ -182,36 +182,47 @@ class waterquality_phosphorus(object):
         self.var.interflow_P = globals.inZero.copy()
         self.var.baseflow_P = globals.inZero.copy()
         self.var.sedYieldLand_PP = globals.inZero.copy()
+        self.var.sedYieldLand_inactiveP = globals.inZero.copy()
         
         # channel phsophorus [kg]
         self.var.channel_P = globals.inZero.copy()
         self.var.channel_PP = globals.inZero.copy()
+        self.var.channel_inactiveP = globals.inZero.copy()
         self.var.channel_PConc = globals.inZero.copy()
         self.var.channel_PPConc = globals.inZero.copy()
+        self.var.channel_inactivePConc = globals.inZero.copy()
         self.var.outlet_P = globals.inZero.copy()
         self.var.outlet_PP = globals.inZero.copy()
+        self.var.outlet_inactiveP = globals.inZero.copy()
         
         # lake reservoirs [kg]
         self.var.resLakeInflow_P = globals.inZero.copy()
         self.var.resLakeInflow_PP = globals.inZero.copy()
+        self.var.resLakeInflow_inactiveP = globals.inZero.copy()
         self.var.resLakeOutflow_P = globals.inZero.copy()
         self.var.resLakeOutflow_PP = globals.inZero.copy()
+        self.var.resLakeOutflow_inactiveP = globals.inZero.copy()
         self.var.resLake_P = globals.inZero.copy()
         self.var.resLake_PP = globals.inZero.copy()
+        self.var.resLake_inactiveP = globals.inZero.copy()
         self.var.resLake_PConc = globals.inZero.copy()
         self.var.resLake_PPConc = globals.inZero.copy()
+        self.var.resLake_inactivePConc = globals.inZero.copy()
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
         # abstraction [kg]
         self.var.channel_P_Abstracted = globals.inZero.copy()
         self.var.channel_PP_Abstracted = globals.inZero.copy()
+        self.var.channel_inactiveP_Abstracted = globals.inZero.copy()
         self.var.resLake_P_Abstracted = globals.inZero.copy()
         self.var.resLake_PP_Abstracted = globals.inZero.copy()
+        self.var.resLake_inactiveP_Abstracted = globals.inZero.copy()
         self.var.groundwater_P_Abstracted = globals.inZero.copy()
         self.var.domestic_P_Abstracted = globals.inZero.copy()
         self.var.livestock_P_Abstracted = globals.inZero.copy()
         self.var.industry_P_Abstracted = globals.inZero.copy()
         self.var.irrigation_P_Abstracted = globals.inZero.copy()
+        self.var.irrigation_inactiveP_Abstracted = globals.inZero.copy()
         self.var.returnflowIrr_P = globals.inZero.copy()
         
         # P retention [fraction]
@@ -256,7 +267,43 @@ class waterquality_phosphorus(object):
         r_f = 1 - np.exp(-1 * (divideValues(vf, hl)))
         r_f = np.where(self.var.discharge < 0.01, 0., r_f)
         return(r_f)
+    
+    def dynamic_channel_sorption(self, TDP, PP, Mss, Kf_w, n_w, v, t):
+        # function goes here - to be used in routing sub-steps
+        '''
+        dPP - Sorption/de-soprtion flux [kg / subtimestep]
+        TDP - Total dissolved P in channel/lake [kg]
+        PP  -  Total particulate P in channel/lake [kg]
+        Msss -  Total suspended solids in channel/lake [kg]
         
+        Kf_w - Water column sorption coefficient [m3 / kg]
+        n_w - Water column Freundlich isotherm constant [unitless]
+        v - water volume in channel/lake [m3]
+        t - number of sub-timesteps
+        
+        # check units in doc. and when loading inputs
+        '''
+        TDPc = divideValues(TDP, v)
+        # EPC0_w - Water column equilibrium TDP concentration of zero sorption [kg/m3]
+        if Kf_w <= 0:
+            EPC0_w = TDPc.copy()
+        else:
+            EPC0_w = divideValues(PP, Kf_w * Mss) ** n_w
+            EPC0_w = np.where(Mss <= 1, TDPc, np.where(PP <= 1 , TDPc, EPC0_w))
+            
+       
+        
+        dPP = Kf_w * (TDPc ** (1 / n_w) - EPC0_w ** (1 / n_w)) * v
+        
+        # restrict by availability of TDP/PP and calculater per sub-timestep
+        dPPt = np.where(dPP < 0, np.minimum(np.abs(dPP / t), PP / t), np.minimum(dPP / t, TDP / t))
+        
+        # update TDP and PP & return TDP, PP & EPC0_w
+        PP += dPPt
+        TDP -= dPPt
+        
+        return TDP, PP, EPC0_w
+
     def dynamic(self):
         # phosphrous dynamic part ###
         day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
@@ -300,8 +347,9 @@ class waterquality_phosphorus(object):
         self.var.soil_P_input1[1] = PSoil_Input1 *  self.var.managedGrassland
         self.var.soil_P_input2[1] = PSoil_Input2 *  self.var.managedGrassland
         
-        # add irrigation to TDP
+        # add irrigation to TDP & inactive to inactive
         self.var.soil_P_input1[3] += self.var.sum_irrigation_P_Applied
+        self.var.soil_P_inactive1[3] += self.var.sum_irrigation_inactiveP_Applied
         
         # temporary
         pre_lab1 = self.var.soil_P_labile1.copy()
@@ -331,7 +379,7 @@ class waterquality_phosphorus(object):
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile1, TDP = self.var.soil_P_dissolved1,\
             EPC0 =  self.var.EPC1, P_in = self.var.soil_P_input1,\
             Qr = nonNaturalDirectRunoff, Qi = globals.inZero, Qp = self.var.perc1to2,\
-            Kf = self.var.Kf, soilmass = self.var.soilM1, Vs = self.var.w1)
+            Kf = self.var.Kf, soilmass = self.var.soilM1, Vs = self.var.w1, runoff_adj = self.var.runoff_Padj)
 
         # update variables
         self.var.soil_P_labile1 =  outputs[0].copy()
@@ -346,7 +394,7 @@ class waterquality_phosphorus(object):
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile2, TDP = self.var.soil_P_dissolved2,\
             EPC0 =  self.var.EPC2, P_in = self.var.soil_P_input2 + perc1to2_P,\
             Qr = globals.inZero, Qi = self.var.interflow[0:4] * interflowDivider, Qp = self.var.perc2to3,\
-            Kf = self.var.Kf, soilmass = self.var.soilM2, Vs = self.var.w2)
+            Kf = self.var.Kf, soilmass = self.var.soilM2, Vs = self.var.w2, runoff_adj = self.var.runoff_Padj)
         
         # update variables
         self.var.soil_P_labile2 =  outputs[0].copy()
@@ -362,7 +410,7 @@ class waterquality_phosphorus(object):
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile3, TDP = self.var.soil_P_dissolved3,\
             EPC0 =  self.var.EPC3, P_in = perc2to3_P,\
             Qr = globals.inZero, Qi = self.var.interflow[0:4] * (1- interflowDivider), Qp = self.var.grossGWrechargeFromSoil[0:4],\
-            Kf = self.var.Kf, soilmass = self.var.soilM3, Vs = self.var.w3)
+            Kf = self.var.Kf, soilmass = self.var.soilM3, Vs = self.var.w3, runoff_adj = self.var.runoff_Padj)
         
         # update variables
         self.var.soil_P_labile3 =  outputs[0].copy()
@@ -376,16 +424,19 @@ class waterquality_phosphorus(object):
         # PP Delivery to channel: soil flux from EroSed + attched labile
         
         # Enrichment factors based on finer soil praticles
-        E_pp = np.exp(2.00 - 0.16 * np.log(self.var.sedYieldLand * 1000))
+
+        E_pp = np.where(self.var.sedYieldLand * 1000 > 0.1, np.exp(2.00 - 0.16 * np.log(self.var.sedYieldLand * 0.1)), 1.) # sedYieldLand * 1000 (to kg) / 10000 (per ha)
         
-        sedYieldLand_PP = np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1)
+        sedYieldLand_PP = np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1) 
+        sedYieldLand_inactiveP = np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_inactive1, self.var.soilM1), self.var.soil_P_inactive1) 
         # update soil layer 1 - erosion is only allowed from the top soil
         self.var.soil_P_labile1 -= sedYieldLand_PP
-        
+        self.var.soil_P_inactive1 -= sedYieldLand_inactiveP
         # sum outflows
         
         # PP into channel [kg]
         self.var.sedYieldLand_PP = np.nansum(sedYieldLand_PP * self.var.fracVegCover[0:4], axis = 0)
+        self.var.sedYieldLand_inactiveP = np.nansum(sedYieldLand_inactiveP * self.var.fracVegCover[0:4], axis = 0)
         
         # runoff [kg]
         self.var.directRunoff_P = np.nansum(directRunoff_P * self.var.fracVegCover[0:4], axis = 0)
@@ -417,6 +468,7 @@ class waterquality_phosphorus(object):
         # channel
         self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_PConc * 10**3, self.var.channel_P), 0.)
         self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_PPConc * 10**3 , self.var.channel_PP), 0.)
+        self.var.channel_inactiveP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_inactivePConc * 10**3 , self.var.channel_inactiveP), 0.)
         
         '''
         # lake/reservoir
@@ -450,6 +502,12 @@ class waterquality_phosphorus(object):
             self.var.resLake_P_Abstracted * divideValues(self.var.Lake_Irrigation + self.var.Res_Irrigation, self.var.totalIrrDemand) +\
             self.var.groundwater_P_Abstracted * divideValues(self.var.GW_Irrigation, self.var.totalIrrDemand)
         
+        self.var.irrigation_inactiveP_Abstracted = (self.var.channel_inactiveP_Abstracted) * divideValues(self.var.Channel_Irrigation, self.var.totalIrrDemand) +\
+            self.var.resLake_inactiveP_Abstracted * divideValues(self.var.Lake_Irrigation + self.var.Res_Irrigation, self.var.totalIrrDemand)
+            
         # irrigation returnFlows
         self.var.returnflowIrr_P = np.minimum(self.var.irrigation_P_Abstracted  * divideValues(self.var.returnflowIrr, self.var.act_irrWithdrawal), self.var.irrigation_P_Abstracted)
+        self.var.returnflowIrr_inactiveP = np.minimum(self.var.irrigation_inactiveP_Abstracted  * divideValues(self.var.returnflowIrr, self.var.act_irrWithdrawal), self.var.irrigation_inactiveP_Abstracted)
+        
         self.var.sum_irrigation_P_Applied = self.var.irrigation_P_Abstracted - self.var.returnflowIrr_P
+        self.var.sum_irrigation_inactiveP_Applied = self.var.irrigation_inactiveP_Abstracted - self.var.returnflowIrr_inactiveP

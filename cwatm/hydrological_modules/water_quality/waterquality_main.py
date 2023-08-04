@@ -65,11 +65,11 @@ class water_quality(object):
                                   'soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3',\
                                   'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3',\
                                   'EPC1', 'EPC2', 'EPC3', 'runoff_P', 'toGroundwater_P',\
-                                  'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
+                                  'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
                                   
                 phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
-                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
+                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
                                 
                 phosphorusVarsSumCat = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
@@ -368,7 +368,7 @@ class water_quality(object):
             # sum total soil P stocks [kg / m2] 
             phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
-                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
+                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
                                 
             for variable in phosphorusVarsSum:
                 vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
@@ -428,15 +428,35 @@ class water_quality(object):
             self.var.sum_soil_P_labileConc2_managed =  divideValues(self.var.sum_soil_P_labile2_managed, self.var.sum_soilM2_f_managed) * 10**6
             self.var.sum_soil_P_labileConc3_managed =  divideValues(self.var.sum_soil_P_labile3_managed, self.var.sum_soilM3_f_managed) * 10**6
             
-            self.var.sum_soil_P_labileConc_managed = divideValues(self.var.sum_soil_P_labile1_managed + self.var.sum_soil_P_labile2_managed + self.var.sum_soil_P_labile3_managed,\
+            # P inactive soil concentration [mg / kg soil] - miligram 
+            self.var.sum_soil_P_inactiveConc1 = divideValues(self.var.sum_soil_P_inactive1, self.var.soilM1) * 10**6
+            self.var.sum_soil_P_inactiveConc2 = divideValues(self.var.sum_soil_P_inactive2, self.var.soilM2) * 10**6
+            self.var.sum_soil_P_inactiveConc3 = divideValues(self.var.sum_soil_P_inactive3, self.var.soilM3) * 10**6
+            
+            # natural landcovers
+            self.var.sum_soil_P_inactiveConc1_natural =  divideValues(self.var.sum_soil_P_inactive1_natural, self.var.sum_soilM1_f_natural) * 10**6
+            self.var.sum_soil_P_inactiveConc2_natural =  divideValues(self.var.sum_soil_P_inactive2_natural, self.var.sum_soilM2_f_natural) * 10**6
+            self.var.sum_soil_P_inactiveConc3_natural =  divideValues(self.var.sum_soil_P_inactive3_natural, self.var.sum_soilM3_f_natural) * 10**6
+            
+            self.var.sum_soil_P_inactiveConc_natural = divideValues(self.var.sum_soil_P_inactive1_natural + self.var.sum_soil_P_inactive2_natural + self.var.sum_soil_P_inactive3_natural,\
+                self.var.sum_soilM1_f_natural + self.var.sum_soilM2_f_natural + self.var.sum_soilM3_f_natural) * 10**6
+            
+            # managed landcovers
+            self.var.sum_soil_P_inactiveConc1_managed =  divideValues(self.var.sum_soil_P_inactive1_managed, self.var.sum_soilM1_f_managed) * 10**6
+            self.var.sum_soil_P_inactiveConc2_managed =  divideValues(self.var.sum_soil_P_inactive2_managed, self.var.sum_soilM2_f_managed) * 10**6
+            self.var.sum_soil_P_inactiveConc3_managed =  divideValues(self.var.sum_soil_P_inactive3_managed, self.var.sum_soilM3_f_managed) * 10**6
+            
+            self.var.sum_soil_P_inactiveConc_managed = divideValues(self.var.sum_soil_P_inactive1_managed + self.var.sum_soil_P_inactive2_managed + self.var.sum_soil_P_inactive3_managed,\
                 self.var.sum_soilM1_f_managed + self.var.sum_soilM2_f_managed + self.var.sum_soilM3_f_managed) * 10**6
             
             # sum soil P  [kg]
             self.var.tot_soil_P_dissolved = self.var.sum_soil_P_dissolved1 + self.var.sum_soil_P_dissolved2 + self.var.sum_soil_P_dissolved3
             self.var.tot_soil_P_labile = self.var.sum_soil_P_labile1 + self.var.sum_soil_P_labile2 + self.var.sum_soil_P_labile3
+            self.var.tot_soil_P_inactive = self.var.sum_soil_P_inactive1 + self.var.sum_soil_P_inactive2 + self.var.sum_soil_P_inactive3
             
             self.var.tot_soil_P_dissolvedConc = divideValues(self.var.tot_soil_P_dissolved, (self.var.sum_w1 + self.var.sum_w2 + self.var.sum_w3)* self.var.cellArea) * 10**3
             self.var.tot_soil_P_labileConc = divideValues(self.var.tot_soil_P_labile, self.var.soilM1 + self.var.soilM2 + self.var.soilM3) * 10**6
+            self.var.tot_soil_P_inactiveConc = divideValues(self.var.tot_soil_P_inactive, self.var.soilM1 + self.var.soilM2 + self.var.soilM3) * 10**6
 
             
             # sum soil P input [kg]
