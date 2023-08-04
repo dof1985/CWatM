@@ -228,6 +228,16 @@ class waterquality_phosphorus(object):
         # P retention [fraction]
         self.var.channelLake_P_retention = globals.inZero.copy()
         self.var.avg_channelLake_P_retention = globals.inZero.copy()
+        
+        # In stream/lake sorption/de-sorption
+        self.var.n_water = globals.inZero.copy() + 1.
+        if 'n_water' in binding:
+            self.var.n_water = loadmap('n_water')
+        
+        # 1.612 - m3/kg <--> 1612 l/kg
+        self.var.kf_water = globals.inZero.copy() + 1. # [l/kg]
+        if 'kf_water' in binding:
+            self.var.kf_water = loadmap('kf_water')
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
@@ -285,23 +295,20 @@ class waterquality_phosphorus(object):
         '''
         TDPc = divideValues(TDP, v)
         # EPC0_w - Water column equilibrium TDP concentration of zero sorption [kg/m3]
-        if Kf_w <= 0:
-            EPC0_w = TDPc.copy()
-        else:
-            EPC0_w = divideValues(PP, Kf_w * Mss) ** n_w
-            EPC0_w = np.where(Mss <= 1, TDPc, np.where(PP <= 1 , TDPc, EPC0_w))
-            
+        EPC0_w = divideValues(PP, Kf_w * Mss) ** n_w
+        EPC0_w = np.where(Mss <= 1, TDPc, np.where(PP <= 1 , TDPc, EPC0_w))
+        EPC0_w = np.where(Kf_w <= 0, TDPc, EPC0_w)
        
-        
         dPP = Kf_w * (TDPc ** (1 / n_w) - EPC0_w ** (1 / n_w)) * v
         
-        # restrict by availability of TDP/PP and calculater per sub-timestep
-        dPPt = np.where(dPP < 0, np.minimum(np.abs(dPP / t), PP / t), np.minimum(dPP / t, TDP / t))
+        # restrict by availability of TDP/PP and calculate per sub-timestep
+        dPPt = np.where(dPP < 0, -1 * np.minimum(np.abs(dPP / t), PP / t), np.minimum(dPP / t, TDP / t))
         
+
         # update TDP and PP & return TDP, PP & EPC0_w
         PP += dPPt
         TDP -= dPPt
-        
+
         return TDP, PP, EPC0_w
 
     def dynamic(self):
