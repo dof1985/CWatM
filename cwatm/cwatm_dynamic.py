@@ -93,7 +93,7 @@ class CWATModel_dyn(DynamicModel):
         
         if self.var.includeWaterQuality:
             self.waterquality_module.dynamic()
-            
+
         self.runoff_concentration_module.dynamic()
         timemeasure("Runoff conc.")  # 8. timing
 
@@ -168,6 +168,7 @@ class CWATModel_dyn(DynamicModel):
         if self.var.modflow:
             if self.currentStep == self.lastStep:
                 self.groundwater_modflow_module.modflow.finalize()
+        
 
 
         #self.var.sumsum_directRunoff += self.var.sum_directRunoff

@@ -82,7 +82,29 @@ class waterquality_erosed(object):
 
         # channel flow time of concentration: unrealistic values. substituted wth. self.var.travelTime
         #tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))
+        
+        # channel sediment [kg]
+        self.var.channel_sed = globals.inZero.copy()
+        self.var.channel_sedConc = globals.inZero.copy()
+        self.var.outlet_sed = globals.inZero.copy()
+        
+        # lake reservoirs [kg]
+        self.var.resLakeInflow_sed = globals.inZero.copy()
+        self.var.resLakeOutflow_sed = globals.inZero.copy()
+        self.var.resLake_sed = globals.inZero.copy()
+        self.var.resLake_sedConc = globals.inZero.copy()
+        #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
+        # abstraction [kg]
+        self.var.channel_sed_Abstracted = globals.inZero.copy()
+        self.var.resLake_sed_Abstracted = globals.inZero.copy()
+        self.var.groundwater_sed_Abstracted = globals.inZero.copy()
+        self.var.domestic_sed_Abstracted = globals.inZero.copy()
+        self.var.livestock_sed_Abstracted = globals.inZero.copy()
+        self.var.industry_sed_Abstracted = globals.inZero.copy()
+        self.var.irrigation_sed_Abstracted = globals.inZero.copy()
+        self.var.returnflowIrr_sed = globals.inZero.copy()
+        
     def dynamic(self):
         """
         Dynamic part of EROSED module
@@ -123,25 +145,13 @@ class waterquality_erosed(object):
 
         # MUSLE: sediment yield per day and grid in [1000 kg]
 
-        # read parameters from settingsfile
-        #self.var.sedYieldLand = np.tile(globals.inZero, (4, 1))
-        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr
+        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) *\
+            self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.fcfr
         #self.var.sedYieldLand_sum = np.nansum(self.var.fracVegCover[0:4]*self.var.sedYieldLand, axis=0)
         erosedVarsSum = ['sedYieldLand']
         for variable in erosedVarsSum:
             vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
-
-
-        #print(np.nanmean(self.var.sedYieldLand, axis=1))
-        #print(np.nanmean(self.var.qpeak, axis=1))
-        #print(self.var.discharge)
-        #print(self.var.runoffEnergyFactor)
-        #print("erosed dyn")
-        #print(np.nanmean(self.var.travelTime)/3600)
-        #print('tconc_min:', np.nanmin(self.var.tconc), 'tconc_max:', np.nanmax(self.var.tconc), 'tconc_mean', np.nanmean(self.var.tconc))
-        #print('tch_min:', np.nanmin(tch), 'tch_max:', np.nanmax(tch), 'tch_mean', np.nanmean(tch))
-        #print('sedYield min,max,mean:', np.nanmin(self.var.sedYieldLand), np.nanmax(self.var.sedYieldLand), np.nanmean(self.var.sedYieldLand))
-        print('sum_sedYield min,max,mean:', np.nanmin(self.var.sum_sedYieldLand), np.nanmax(self.var.sum_sedYieldLand), np.nanmean(self.var.sum_sedYieldLand))
-        #print('tconc:', np.nanmean(self.var.tconc, axis=1))
-        #print('tch_traveltime min,max,mean:', np.nanmin(self.var.travelTime), np.nanmax(self.var.travelTime), np.nanmean(self.var.travelTime))
-        #print('tch_traveltime min,max,mean:', np.nanmin(self.var.tch_man), np.nanmax(self.var.tch_man), np.nanmean(self.var.tch_man))
+        
+        # channel
+        self.var.channel_sed_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_sedConc, self.var.channel_sed), 0.)
+        
