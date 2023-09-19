@@ -817,7 +817,7 @@ class water_demand:
         """
 
         if self.var.modflow:
-
+            self.var.modfPumpingM = globals.inZero.copy()
             if self.var.includeIndusDomesDemand:  # all demands are taken into account
                 self.environmental_need.dynamic()
             else:
@@ -1974,14 +1974,17 @@ class water_demand:
 
             if self.var.modflow:
                 # if available storage is too low, no pumping in this cell (defined in transient module)
-
-                self.var.nonFossilGroundwaterAbs = np.where(self.var.groundwater_storage_available > (
-                        1 - self.var.availableGWStorageFraction) * self.var.gwstorage_full,
-                                                            np.minimum(self.var.groundwater_storage_available,
-                                                                       self.var.pot_GroundwaterAbstract), 0)
+                
+                self.var.nonFossilGroundwaterAbs = np.minimum(self.var.groundwater_storage_available,
+                                                                       self.var.pot_GroundwaterAbstract)
+                #self.var.nonFossilGroundwaterAbs = np.where(self.var.groundwater_storage_available > (
+                #        1 - self.var.availableGWStorageFraction) * self.var.gwstorage_full,
+                #                                            np.minimum(self.var.groundwater_storage_available,
+                #                                                       self.var.pot_GroundwaterAbstract), 0)
             else:
                 self.var.nonFossilGroundwaterAbs = np.maximum(0., np.minimum(self.var.readAvlStorGroundwater,
                                                                              self.var.pot_GroundwaterAbstract))
+                                                                             
 
             # if limitAbstraction from groundwater is True
             # fossil gwAbstraction and water demand may be reduced
@@ -2268,6 +2271,7 @@ class water_demand:
                     self.var.modfPumpingM += act_gw
                     self.var.Pumping_daily = np.copy(act_gw)
                     self.var.PumpingM3_daily = act_gw * self.var.cellArea
+                    
 
             if self.var.sectorSourceAbstractionFractions:
 

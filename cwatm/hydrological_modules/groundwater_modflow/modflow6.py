@@ -38,9 +38,11 @@ class ModFlowSimulation:
         top,
         bottom,
         basin,
+        confined_only,              
         head,
         topography,
         permeability,
+        permeability_vertical,
         load_from_disk=False,
         setpumpings=False,
         pumpingloc=None,
@@ -98,7 +100,7 @@ class ModFlowSimulation:
                 ims = flopy.mf6.ModflowIms(sim, print_option=None, complexity='SIMPLE', linear_acceleration='BICGSTAB',
                                            rcloserecord=[0.1 * 24 * 3600 * timestep * np.nansum(basin),
                                                          'L2NORM_RCLOSE'])
-
+      
 
             # create gwf model
             # MODIF LUCA
@@ -109,7 +111,7 @@ class ModFlowSimulation:
                 botm=bottom, idomain=self.basin, nogrb=True)
 
             initial_conditions = flopy.mf6.ModflowGwfic(gwf, strt=head)
-            node_property_flow = flopy.mf6.ModflowGwfnpf(gwf, save_flows=True, icelltype=1, k=permeability*timestep)
+            node_property_flow = flopy.mf6.ModflowGwfnpf(gwf, save_flows=True, icelltype=confined_only, k=permeability*timestep, k33=permeability_vertical*timestep)
 
             # MODIF LUCA
             output_control = flopy.mf6.ModflowGwfoc(gwf, head_filerecord=f'{self.name}.hds',
@@ -127,17 +129,19 @@ class ModFlowSimulation:
 
             storage = flopy.mf6.ModflowGwfsto(gwf,
                 save_flows=False,
-                iconvert=1,
+                iconvert=confined_only,
                 ss=specific_storage,  # specific storage
                 sy=specific_yield,  # specific yield
                 steady_state=False,
                 transient=True,
             )
-
-            recharge = np.zeros((self.basin.sum(), 4), dtype=np.int32)
-            recharge_locations = np.where(self.basin == True)  # only set wells where basin is True
+           
+            basin_map = np.where(self.basin[0], self.basin[0], False)
+            
+            recharge = np.zeros((basin_map.sum(), 4), dtype=np.int32)
+            recharge_locations = np.where(basin_map == True)  # only set wells where basin is True
             # 0: layer, 1: y-idx, 2: x-idx, 3: rate
-            recharge[:,0] = 0
+            recharge[:, 0] = 0
             recharge[:, 1] = recharge_locations[0]
             recharge[:, 2] = recharge_locations[1]
             #recharge = np.zeros((self.basin.sum(), 2), dtype=np.int32)
@@ -154,23 +158,35 @@ class ModFlowSimulation:
                 wells = np.zeros((self.wellsloc.sum(), 4), dtype=np.int32)
                 well_locations = np.where(self.wellsloc == True)  # only set wells where basin is True
                 # 0: layer, 1: y-idx, 2: x-idx, 3: rate
-                wells[:, 1] = well_locations[0]
-                wells[:, 2] = well_locations[1]
+                wells[:, 0] = well_locations[0]
+                wells[:, 1] = well_locations[1]                
+                wells[:, 2] = well_locations[2]
+                #wells[:, 1] = well_locations[0]
+                #wells[:, 2] = well_locations[1]
                 wells = wells.tolist()
 
                 # Pumping is < 0 for abstraction, and is already given here in m3/timestep per ModFlow cell
                 wells = flopy.mf6.ModflowGwfwel(gwf, print_input=False, print_flows=False, save_flows=False,
                                             maxbound=self.basin.sum(), stress_period_data=wells,
                                             boundnames=False, auto_flow_reduce=0.1)
-
+            
             # MODIF LUCA
+            topography2 = np.array([topography] * nlay)
+            permeability2 = permeability.copy()
+            
             drainage = np.zeros((self.basin.sum(), 5))  # Only i,j,k indices should be integer
             drainage_locations = np.where(self.basin == True)  # only set wells where basin is True
             # 0: layer, 1: y-idx, 2: x-idx, 3: drainage altitude, 4: permeability
-            drainage[:, 1] = drainage_locations[0]
-            drainage[:, 2] = drainage_locations[1]
-            drainage[:, 3] = topography[drainage_locations]  # This one should not be an integer
-            drainage[:, 4] = permeability[0, self.basin == True] * self.rowsize * self.colsize * timestep
+            drainage[:, 0] = drainage_locations[0]
+            drainage[:, 1] = drainage_locations[1]
+            drainage[:, 2] = drainage_locations[2]
+            drainage[:, 3] = topography2[drainage_locations]  # This one should not be an integer
+            drainage[:, 4] = permeability2[self.basin == True] * self.rowsize * self.colsize * timestep # re
+            
+            #drainage[:, 1] = drainage_locations[0]
+            #drainage[:, 2] = drainage_locations[1]
+            #drainage[:, 3] = topography[drainage_locations]  # This one should not be an integer
+            #drainage[:, 4] = permeability[0, self.basin == True] * self.rowsize * self.colsize * timestep
             drainage = drainage.tolist()
             drainage = [[int(i), int(j), int(k) ,l, m] for i, j, k, l, m in drainage]  # MODIF LUCA
 
@@ -181,9 +197,8 @@ class ModFlowSimulation:
             # sim.run_simulation()
         elif self.verbose:
             print("Loading MODFLOW model from disk")
-        
         self.load_bmi(setpumpings)
-
+        
     def bmi_return(self, success, model_ws):
         """
         parse libmf6.so and libmf6.dll stdout file
@@ -256,7 +271,7 @@ class ModFlowSimulation:
 
         mxit_tag = self.mf6.get_var_address("MXITER", "SLN_1")
         self.max_iter = self.mf6.get_value_ptr(mxit_tag)[0]
-
+       
         self.prepare_time_step()
 
     def compress(self, a):
@@ -273,7 +288,8 @@ class ModFlowSimulation:
 
     def set_recharge(self, recharge):
         """Set recharge, value in m/day"""
-        recharge = recharge[self.basin == True]
+        basin_map =  self.basin.copy()[0]                              
+        recharge = recharge[0][basin_map == True]
         self.recharge[:] = recharge * (self.rowsize * self.colsize)
     
     def set_groundwater_abstraction(self, groundwater_abstraction):
@@ -287,7 +303,7 @@ class ModFlowSimulation:
     def step(self, plot=False):
         if self.mf6.get_current_time() > self.end_time:
             raise StopIteration("MODFLOW used all iteration steps. Consider increasing `ndays`")
-
+        
         t0 = time()
         # loop over subcomponents
         n_solutions = self.mf6.get_subcomponent_count()
@@ -304,7 +320,7 @@ class ModFlowSimulation:
                     break
 
             self.mf6.finalize_solve(solution_id)
-
+        
         self.mf6.finalize_time_step()
 
         if self.verbose:

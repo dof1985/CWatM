@@ -106,7 +106,7 @@ class CWATModel_dyn(DynamicModel):
         # [m3] >> [m] --> * InvCellArea
 
         if self.var.modflow:
-            groundwater_storage = self.var.groundwater_storage_available
+            groundwater_storage = self.var.groundwater_storage_total
         else:
             groundwater_storage = self.var.storGroundwater
 
