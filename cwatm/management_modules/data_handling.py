@@ -1078,8 +1078,8 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
         name = cbinding(namebinding)
     filename =  os.path.normpath(name)
     
-    
-    cut0, cut1, cut2, cut3 = mapattrNetCDF(filename, check = False)
+    if cut:
+        cut0, cut1, cut2, cut3 = mapattrNetCDF(filename, check = False)
 
     try:
        nf1 = Dataset(filename, 'r')
