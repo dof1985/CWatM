@@ -84,8 +84,6 @@ class waterquality_vars(object):
         # in van Vliet et al. 2012 (from Lohmann et al., 1998; Leopold and Maddock, 1953; Allen et al. (1994))
 
 
-
-
         #flowVelocity = np.minimum(self.var.discharge /self.var.totalCrossSectionArea, 0.36*self.var.discharge**0.24)
         flowVelocity = np.minimum(self.var.discharge / self.var.crossArea,0.36 * dis ** 0.24)
         flowVelocity = np.maximum(flowVelocity, 10.*0.0011575)

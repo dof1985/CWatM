@@ -16,7 +16,7 @@ from cwatm.hydrological_modules.water_quality.waterquality_vars import waterqual
 
 class routing_kinematic(object):
 
-    """
+    '''
     ROUTING
 
     routing using the kinematic wave
@@ -124,7 +124,7 @@ class routing_kinematic(object):
     =====================================  ======================================================================  =====
 
     **Functions**
-    """
+    '''
 
     def __init__(self, model):
         self.var = model.var
@@ -546,6 +546,7 @@ class routing_kinematic(object):
                 
                 # INPUTS
                 runoff_P_Dt = self.var.runoff_P / self.var.noRoutingSteps
+                mineralWeat_P_Dt = self.var.mineralWeat_P / self.var.noRoutingSteps
                 returnflowIrr_P_Dt = globals.inZero.copy()
                 #self.var.returnflowIrr_P /  self.var.noRoutingSteps
                 input_PP_Dt = self.var.sedYieldLand_PP / self.var.noRoutingSteps
@@ -782,7 +783,7 @@ class routing_kinematic(object):
                     
                 if self.var.includePhosphorus: 
 
-                    self.var.channel_P = np.maximum(self.var.channel_P + runoff_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - channel_P_Abstracted_Dt, 0.)
+                    self.var.channel_P = np.maximum(self.var.channel_P + runoff_P_Dt + mineralWeat_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - channel_P_Abstracted_Dt, 0.)
                     self.var.channel_P = np.where(self.var.channel_P <= minMassAllowed, 0., self.var.channel_P)
                     massFluxArray[1, :] = self.var.channel_P
 
@@ -1026,7 +1027,7 @@ class routing_kinematic(object):
                     "lake_res", False)
 
 #### IMPORTANT set Routingstep to 1 to test!
-        """
+        '''
         if checkOption('calcWaterBalance'):
             self.model.waterbalance_module.waterBalanceCheck(
                 [runoffM3, lakesResOut ],  # In
@@ -1081,10 +1082,10 @@ class routing_kinematic(object):
                 [self.var.prechannelStorage, self.var.prelakeResStorage],   # prev storage
                 [self.var.channelStorage, self.var.lakeResStorage],
                 "rout8", False)  # without waterbody
-        """
+        '''
 
 
-        """
+        '''
         a = readmap("C:\work\output/q_pcr")
         b = nominal(a*100)
         c = ifthenelse(b == 105779, scalar(9999), scalar(0))
@@ -1093,7 +1094,7 @@ class routing_kinematic(object):
         np.where(d == 9999)   #23765
         e = pcr2numpy(c, 0).astype(np.float64)
         np.where(e > 9000)   # 75, 371  -> 76, 372
-        """
+        '''
 
 
 

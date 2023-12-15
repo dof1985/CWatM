@@ -18,7 +18,7 @@ from cwatm.hydrological_modules.water_quality.phosphorus import waterquality_pho
 from cwatm.hydrological_modules.water_quality.erosed import waterquality_erosed
 
 class water_quality(object):
-    """
+    '''
     WATER QUALITY - MAIN MODULE
         
     Note:
@@ -39,7 +39,7 @@ class water_quality(object):
     =====================================  ======================================================================  =====
 
     **Functions**
-    """
+    '''
 
     def __init__(self, model):
         self.var = model.var
@@ -59,7 +59,6 @@ class water_quality(object):
             for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))            
             
             # Create sub-modules variables
-            
             if self.var.includePhosphorus:
                 phosphorusVars = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3',\
                                   'soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3',\
@@ -80,7 +79,7 @@ class water_quality(object):
                 # only applied to landcovers with soil underneath (grassland and managed grasslands are treated has one landcover
                 for variable in phosphorusVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))
 
-            
+                self.var.sum_soil_TP_urbanLoss = globals.inZero.copy()
             
             # Define depth of top soil from which nutrients leaks to runoff: 10 mm###
 
@@ -200,49 +199,29 @@ class water_quality(object):
 
     def dynamic(self): 
         
-        ## Calculate landcover change fractions to adjust soil nutrient stocks
-        # Save previous year landcover at the last day of each year
-        #if dateVar['doy'] == dateVar['daysInYear']:
-        #    self.var.pre_fracVegCover = self.var.fracVegCover.copy()
-        
+        # landcover transitions
         if self.var.includePhosphorus:
-            self.var.soil_TP_urbanLoss = globals.inZero.copy()
-        
-        '''
-        # calculate change fractions and landcover to landcover changes
+                self.var.soil_P_inactive_urbanLoss = globals.inZero.copy()
+                self.var.soil_P_dissolved_urbanLoss = globals.inZero.copy()
+
+                
+                self.var.sum_soil_TP_urbanLoss = globals.inZero.copy()
+
         if dateVar['newYear'] and not dateVar['newStart']:
+            delta_LC = self.var.fracVegCover - self.var.fracVegCover_former
             
-            delta_fracVegCover = (self.var.fracVegCover - self.var.pre_fracVegCover) 
-            
-            natural = delta_fracVegCover[0] + delta_fracVegCover[1]
-            managed = delta_fracVegCover[2] + delta_fracVegCover[3]
-            urban = delta_fracVegCover[4] + delta_fracVegCover[5]
-            # natural/managed loss, urban gained
-            natural = np.where(natural < 0, -1 * natural, 0)
-            managed = np.where(managed < 0, -1 * managed, 0)
-            totLoss = managed + natural
-            urban = np.where(urban > 0, urban, 0)
-            
-            if self.var.includePhosphorus:
-                self.var.soil_TP_urbanLoss = urban * (divideValues(managed, totLoss) *\
-                (self.var.sum_soil_P_dissolved1_managed + self.var.sum_soil_P_dissolved2_managed + self.var.sum_soil_P_dissolved3_managed +\
-                        self.var.sum_soil_P_labile1_managed + self.var.sum_soil_P_labile2_managed + self.var.sum_soil_P_labile3_managed) +\
-                        divideValues(natural, totLoss) * (self.var.sum_soil_P_dissolved1_natural + self.var.sum_soil_P_dissolved2_natural + self.var.sum_soil_P_dissolved3_natural +\
-                        self.var.sum_soil_P_labile1_natural + self.var.sum_soil_P_labile2_natural + self.var.sum_soil_P_labile3_natural))
-            
-            self.var.gain_fracVegCover = divideArrays(np.where(delta_fracVegCover > 0, delta_fracVegCover, 0.), self.var.pre_fracVegCover)
-           
-            #0 - grassland (natural & managed)
-            #1 - forest (natural)
-            #2 - irrPaddy (managed)
-            #3 - irrNonPaddy (managed)
-            #4 - sealed (sealed)
-            #5 - water (sealed)
-            
+            # 0 : forest
+            # 1 : grassland
+            # 2 : paddy
+            # 3 : irrNonPaddy
+            # 4 : sealed
+            # 5 : water 
+        
+            # DEFINE THERSHOLD TO CHANGE
           
+            # End guess landcover transitions  ####
             
-            loss_fracVegCoverManaged = np.nansum(np.abs(np.where(delta_fracVegCover < 0, delta_fracVegCover, 0.))[2:4], axis = 0)
-        '''    
+
         if dateVar['newStart'] or dateVar['newYear']:
             current_year = globals.dateVar['currDate']
             '''
@@ -282,99 +261,115 @@ class water_quality(object):
         if self.var.includePhosphorus: 
                           
             self.waterquality_p.dynamic()
-            '''
-            if dateVar['newYear'] and not dateVar['newStart']:
-                # calculate last time step total P concentration
-                pre_tot_soil_P_dissolved = divideValues(self.var.tot_soil_P_dissolved, (self.var.sum_w1 + self.var.sum_w2 + self.var.sum_w3) * self.var.cellArea) * 10**3
-                pre_tot_soil_P_labile = divideValues(self.var.tot_soil_P_labile, (self.var.soilM1 + self.var.soilM2 + self.var.soilM3)) * 10**6
-                # calculate up-to-date total P concentration
-             
-                phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
-                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
-                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied']
             
-                phosphorusVarsSum = ['soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3']
-                                
-                for variable in phosphorusVarsSum:
-                    vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
-                
-                tot_soil_P_dissolved = divideValues(self.var.sum_soil_P_dissolved1 + self.var.sum_soil_P_dissolved2 + self.var.sum_soil_P_dissolved3,\
-                    (self.var.sum_w1 + self.var.sum_w2 + self.var.sum_w3) * self.var.cellArea) * 10**3
-                tot_soil_P_labile = divideValues(self.var.sum_soil_P_labile1 + self.var.sum_soil_P_labile2 + self.var.sum_soil_P_labile3,\
-                    (self.var.soilM1 + self.var.soilM2 + self.var.soilM3)) * 10**6
-                
-                # calculate multipliers
-                multiplier_dissolved = divideValues(tot_soil_P_dissolved, pre_tot_soil_P_dissolved)
-                multiplier_labile = divideValues(tot_soil_P_labile, pre_tot_soil_P_labile)
-                
-                shr_dissolve = divideValues(tot_soil_P_dissolved, tot_soil_P_dissolved + tot_soil_P_labile)
-                multiplier_avg = shr_dissolve * multiplier_dissolved + (1 - shr_dissolve) * multiplier_labile
-                
-                print("multipliuer TDP [" + str(np.nanmin(multiplier_dissolved)) + ", " +  str(np.nanmax(multiplier_dissolved)) + "]" + \
-                    str(np.nanmean(multiplier_dissolved)))
-                print("multipliuer labile [" + str(np.nanmin(multiplier_labile)) + ", " +  str(np.nanmax(multiplier_labile)) + "]" + \
-                    str(np.nanmean(multiplier_labile)))
-                print("multipliuer avg [" + str(np.nanmin(multiplier_avg)) + ", " +  str(np.nanmax(multiplier_avg)) + "]" + \
-                    str(np.nanmean(multiplier_avg)))
-               
-                # update all P stocks
-                self.var.soil_P_dissolved1 = self.var.soil_P_dissolved1 * multiplier_avg
-                self.var.soil_P_dissolved2 = self.var.soil_P_dissolved2 * multiplier_avg
-                self.var.soil_P_dissolved3 = self.var.soil_P_dissolved3 * multiplier_avg
-                self.var.soil_P_labile1 = self.var.soil_P_labile1 * multiplier_avg
-                self.var.soil_P_labile2 = self.var.soil_P_labile2 * multiplier_avg
-                self.var.soil_P_labile3 = self.var.soil_P_labile3 * multiplier_avg
-                
-              
-                
-                # Assume P concentrations are unchanged - TDP
-                
-                TP_pre = np.nansum(self.var.sum_soil_P_dissolved1 + self.var.sum_soil_P_dissolved2 + self.var.sum_soil_P_dissolved3 +\
-                                self.var.sum_soil_P_labile1 + self.var.sum_soil_P_labile2 + self.var.sum_soil_P_labile3, axis = 0)
-                
-                sum_soil_P_dissolved1 =  self.var.sum_soil_P_dissolvedConc1 * 10**-3 * self.var.sum_w1 * self.var.cellArea
-                sum_soil_P_dissolved2 =  self.var.sum_soil_P_dissolvedConc2 * 10**-3 * self.var.sum_w2 * self.var.cellArea
-                sum_soil_P_dissolved3 =  self.var.sum_soil_P_dissolvedConc3 * 10**-3 * self.var.sum_w3 * self.var.cellArea
-                
-                # Assume P concentrations are unchanged - P labile
-                sum_soil_P_labile1 =  self.var.sum_soil_P_labileConc1 * 10**-6 * self.var.soilM1
-                sum_soil_P_labile2 =  self.var.sum_soil_P_labileConc2 * 10**-6 * self.var.soilM2
-                sum_soil_P_labile3 =  self.var.sum_soil_P_labileConc3 * 10**-6 * self.var.soilM3
-                
-                TP_post = np.nansum(sum_soil_P_dissolved1 + sum_soil_P_dissolved2 + sum_soil_P_dissolved3 +\
-                                sum_soil_P_labile1 + sum_soil_P_labile2 + sum_soil_P_labile3, axis = 0)
-                
-                self.var.soil_TP_urbanLoss = np.maximum(TP_pre- TP_post, 0.)
-                print(np.nansum(self.var.soil_TP_urbanLoss))
-                
-                def splitSumStock(var, var_target):
-                    varOut = np.tile(var, (4, 1))
-                    varOut = var * divideArrays(var_target, self.var.fracVegCover[0:4])
-                    return(varOut)
-                print(np.nanmean(np.nansum(self.var.soil_P_dissolved1 * self.var.pre_fracVegCover[0:4], axis = 0)))    
-                print(np.nanmean(sum_soil_P_dissolved1, axis = 0))
-                # back-calculate TDP mass
-                self.var.soil_P_dissolved1 = splitSumStock(sum_soil_P_dissolved1, self.var.soil_P_dissolved1)
-                self.var.soil_P_dissolved2 = splitSumStock(sum_soil_P_dissolved2, self.var.soil_P_dissolved2)
-                self.var.soil_P_dissolved3 = splitSumStock(sum_soil_P_dissolved3, self.var.soil_P_dissolved3)
+            # update nutrients soil stocks due to land cover change; note sigma(deltaP_j) = 0; i.e., P mass is balanced 
 
-                # back-calculate P labile mass
-                self.var.soil_P_labile1 = splitSumStock(sum_soil_P_labile1, self.var.soil_P_labile1)
-                self.var.soil_P_labile2 = splitSumStock(sum_soil_P_labile2, self.var.soil_P_labile2)
-                self.var.soil_P_labile3 = splitSumStock(sum_soil_P_labile3, self.var.soil_P_labile3)
+            if dateVar['newYear'] and not dateVar['newStart']:
                 
-                print(np.nanmean(np.nansum(self.var.soil_P_dissolved1 * self.var.fracVegCover[0:4], axis = 0)))
-            '''
+                # 0 : forest
+                # 1 : grassland
+                # 2 : paddy
+                # 3 : irrNonPaddy
+                # 4 : sealed
+                # 5 : water 
+                
+                
+                delta_LC = self.var.fracVegCover - self.var.fracVegCover_former
+                
+                urbanGain = np.where(delta_LC[4] > 0, delta_LC[4], 0.)
+                allLoss = np.nansum(np.where(delta_LC < 0, np.abs(delta_LC), 0.), axis = 0) 
+                wghts = divideArrays(np.where(delta_LC < 0, np.abs(delta_LC), 0.), allLoss)[0:4]
+                # update all landcovers to new fractions
+                wghts_add = globals.inZero.copy()
+                
+
+                '''
+                    Tot =  sigma(fi*xi) : i E 0,4
+                    loss - total weighted urban loss
+                    
+                    sigma(fi'*xi') = Tot - loss
+                    xi/xj = xi'/xj' = Constant
+                    
+                    x0 = (Tot - Loss) /  (f'0 + f'1/a + f'2/b + f'3/c)
+                    a = x0/x1; b = x0/x2; c = x0/x3
+                    
+                '''
+                
+                for var in ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3']:
+                    toUrban = np.nansum(np.minimum(np.tile(urbanGain, (4,1)) * wghts * vars(self.var)[var], vars(self.var)[var]), axis = 0)
+                    a = divideValues(vars(self.var)[var][0], vars(self.var)[var][1])
+                    b = divideValues(vars(self.var)[var][0], vars(self.var)[var][2])
+                    c = divideValues(vars(self.var)[var][0], vars(self.var)[var][3])
+                    
+                    Tot =  np.nansum(vars(self.var)[var] * self.var.fracVegCover_former[0:4] ,axis = 0)
+                    x0 = divideValues(Tot - toUrban, self.var.fracVegCover[0] + divideValues(self.var.fracVegCover[1], a) +\
+                        divideValues(self.var.fracVegCover[2], b) + divideValues(self.var.fracVegCover[3], c))
+                    x1 = divideValues(x0, a)
+                    x2 = divideValues(x0, b)
+                    x3 = divideValues(x0, c)
+                    
+                    vars(self.var)[var][0] = x0.copy()
+                    vars(self.var)[var][1] = x1.copy()
+                    vars(self.var)[var][2] = x2.copy()
+                    vars(self.var)[var][3] = x3.copy()
+                    self.var.soil_P_inactive_urbanLoss += toUrban
+
+                for var in ['soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3']:
+                    toUrban = np.nansum(np.minimum(np.tile(urbanGain, (4,1)) * wghts * vars(self.var)[var], vars(self.var)[var]), axis = 0)
+                    a = divideValues(vars(self.var)[var][0], vars(self.var)[var][1])
+                    b = divideValues(vars(self.var)[var][0], vars(self.var)[var][2])
+                    c = divideValues(vars(self.var)[var][0], vars(self.var)[var][3])
+                    
+                    Tot =  np.nansum(vars(self.var)[var] * self.var.fracVegCover_former[0:4] ,axis = 0)
+                    x0 = divideValues(Tot - toUrban, self.var.fracVegCover[0] + divideValues(self.var.fracVegCover[1], a) +\
+                        divideValues(self.var.fracVegCover[2], b) + divideValues(self.var.fracVegCover[3], c))
+                    x1 = divideValues(x0, a)
+                    x2 = divideValues(x0, b)
+                    x3 = divideValues(x0, c)
+                    
+                    vars(self.var)[var][0] = x0.copy()
+                    vars(self.var)[var][1] = x1.copy()
+                    vars(self.var)[var][2] = x2.copy()
+                    vars(self.var)[var][3] = x3.copy()
+                    self.var.soil_P_labile_urbanLoss += toUrban
+
+                     
+                for var in ['soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3']:
+                    toUrban = np.nansum(np.minimum(np.tile(urbanGain, (4,1)) * wghts * vars(self.var)[var], vars(self.var)[var]), axis = 0)
+                    a = divideValues(vars(self.var)[var][0], vars(self.var)[var][1])
+                    b = divideValues(vars(self.var)[var][0], vars(self.var)[var][2])
+                    c = divideValues(vars(self.var)[var][0], vars(self.var)[var][3])
+                    
+                    Tot =  np.nansum(vars(self.var)[var] * self.var.fracVegCover_former[0:4] ,axis = 0)
+                    x0 = divideValues(Tot - toUrban, self.var.fracVegCover[0] + divideValues(self.var.fracVegCover[1], a) +\
+                        divideValues(self.var.fracVegCover[2], b) + divideValues(self.var.fracVegCover[3], c))
+                    x1 = divideValues(x0, a)
+                    x2 = divideValues(x0, b)
+                    x3 = divideValues(x0, c)
+                    
+                    vars(self.var)[var][0] = x0.copy()
+                    vars(self.var)[var][1] = x1.copy()
+                    vars(self.var)[var][2] = x2.copy()
+                    vars(self.var)[var][3] = x3.copy()
+                    self.var.soil_P_dissolved_urbanLoss += toUrban
+
+                self.var.sum_soil_TP_urbanLoss = self.var.soil_P_inactive_urbanLoss + self.var.soil_P_labile_urbanLoss + self.var.soil_P_dissolved_urbanLoss
+                
+            ## End phosphorus balance #######
+                
+                           
+
             # sum total soil P stocks [kg / m2] 
             phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
                                 'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
-                                
+            
+            
+            
             for variable in phosphorusVarsSum:
                 vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
             
-          
-            
+   
             phosphorusVarsSumCat = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
                                 'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
                                 'w1', 'w2', 'w3', 'soilM1_f', 'soilM2_f', 'soilM3_f']
@@ -428,6 +423,9 @@ class water_quality(object):
             self.var.sum_soil_P_labileConc2_managed =  divideValues(self.var.sum_soil_P_labile2_managed, self.var.sum_soilM2_f_managed) * 10**6
             self.var.sum_soil_P_labileConc3_managed =  divideValues(self.var.sum_soil_P_labile3_managed, self.var.sum_soilM3_f_managed) * 10**6
             
+            self.var.sum_soil_P_labileConc_managed = divideValues(self.var.sum_soil_P_labile1_managed + self.var.sum_soil_P_labile2_managed + self.var.sum_soil_P_labile3_managed,\
+                (self.var.sum_w1_managed + self.var.sum_w2_managed + self.var.sum_w3_managed)  * self.var.cellArea) * 10**3
+                
             # P inactive soil concentration [mg / kg soil] - miligram 
             self.var.sum_soil_P_inactiveConc1 = divideValues(self.var.sum_soil_P_inactive1, self.var.soilM1) * 10**6
             self.var.sum_soil_P_inactiveConc2 = divideValues(self.var.sum_soil_P_inactive2, self.var.soilM2) * 10**6
@@ -461,13 +459,3 @@ class water_quality(object):
             
             # sum soil P input [kg]
             self.var.tot_soil_P_input = self.var.sum_soil_P_input1 + self.var.sum_soil_P_input2
-            
-            '''
-            if dateVar['newYear'] and not dateVar['newStart']:
-                pre_TP =  (pre_tot_soil_P_labile / 10**6) *  (self.var.soilM1 + self.var.soilM2 + self.var.soilM3) +\
-                (pre_tot_soil_P_dissolved / 10**3) * (self.var.sum_w1 + self.var.sum_w2 + self.var.sum_w3)
-                
-                self.var.soil_TP_urbanLoss = pre_TP - (self.var.tot_soil_P_dissolved + self.var.tot_soil_P_labile)
-                
-            '''
-           
