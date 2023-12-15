@@ -90,12 +90,12 @@ class CWATModel_dyn(DynamicModel):
         else:
             self.groundwater_module.dynamic()
         timemeasure("Groundwater")  # 7. timing
-        
-        if self.var.includeWaterQuality:
-            self.waterquality_module.dynamic()
 
         self.runoff_concentration_module.dynamic()
         timemeasure("Runoff conc.")  # 8. timing
+
+        if self.var.includeWaterQuality:
+            self.waterquality_module.dynamic()
 
         self.lakes_res_small_module.dynamic()
         timemeasure("Small lakes")  # 9. timing
