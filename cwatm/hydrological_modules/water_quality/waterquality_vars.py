@@ -77,18 +77,19 @@ class waterquality_vars(object):
         Read meteo input maps from netcdf files
         """
 
-        #crossArea = 0.34 * (self.var.discharge ** 0.341) * 1.22 * (self.var.discharge ** 0.557)
+        #self.var.crossArea = 0.34 * (self.var.discharge ** 0.341) * 1.22 * (self.var.discharge ** 0.557)
         dis = np.where (self.var.discharge < 0.0001, 0.0001, self.var.discharge)
         width = 1.22 * (dis ** 0.557)
-        crossArea = 0.4148 * dis ** 0.898
-        # van Vliet et al. 2012
+        self.var.crossArea = 0.4148 * dis ** 0.898
+        # in van Vliet et al. 2012 (from Lohmann et al., 1998; Leopold and Maddock, 1953; Allen et al. (1994))
 
 
 
 
         #flowVelocity = np.minimum(self.var.discharge /self.var.totalCrossSectionArea, 0.36*self.var.discharge**0.24)
-        flowVelocity = np.minimum(self.var.discharge / crossArea,0.36 * dis ** 0.24)
+        flowVelocity = np.minimum(self.var.discharge / self.var.crossArea,0.36 * dis ** 0.24)
         flowVelocity = np.maximum(flowVelocity, 10.*0.0011575)
+        self.var.flowVelocity = flowVelocity.copy()
            # Channel velocity (m/s); dividing Q (m3/s) by CrossSectionArea (m2)
            # avoid extreme velocities by using the Wollheim 2006 equation
            #  minimum velocity = 1000 m per day!
@@ -102,7 +103,6 @@ class waterquality_vars(object):
         #TravelTime = downstreamdist(Ldd) * (ChanLength/PixelLength) / FlowVelocity
         self.var.travelTime = self.var.chanLength / flowVelocity
         self.var.travelTime = np.where(self.var.travelTime > 200000, 200000, self.var.travelTime)
-
               # Traveltime through gridcell (sec)
               # further calculation with pc raster: l2.map = ldddist(ldd.map,p1.map,ttime1.map/cell.map)/86400
               # / cell.map (here 0.8333 deg is necessary because it is multiplied again in the ldddist command
@@ -110,11 +110,11 @@ class waterquality_vars(object):
 
 
         # Water level
-        chanCrossSectionArea = np.where(crossArea < self.var.totalCrossSectionArea, crossArea, self.var.totalCrossSectionArea)
+        chanCrossSectionArea = np.where(self.var.crossArea < self.var.totalCrossSectionArea, self.var.crossArea, self.var.totalCrossSectionArea)
         chanWaterDepth = chanCrossSectionArea / width
         # Water level in channel [m]
 
-        floodPlainCrossSectionArea = np.where(crossArea < self.var.totalCrossSectionArea, 0, crossArea - self.var.totalCrossSectionArea)
+        floodPlainCrossSectionArea = np.where(self.var.crossArea < self.var.totalCrossSectionArea, 0, self.var.crossArea - self.var.totalCrossSectionArea)
         floodPlainWaterDepth = floodPlainCrossSectionArea / (2.0 * width)
         # Water level on floodplain [m]
         self.var.waterLevel = chanWaterDepth + floodPlainWaterDepth
