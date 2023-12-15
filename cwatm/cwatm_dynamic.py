@@ -76,7 +76,10 @@ class CWATModel_dyn(DynamicModel):
         timemeasure("Snow")  # 3. timing
 
         # ***** READ land use fraction maps***************************
-
+        if dateVar['newYear']  and not dateVar['newStart']:
+            # save last year landcover fraction to guess transition in the water quality module
+            self.var.fracVegCover_former = self.var.fracVegCover.copy()
+            
         self.landcoverType_module.dynamic_fracIrrigation(init=dateVar['newYear'], dynamic=self.var.dynamicLandcover)
         self.capillarRise_module.dynamic()
         timemeasure("Soil 1.Part")  # 4. timing
@@ -103,7 +106,6 @@ class CWATModel_dyn(DynamicModel):
         self.routing_kinematic_module.dynamic()
         timemeasure("Routing_Kin")  # 10. timing
 
-        
 
         # calculate Total water storage (tws) [m] as a sum of
         # Groundwater [m] + soil [m] + lake and reservoir storage [m3] + channel storage [m3]

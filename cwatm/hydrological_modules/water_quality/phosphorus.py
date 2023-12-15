@@ -162,7 +162,22 @@ class waterquality_phosphorus(object):
         self.var.soil_P_labile1 -= self.var.soil_P_dissolved1
         self.var.soil_P_labile2 -= self.var.soil_P_dissolved2
         self.var.soil_P_labile3 -= self.var.soil_P_dissolved3
-
+        
+        # load data for calculating mineral P weathering and supply to rivers - based on https://doi.org/10.1016/j.chemgeo.2013.10.025
+        
+        self.var.background_P_mineral = globals.inZero.copy()
+        if 'background_P_mineral' in binding:
+            self.var.background_P_mineral = loadmap('background_P_mineral')
+               
+        self.var.soil_shielding = globals.inZero.copy() + 1.
+        if 'soil_shielding' in binding:
+            self.var.soil_shielding = loadmap('soil_shielding')
+        
+        self.var.activation_energy = globals.inZero.copy()
+        if 'activation_energy' in binding:
+            self.var.activation_energy = loadmap('activation_energy')
+        
+        
         # load groundwater P concentration [kg / m3]
         self.var.GW_P_Conc = globals.inZero.copy()
         if 'GW_P_Conc' in binding:
@@ -177,12 +192,18 @@ class waterquality_phosphorus(object):
         self.var.returnflowNonIrr_P = globals.inZero.copy()
         self.var.returnflowIrr_P = globals.inZero.copy()
         
+        # variables for daily Point Source loadings
+        self.var.PntSource_NetPload_topsoil = globals.inZero.copy()
+        self.var.PntSource_NetPload_channel = globals.inZero.copy()
+        self.var.PntSource_NetPload_soil23 = globals.inZero.copy()
+        
         # runoff, interflow, baseflow P [kg]
         self.var.directRunoff_P = globals.inZero.copy()
         self.var.interflow_P = globals.inZero.copy()
         self.var.baseflow_P = globals.inZero.copy()
         self.var.sedYieldLand_PP = globals.inZero.copy()
         self.var.sedYieldLand_inactiveP = globals.inZero.copy()
+        self.var.mineralWeat_P = globals.inZero.copy()
         
         # channel phsophorus [kg]
         self.var.channel_P = globals.inZero.copy()
@@ -314,18 +335,37 @@ class waterquality_phosphorus(object):
     def dynamic(self):
         # phosphrous dynamic part ###
         day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
-        
+        wd_date = globals.dateVar['currDate']
         # soil depth ratio - layer 0 out of 0 + 1 : to split P inputs
         soil_depthRatio1 = divideValues(self.var.soildepth[0], self.var.soildepth[0] + self.var.soildepth[1])
     
         # load daily net inputs 
         # should be at [kg P / m2]
-        PSoil_Input1 = loadmap('P_netInput') * soil_depthRatio1 * self.var.cellArea
-        PSoil_Input2 = loadmap('P_netInput') * (1 - soil_depthRatio1) * self.var.cellArea
+        croplandInputNet = readnetcdf2('P_Cropland_Input', wd_date, useDaily='monthly', value='P_Cropland') / globals.dateVar['daysInMonth']
+        croplandInputNet1 = croplandInputNet * soil_depthRatio1 * self.var.cellArea
+        croplandInputNet2 = croplandInputNet * (1 - soil_depthRatio1) * self.var.cellArea
+        
+        grasslandInputNet = readnetcdf2('P_Grassland_Input', wd_date, useDaily='yearly', value='P_Grassland') / globals.dateVar['daysInYear']
+        grasslandInputNet1 = grasslandInputNet * soil_depthRatio1 * self.var.cellArea
+        grasslandInputNet2 = grasslandInputNet * (1 - soil_depthRatio1) * self.var.cellArea
+
         '''
         later change to:
         self.var.soil_PConc_total = readnetcdf2('P_netInput', day_of_year, useDaily='DOY', value='Net_P_Input')
         '''
+        
+        # read Point source net P loadings - daily
+        
+        self.var.PntSource_NetPload_topsoil = readnetcdf2('P_sourcePoint', wd_date, useDaily='yearly', value='opendef')
+        self.var.PntSource_NetPload_channel = readnetcdf2('P_sourcePoint', wd_date, useDaily='yearly', value='wwtp')
+        self.var.PntSource_NetPload_soil23 = readnetcdf2('P_sourcePoint', wd_date, useDaily='yearly', value='latrines')
+
+        
+        PntSource_toSoilLyr2 = self.var.soildepth[1] + 0.05 >= 3
+        PntSource_toSoilLyr3 = self.var.soildepth[1] + 0.05 < 3
+        
+        self.var.PntSource_toSoil =  self.var.PntSource_NetPload_topsoil + self.var.PntSource_NetPload_soil23
+      
         manureFrac = loadmap('f_Manure')
         
         ## Place holder for P weathering
@@ -347,12 +387,12 @@ class waterquality_phosphorus(object):
         
         # Calculate Plab Net Input - Currently only apply on managed grasslands and on irrigated agriculture
         
-        self.var.soil_P_input1[2:4] = PSoil_Input1# * self.var.naturalLandFrac
-        self.var.soil_P_input2[2:4] = PSoil_Input2# * self.var.naturalLandFrac
+        self.var.soil_P_input1[2:4] = croplandInputNet1# * self.var.naturalLandFrac
+        self.var.soil_P_input2[2:4] = croplandInputNet2# * self.var.naturalLandFrac
         
         # Temporary
-        self.var.soil_P_input1[1] = PSoil_Input1 *  self.var.managedGrassland
-        self.var.soil_P_input2[1] = PSoil_Input2 *  self.var.managedGrassland
+        self.var.soil_P_input1[1] = grasslandInputNet1 *  self.var.managedGrassland
+        self.var.soil_P_input2[1] = grasslandInputNet2 *  self.var.managedGrassland
         
         # add irrigation to TDP & inactive to inactive
         self.var.soil_P_input1[3] += self.var.sum_irrigation_P_Applied
@@ -384,7 +424,7 @@ class waterquality_phosphorus(object):
         nonNaturalDirectRunoff = self.var.directRunoff[0:4].copy()
         nonNaturalDirectRunoff[0:2] = globals.inZero.copy()
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile1, TDP = self.var.soil_P_dissolved1,\
-            EPC0 =  self.var.EPC1, P_in = self.var.soil_P_input1,\
+            EPC0 =  self.var.EPC1, P_in = self.var.soil_P_input1 + self.var.PntSource_NetPload_topsoil,\
             Qr = nonNaturalDirectRunoff, Qi = globals.inZero, Qp = self.var.perc1to2,\
             Kf = self.var.Kf, soilmass = self.var.soilM1, Vs = self.var.w1, runoff_adj = self.var.runoff_Padj)
 
@@ -399,7 +439,7 @@ class waterquality_phosphorus(object):
         
         # run dynamic soil P - layer 2 ######
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile2, TDP = self.var.soil_P_dissolved2,\
-            EPC0 =  self.var.EPC2, P_in = self.var.soil_P_input2 + perc1to2_P,\
+            EPC0 =  self.var.EPC2, P_in = self.var.soil_P_input2 + perc1to2_P + np.tile(self.var.PntSource_NetPload_soil23 * PntSource_toSoilLyr2, (4,1)),\
             Qr = globals.inZero, Qi = self.var.interflow[0:4] * interflowDivider, Qp = self.var.perc2to3,\
             Kf = self.var.Kf, soilmass = self.var.soilM2, Vs = self.var.w2, runoff_adj = self.var.runoff_Padj)
         
@@ -413,9 +453,10 @@ class waterquality_phosphorus(object):
         perc2to3_P = outputs[5].copy()
         
         # run dynamic soil P - layer 3 ######
-         #
+        
+        
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile3, TDP = self.var.soil_P_dissolved3,\
-            EPC0 =  self.var.EPC3, P_in = perc2to3_P,\
+            EPC0 =  self.var.EPC3, P_in = perc2to3_P + np.tile(self.var.PntSource_NetPload_soil23 * PntSource_toSoilLyr3, (4, 1)),\
             Qr = globals.inZero, Qi = self.var.interflow[0:4] * (1- interflowDivider), Qp = self.var.grossGWrechargeFromSoil[0:4],\
             Kf = self.var.Kf, soilmass = self.var.soilM3, Vs = self.var.w3, runoff_adj = self.var.runoff_Padj)
         
@@ -434,8 +475,8 @@ class waterquality_phosphorus(object):
 
         E_pp = np.where(self.var.sedYieldLand * 1000 > 0.1, np.exp(2.00 - 0.16 * np.log(self.var.sedYieldLand * 0.1)), 1.) # sedYieldLand * 1000 (to kg) / 10000 (per ha)
         
-        sedYieldLand_PP = np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1) 
-        sedYieldLand_inactiveP = np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_inactive1, self.var.soilM1), self.var.soil_P_inactive1) 
+        sedYieldLand_PP = np.maximum(np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1) , 0.)
+        sedYieldLand_inactiveP = np.maximum(np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_inactive1, self.var.soilM1), self.var.soil_P_inactive1) , 0.)
         # update soil layer 1 - erosion is only allowed from the top soil
         self.var.soil_P_labile1 -= sedYieldLand_PP
         self.var.soil_P_inactive1 -= sedYieldLand_inactiveP
@@ -450,7 +491,7 @@ class waterquality_phosphorus(object):
         self.var.interflow_P = np.nansum((interflow2_P + interflow3_P) * self.var.fracVegCover[0:4], axis = 0)
         self.var.baseflow_P = self.var.baseflow * self.var.cellArea * self.var.GW_P_Conc 
         
-        self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, loadmap('P_sourcePoint'),0.)
+        self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, self.var.PntSource_NetPload_channel,0.)
         
         # to runoff [kg] 
         self.var.runoff_P = self.var.directRunoff_P +  self.var.interflow_P + self.var.baseflow_P + self.var.returnflowNonIrr_P
@@ -458,6 +499,11 @@ class waterquality_phosphorus(object):
         # to groundwater [kg]
         self.var.toGroundwater_P =  np.nansum(toGW * self.var.fracVegCover[0:4], axis = 0)
         
+        # calculating mineral P weathering and supply to rivers
+        # based on https://doi.org/10.1016/j.chemgeo.2013.10.025
+        
+        self.var.mineralWeat_P = self.var.background_P_mineral * self.var.sum_directRunoff * self.var.soil_shielding *\
+            np.exp(-1 * (self.var.activation_energy / 8.3144) * (divideValues(globals.inZero.copy() + 1., self.var.waterTemperature + 273.15) - 1 / 284.15))
         # Update dissolved P mass in soils  - runoff TDP is allowed only when directRunoff > 0
         # to be improved - self.var.runoff_Padj should be also accompanied by max runoff concentration, e.g., how much phosphrous can be removed by the surfacerunoff as a function of runoff volume
       
@@ -518,3 +564,5 @@ class waterquality_phosphorus(object):
         
         self.var.sum_irrigation_P_Applied = self.var.irrigation_P_Abstracted - self.var.returnflowIrr_P
         self.var.sum_irrigation_inactiveP_Applied = self.var.irrigation_inactiveP_Abstracted - self.var.returnflowIrr_inactiveP
+
+        

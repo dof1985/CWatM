@@ -175,34 +175,30 @@ class waterquality_erosed(object):
         #if self.var.a
         #self.var.runoffEnergyFactor = self.var.sum_directRunoff * 2
         '''
-
+        
+        
         self.waterquality_vars.dynamic()  # TO FIX
         directRunoff_m3sec = self.var.directRunoff[0:4] * self.var.cellArea / self.var.DtSec
         runoffm3s = self.var.runoff * self.var.cellArea / self.var.DtSec
-        print('runoffm3s', np.nansum(runoffm3s), 'runoffmin', np.nanmin(runoffm3s) , 'runoffmax', np.nanmax(runoffm3s))
+
         self.var.directRunoff_mm = self.var.directRunoff[0:4]/1000
-        #print('runoffm3s', np.nanmean(directRunoff_m3sec), 'runoffmin', np.nanmin(directRunoff_m3sec) , 'runoffmax', np.nanmax(directRunoff_m3sec))
-        #print('directRunoffm', self.var.directRunoff)
-        #print('directRunoffmm', directRunoff_mm)
+        
 
 
         #tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
         #                  18 * np.power(self.var.tanslope, 0.3))
         vov = divideArrays(np.power(runoffm3s, 0.4)*np.power(self.var.tanslope, 0.3), np.power(self.var.manOverland, 0.6))
 
-        print('vov', np.nanmean(vov), 'vovmin', np.nanmin(vov) , 'vovmax', np.nanmax(vov))
         tov = divideArrays(self.var.lsFactor * np.power(self.var.manOverland, 0.6),
                            3600 * np.power(self.var.directRunoff_mm, 0.4) * np.power(self.var.tanslope, 0.3))
         tov2 = divideArrays(self.var.slopelength, 3600 * vov)
-        print('Tov', np.nanmean(tov), 'tovmin', np.nanmin(tov) , 'tovmax', np.nanmax(tov))
-        print('Tov2', np.nanmean(tov2), 'tov2min', np.nanmin(tov2) , 'tov2max', np.nanmax(tov))
+        
+        
         #tov2 = divideArrays(np.power(self.var.slopelength, 0.6))
-        #print('maxtimerunoff', np.nanmean(self.var.maxtime_runoff_conc))
-
+        
         tch = self.var.travelTime / 3600  # converted from seconds to hours
-        #print('tchmean', np.nanmean(tch), 'tchmin', np.nanmin(tch), 'tchmax',np.nanmax(tch))
         self.var.tconc = tov + tch  # [hours]
-        #print('tconcmean', np.nanmean(self.var.tconc), 'tconcmin', np.nanmin(self.var.tconc), 'tconcmax', np.nanmax(self.var.tconc))
+        
         # a05 load dummy value: fraction of daily rain falling in the half-hour highest intensity
         # if time series read netcdf2
         a05 = np.maximum(np.minimum(loadmap('a05'), 1.0), 0.0)  # must be a fraction between 0 and 1
@@ -221,15 +217,32 @@ class waterquality_erosed(object):
         erosedVarsSum = ['sedYieldLand', 'channel_sed', 'channel_sedConc']
         for variable in erosedVarsSum:
             vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
-        #print('sedYieldmean',np.nanmean(self.var.sum_sedYieldLand), np.nanmin(self.var.sum_sedYieldLand), np.nanmax(self.var.sum_sedYieldLand))
-        #print('sedYieldmean',np.nanmean(self.var.sum_sedYieldLand), 'sedYieldmin',np.nanmin(self.var.sum_sedYieldLand), 'sedYieldmax',np.nanmax(self.var.sum_sedYieldLand))
+        
         # CHANNEL
         if checkOption('includeWaterDemand'):
             self.var.channel_sed_Abstracted = np.maximum(
             np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),
             0.)
-        if (dateVar['curr'] == 282):
-            ii=1
+        
+        # as an output variable
+        self.var.sum_sedYieldLand_tonha =  divideValues(self.var.sum_sedYieldLand, self.var.cellArea * 0.0001)
+        
+        erosed_debug = False
+        if erosed_debug:
+            print('runoffm3s', np.nansum(runoffm3s), 'runoffmin', np.nanmin(runoffm3s) , 'runoffmax', np.nanmax(runoffm3s))
+            #print('runoffm3s', np.nanmean(directRunoff_m3sec), 'runoffmin', np.nanmin(directRunoff_m3sec) , 'runoffmax', np.nanmax(directRunoff_m3sec))
+            #print('directRunoffm', self.var.directRunoff)
+            #print('directRunoffmm', directRunoff_mm)
+            print('vov', np.nanmean(vov), 'vovmin', np.nanmin(vov) , 'vovmax', np.nanmax(vov))
+            print('Tov', np.nanmean(tov), 'tovmin', np.nanmin(tov) , 'tovmax', np.nanmax(tov))
+            print('Tov2', np.nanmean(tov2), 'tov2min', np.nanmin(tov2) , 'tov2max', np.nanmax(tov))
+            #print('maxtimerunoff', np.nanmean(self.var.maxtime_runoff_conc))
+            #print('tchmean', np.nanmean(tch), 'tchmin', np.nanmin(tch), 'tchmax',np.nanmax(tch))
+            #print('tconcmean', np.nanmean(self.var.tconc), 'tconcmin', np.nanmin(self.var.tconc), 'tconcmax', np.nanmax(self.var.tconc))
+            
+            ### Stop run at step 282 - for debugging purposes
+            if (dateVar['curr'] == 282):
+               ii=1
 
-
+        
 
