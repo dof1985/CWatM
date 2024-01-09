@@ -553,7 +553,8 @@ class water_demand:
             self.var.ratio_irrWithdrawalSW_month = globals.inZero.copy()
             self.var.act_irrWithdrawalSW_month = globals.inZero.copy()
             self.var.act_irrWithdrawalGW_month = globals.inZero.copy()
-
+            self.var.act_DesalWaterAbstractM = globals.inZero.copy()
+            
             self.var.Channel_Domestic = globals.inZero.copy()
             self.var.Channel_Industry = globals.inZero.copy()
             self.var.Channel_Livestock = globals.inZero.copy()

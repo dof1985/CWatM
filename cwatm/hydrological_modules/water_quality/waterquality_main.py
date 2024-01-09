@@ -202,6 +202,7 @@ class water_quality(object):
         # landcover transitions
         if self.var.includePhosphorus:
                 self.var.soil_P_inactive_urbanLoss = globals.inZero.copy()
+                self.var.soil_P_labile_urbanLoss = globals.inZero.copy()
                 self.var.soil_P_dissolved_urbanLoss = globals.inZero.copy()
 
                 

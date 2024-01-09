@@ -13,7 +13,7 @@ from cwatm.management_modules.messages import *
 
 
 import time
-
+import pandas as pd
 
 class CWATModel_dyn(DynamicModel):
 
@@ -96,14 +96,15 @@ class CWATModel_dyn(DynamicModel):
 
         self.runoff_concentration_module.dynamic()
         timemeasure("Runoff conc.")  # 8. timing
-
+        
         if self.var.includeWaterQuality:
             self.waterquality_module.dynamic()
-
+            timemeasure("Water_Quality")
         self.lakes_res_small_module.dynamic()
         timemeasure("Small lakes")  # 9. timing
         
         self.routing_kinematic_module.dynamic()
+
         timemeasure("Routing_Kin")  # 10. timing
 
 
@@ -140,7 +141,15 @@ class CWATModel_dyn(DynamicModel):
 
         if checkOption('includeRunoffConcentration'):
             self.var.tws = self.var.tws + self.var.gridcell_storage
-
+        
+        if self.var.includeWaterQuality:
+            if self.var.includePhosphorus:
+                self.var.channel_TP = self.var.channel_P + self.var.channel_PP + self.var.channel_inactiveP
+                self.var.resLake_TP = self.var.resLake_P + self.var.resLake_PP + self.var.resLake_inactiveP
+                self.var.channel_TPConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_TP, self.var.channelStorage), 0.) * 10**3
+                self.var.channel_TDPConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
+                self.var.resLake_TPConc = divideValues(self.var.resLake_TP, self.var.lakeResStorage) * 10**3
+                self.var.resLake_TDPConc = divideValues(self.var.resLake_P, self.var.lakeResStorage) * 10**3
         # *******  Calculate CUMULATIVE MASS BALANCE ERROR  **********
         # self.waterbalance_module.dynamic()
 
@@ -156,13 +165,18 @@ class CWATModel_dyn(DynamicModel):
 
         self.output_module.dynamic()
         timemeasure("Output")  # 12. timing
-
+        
         self.init_module.dynamic()
-
+        if self.currentStep == self.firstStep:
+            self.timeMesTbl = pd.DataFrame(np.array([np.array(timeMes)]), index = [self.currentStep])
+        else:
+            self.timeMesTbl = pd.concat([self.timeMesTbl, pd.DataFrame(np.array([np.array(timeMes)]), index = [self.currentStep])])
+       
         for i in range(len(timeMes)):
+            
             # if self.currentTimeStep() == self.firstTimeStep():
             if self.currentStep == self.firstStep:
-                timeMesSum.append(timeMes[i] - timeMes[0])
+                timeMesSum.append(timeMes[i] - timeMes[0])                
             else:
                 timeMesSum[i] += timeMes[i] - timeMes[0]
         # if modflow is used, the temporary files produced by Modflow/Flopy have to be closed with finalize
@@ -170,9 +184,32 @@ class CWATModel_dyn(DynamicModel):
         if self.var.modflow:
             if self.currentStep == self.lastStep:
                 self.groundwater_modflow_module.modflow.finalize()
-        
+                
+        '''
+        if self.currentStep == self.lastStep:
+            if self.var.includeWaterQuality:
+                colNms = {'0':'Start_dynamic', '1':'read_meteo',\
+                    '2':'et_pot', '3':'snow', '4':'Soil_1part',	'5':'Soil_main',\
+                    '6':'groundwater', '7':'runoff_conc', '8':'Water_Quality',\
+                    '9':'small_lakes', '10':'RoutingKin', '11':'Waterbalance',\
+                    '12':'Output'}
+                colNms = ['Start_dynamic', 'read_meteo', 'et_pot', 'snow',\
+                    'Soil_1part', 'Soil_main', 'groundwater', 'runoff_conc', 
+                    'Water_Quality', 'small_lakes', 'RoutingKin', 'Waterbalance',\
+                    'Output']
+                pth_out = "c:/users/dof19/dropbox/iiasa/cwatm_wq_dev/elvba/timing_with_wq.csv"
+            else:
+                colNms = ['Start_dynamic', 'read_meteo', 'et_pot', 'snow',\
+                    'Soil_1part', 'Soil_main', 'groundwater', 'runoff_conc', 
+                    'small_lakes', 'RoutingKin', 'Waterbalance',\
+                    'Output']
+                pth_out = "c:/users/dof19/dropbox/iiasa/cwatm_wq_dev/elvba/timing_without_wq.csv"
 
 
+            self.timeMesTbl.columns = colNms
+
+            self.timeMesTbl.to_csv(pth_out)
+        '''
         #self.var.sumsum_directRunoff += self.var.sum_directRunoff
         #self.var.sumsum_Runoff += self.var.sum_directRunoff
         #self.var.sumsum_Precipitation += self.var.Precipitation

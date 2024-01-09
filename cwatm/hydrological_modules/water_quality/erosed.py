@@ -46,6 +46,7 @@ class waterquality_erosed(object):
 
     def sediments_in_channel(self, channel_sed, channel_sedConc, prf, Q, A, csp, spexp, V, Kch, Cch):
         # this function is used for sediment routing sub-steps in the channel
+
         '''
         prf - peak rate factor, atm. to be defined in settingsfile
         Q - discharge [m3/s]
@@ -62,6 +63,7 @@ class waterquality_erosed(object):
         Kch - Channel erodibility factor
         Cch - channel cover factor
         '''
+        pre_channel_sed = self.var.channel_sed.copy()
         qChanPeak = prf * Q
         vChanPeak = qChanPeak / A #substituted totalCrossArea wth. crossArea calculated in waterquality_vars.py
         #print('vcahnpeak', np.nanmean(vChanPeak), 'vchanmin' , np.nanmin(vChanPeak), 'vchanmax' ,np.nanmax(vChanPeak))
@@ -74,13 +76,16 @@ class waterquality_erosed(object):
         #print('Seddep', np.nanmean(sedDep))
         sedDeg = np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch * V, 0.)
         #print('SedDeg',np.nanmean(sedDeg))
-
+        #print('channel_sed',np.nanmean(channel_sed))
         #dChanSedConc = divideValues(sedDeg - sedDep, V)
         #channel_sedConc += dChanSedConc
         dchannelSed = sedDeg - sedDep
         channel_sed += dchannelSed
         channel_sedConc = divideValues(channel_sed,V)
-        return channel_sed, channel_sedConc
+        #print('channel_sedConc',np.nanmean(channel_sedConc))
+       
+
+        return channel_sed, channel_sedConc, sedDep, sedDeg
 
     def initial(self):
         """
@@ -129,7 +134,10 @@ class waterquality_erosed(object):
         self.var.channel_sed = globals.inZero.copy()
         self.var.channel_sedConc = globals.inZero.copy()
         self.var.outlet_sed = globals.inZero.copy()
-
+        self.var.channel_sedDep = globals.inZero.copy()
+        # channelbed degradation - input into channels
+        self.var.channel_sedDeg = globals.inZero.copy() 
+        
         # lake reservoirs [kg]
         self.var.resLakeInflow_sed = globals.inZero.copy()
         self.var.resLakeOutflow_sed = globals.inZero.copy()
@@ -149,7 +157,7 @@ class waterquality_erosed(object):
 
         # instream routing
         # channel erodibility factor
-        self.var.Kch = globals.inZero.copy() + 0.8
+        self.var.Kch = globals.inZero.copy() + 0.008
         # channel cover factor
         self.var.Cch = globals.inZero.copy() + 0.9
         # peak runoff factor
