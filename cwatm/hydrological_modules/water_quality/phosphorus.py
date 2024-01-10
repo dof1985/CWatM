@@ -256,7 +256,7 @@ class waterquality_phosphorus(object):
             self.var.n_water = loadmap('n_water')
         
         # 1.612 - m3/kg <--> 1612 l/kg
-        self.var.kf_water = globals.inZero.copy() + 1. # [l/kg]
+        self.var.kf_water = globals.inZero.copy() + 1.612 # [l/kg]
         if 'kf_water' in binding:
             self.var.kf_water = loadmap('kf_water')
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
@@ -423,6 +423,7 @@ class waterquality_phosphorus(object):
         # self.var.directRunoff[0:4]
         nonNaturalDirectRunoff = self.var.directRunoff[0:4].copy()
         nonNaturalDirectRunoff[0:2] = globals.inZero.copy()
+        
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile1, TDP = self.var.soil_P_dissolved1,\
             EPC0 =  self.var.EPC1, P_in = self.var.soil_P_input1 + self.var.PntSource_NetPload_topsoil,\
             Qr = nonNaturalDirectRunoff, Qi = globals.inZero, Qp = self.var.perc1to2,\

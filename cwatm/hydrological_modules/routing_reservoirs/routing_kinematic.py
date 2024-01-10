@@ -533,9 +533,11 @@ class routing_kinematic(object):
                 self.var.resLakeOutflow_sed = globals.inZero.copy()
                 self.var.resLakeInflow_sed = globals.inZero.copy()
                 self.var.outlet_sed = globals.inZero.copy()
+                self.var.channel_sedDep = globals.inZero.copy()
+                self.var.channel_sedDeg = globals.inZero.copy()
                 channel_sed_Abstracted_Dt  = self.var.channel_sed_Abstracted / self.var.noRoutingSteps
                 returnflowIrr_sed_Dt = self.var.returnflowIrr_sed /  self.var.noRoutingSteps
-  
+                
             if self.var.includePhosphorus:
                 self.var.resLakeOutflow_P = globals.inZero.copy()
                 self.var.resLakeOutflow_PP = globals.inZero.copy()
@@ -840,14 +842,18 @@ class routing_kinematic(object):
                 self.waterquality_vars.dynamic()
                 self.var.substepChannelStorage = self.var.channelAlpha * self.var.chanLength * Qnew ** self.var.beta
 
-
                 if self.var.includeErosed:
-                    self.var.channel_sed, self.var.channel_sedConc = self.model.waterquality_module.erosed.sediments_in_channel(
+                    # Update channel_sedConc
+                    self.var.channel_sedConc = np.where(self.var.substepChannelStorage > 1, divideValues(self.var.channel_sed, self.var.substepChannelStorage), 0.)
+
+                    
+                    self.var.channel_sed, self.var.channel_sedConc, sed_dep_dt, sed_deg_dt = self.model.waterquality_module.erosed.sediments_in_channel(
                         channel_sed = self.var.channel_sed, channel_sedConc = self.var.channel_sedConc, prf=self.var.prf, \
                         Q=self.var.discharge, A=self.var.crossArea, csp=self.var.csp, spexp=self.var.spexp,
                         V=self.var.substepChannelStorage, Kch=self.var.Kch, Cch = self.var.Cch)
-                    #self.var.EPC0_w += EPC0t_w / self.var.noRoutingSteps
-
+                    
+                    self.var.channel_sedDep += sed_dep_dt
+                    self.var.channel_sedDeg += sed_deg_dt
                 if self.var.includePhosphorus:
                     self.var.channelLake_P_retention = self.model.waterquality_module.waterquality_p.dynamic_P_retention()
                     self.var.avg_channelLake_P_retention += self.var.channelLake_P_retention / self.var.noRoutingSteps
