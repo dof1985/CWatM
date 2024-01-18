@@ -45,8 +45,8 @@ class waterdemand_irrigation:
     Variable [self.var]                    Description                                                             Unit 
     =====================================  ======================================================================  =====
     load_initial                           Settings initLoad holds initial conditions for variables                input
-    topwater                               quantity of water above the soil (flooding)                             m    
     cropKC                                 crop coefficient for each of the 4 different land cover types (forest,  --   
+    topwater                               quantity of water above the soil (flooding)                             m    
     efficiencyPaddy                        Input, irrPaddy_efficiency, paddy irrigation efficiency, the amount of  frac 
     efficiencyNonpaddy                     Input, irrNonPaddy_efficiency, non-paddy irrigation efficiency, the am  frac 
     returnfractionIrr                      Input, irrigation_returnfraction, the fraction of non-efficient water   frac 
@@ -58,23 +58,23 @@ class waterdemand_irrigation:
     availWaterInfiltration                 quantity of water reaching the soil after interception, more snowmelt   m    
     ws1                                    Maximum storage capacity in layer 1                                     m    
     ws2                                    Maximum storage capacity in layer 2                                     m    
-    wfc1                                   Soil moisture at field capacity in layer 1                                   
-    wfc2                                   Soil moisture at field capacity in layer 2                                   
-    wwp1                                   Soil moisture at wilting point in layer 1                                    
-    wwp2                                   Soil moisture at wilting point in layer 2                                    
-    arnoBeta                                                                                                            
+    wfc1                                   Soil moisture at field capacity in layer 1                              --   
+    wfc2                                   Soil moisture at field capacity in layer 2                              --   
+    wwp1                                   Soil moisture at wilting point in layer 1                               --   
+    wwp2                                   Soil moisture at wilting point in layer 2                               --   
+    arnoBeta                                                                                                       --   
     maxtopwater                            maximum heigth of topwater                                              m    
     totAvlWater                            Field capacity minus wilting point in soil layers 1 and 2               m    
     InvCellArea                            Inverse of cell area of each simulated mesh                             1/m2 
+    totalPotET                             Potential evaporation per land use class                                m    
     w1                                     Simulated water storage in the layer 1                                  m    
     w2                                     Simulated water storage in the layer 2                                  m    
-    totalPotET                             Potential evaporation per land use class                                m    
     fracVegCover                           Fraction of specific land covers (0=forest, 1=grasslands, etc.)         %    
-    unmetDemand                            Unmet demand                                                            m    
+    unmetDemand                            Unmet groundwater demand to determine potential fossil groundwaterwate  m    
     unmetDemandPaddy                       Unmet paddy demand                                                      m    
     unmetDemandNonpaddy                    Unmet nonpaddy demand                                                   m    
     irrDemand                              Cover-specific Irrigation demand                                        m/m  
-    irrNonpaddyDemand                                                                                                   
+    irrNonpaddyDemand                                                                                              --   
     totalIrrDemand                         Irrigation demand                                                       m    
     =====================================  ======================================================================  =====
 
@@ -97,6 +97,7 @@ class waterdemand_irrigation:
         self.var.unmetDemandNonpaddy = self.var.load_initial('unmetDemandNonpaddy', default=globals.inZero.copy())
         # in case fossil water abstraction is allowed this will be filled
         self.var.unmetDemand = globals.inZero.copy()
+        self.var.unmetDemand_runningSum = self.var.load_initial('unmetDemand_runningSum', default=globals.inZero.copy())
 
         # irrigation efficiency
         # at the moment a single map, but will be replaced by map stack for every year
@@ -149,7 +150,7 @@ class waterdemand_irrigation:
         soilWaterStorage = self.var.w1[No] + self.var.w2[No]
         soilWaterStorageCap = self.var.ws1[No] + self.var.ws2[No]
         relSat = soilWaterStorage / soilWaterStorageCap
-        satAreaFrac = 1 - (1 - relSat) ** self.var.arnoBeta[No]
+        satAreaFrac = np.maximum(1 - (1 - relSat),0) ** self.var.arnoBeta[No]
         satAreaFrac = np.maximum(np.minimum(satAreaFrac, 1.0), 0.0)
 
         store = soilWaterStorageCap / (self.var.arnoBeta[No] + 1)

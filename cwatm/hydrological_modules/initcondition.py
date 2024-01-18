@@ -25,12 +25,16 @@ class initcondition(object):
     =====================================  ======================================================================  =====
     Variable [self.var]                    Description                                                             Unit 
     =====================================  ======================================================================  =====
+    modflow                                Flag: True if modflow_coupling = True in settings file                  --   
+    Crops_names                            Internal: List of specific crops                                        --   
     includeCrops                           1 when includeCrops=True in Settings, 0 otherwise                       bool 
-    Crops                                  Internal: List of specific crops and Kc/Ky parameters                        
-    Crops_names                            Internal: List of specific crops                                             
+    Crops                                  Internal: List of specific crops and Kc/Ky parameters                   --   
+    includeDesal                                                                                                   --   
+    unlimitedDesal                                                                                                 --   
+    desalAnnualCap                                                                                                 --   
     reservoir_transfers                    [['Giving reservoir'][i], ['Receiving reservoir'][i], ['Fraction of li  array
-    wwt_def                                                                                                             
-    wastewater_to_reservoirs                                                                                            
+    wwt_def                                                                                                        --   
+    wastewater_to_reservoirs                                                                                       --   
     loadInit                               Flag: if true initial conditions are loaded                             --   
     initLoadFile                           load file name of the initial condition data                            --   
     saveInit                               Flag: if true initial conditions are saved                              --   
@@ -104,15 +108,28 @@ class initcondition(object):
         pd = importlib.import_module("pandas", package=None)
         df = pd.read_excel(xl_settings_file_path, sheet_name='Wastewater_def')
         
-        cols = ['From year', 'To year', 'Volume (cubic m per day)', 'Treatment days', 'Treatment level', 'Export share', 'Domestic', 'Industrial']
+        cols = ['From year', 'To year', 'Volume (cubic m per day)', 'Treatment days', 'Treatment level', 'Export share', 'Domestic', 'Industrial', 'min_HRT']
         wwtp_definitions = {}
         for wwtpid in df['WWTP ID'].unique():
             wwtp_definitions[wwtpid] = df[df['WWTP ID'] == wwtpid][cols].to_numpy()
-            #transfer = [df['Sending WWTP'][i], df['Receiving Reservoir'][i]]
-            #wwtp_to_reservoir.append(transfer)
-        #print(wwtp_definitions)
         return wwtp_definitions
-
+    
+    def desalinationCapacity(self, xl_settings_file_path):
+        pd = importlib.import_module("pandas", package=None)
+        df = pd.read_excel(xl_settings_file_path, sheet_name='Desalination')
+        
+        s_year = globals.dateVar['dateBegin'].year
+        e_year = globals.dateVar['dateEnd'].year
+        
+        desalCap = {}
+        lastDesal = 0
+        for year in range(s_year, e_year + 1):
+            if np.in1d(year, df['Year']):
+                lastDesal = df[df['Year'] == year]['Capacity'].to_list()[0]
+            desalCap[year] = lastDesal
+        return desalCap
+        
+    
     def initial(self):
         """
         initial part of the initcondition module
@@ -215,6 +232,21 @@ class initcondition(object):
         initCondVar.append("unmetDemandNonpaddy")
         initCondVarValue.append("unmetDemandNonpaddy")
 
+        initCondVar.append('unmetDemand_runningSum')
+        initCondVarValue.append('unmetDemand_runningSum')
+        
+        # Desalination
+        self.var.includeDesal = False
+        self.var.unlimitedDesal = False
+        if 'includeDesalination' in option:
+            self.var.includeDesal = checkOption('includeDesalination')
+        
+        if self.var.includeDesal:
+            self.var.unlimitedDesal = returnBool('unlimitedDesalinationCapacity')
+            if not self.var.unlimitedDesal:
+                xl_settings_file_path = cbinding('Excel_settings_file')
+                self.var.desalAnnualCap = self.desalinationCapacity(xl_settings_file_path)
+        
         # groundwater
         if not self.var.modflow:
             initCondVar.append("storGroundwater")
@@ -279,7 +311,7 @@ class initcondition(object):
         # or in certain interval e.g. 2y = every 2 years, 3m = every 3 month, 15d = every 15 days
 
         self.var.saveInit = returnBool('save_initial')
-        #self.var.initmap = {}
+        self.var.initmap = {}
 
         if self.var.saveInit:
             self.var.saveInitFile = cbinding('initSave')

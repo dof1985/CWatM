@@ -49,7 +49,6 @@ def valuecell( coordx, coordstr, returnmap = True):
             msg = "Error 101: Gauges in settings file: " + xy + " in " + coordstr + " is not a coordinate"
             raise CWATMError(msg)
 
-
     null = np.zeros((maskmapAttr['row'], maskmapAttr['col']))
     null[null == 0] = -9999
 
@@ -152,22 +151,24 @@ def loadsetclone(self,name):
         filename = os.path.splitext(cbinding(name))[0] + '.nc'
         try:
             nf1 = Dataset(filename, 'r')
+            #y, x, cell, invcell, rows, cols = readCoordNetCDF(filename)
+            #setmaskmapAttr(x, y, cols, rows, cell)
+
             value = list(nf1.variables.items())[-1][0]  # get the last variable name
 
-            #x1 = nf1.variables.values()[0][0]
-            #x2 = nf1.variables.values()[0][1]
-            #xlast = nf1.variables.values()[0][-1]
-            x1 = nf1.variables['lon'][0]
-            x2 = nf1.variables['lon'][1]
-            xlast = nf1.variables['lon'][-1]
+            x1 = list(nf1.variables.values())[0][0]
+            x2 = list(nf1.variables.values())[0][1]
+            xlast = list(nf1.variables.values())[0][-1]
 
-            y1 = nf1.variables['lat'][0]
-            ylast = nf1.variables['lat'][-1]
+            y1 = list(nf1.variables.values())[1][0]
+            ylast = list(nf1.variables.values())[1][-1]
+
             # swap to make y1 the biggest number
             if y1 < ylast:  y1, ylast = ylast, y1
 
             cellSize = np.abs(x2 - x1)
             invcell = round(1/cellSize)
+            if invcell == 0: invcell = 1/cellSize
             nrRows = int(0.5 + np.abs(ylast - y1) * invcell + 1)
             nrCols = int(0.5 + np.abs(xlast - x1) * invcell + 1)
             x = x1 - cellSize / 2
@@ -579,6 +580,12 @@ def readCoordNetCDF(name,check = True):
             maskmapAttr['coordx'] = 'x'
             maskmapAttr['coordy'] = 'y'
 
+    if 'X' in nf1.variables.keys():
+        maskmapAttr['coordx'] = 'X'
+        maskmapAttr['coordy'] = 'Y'
+    if 'x' in nf1.variables.keys():
+        maskmapAttr['coordx'] = 'x'
+        maskmapAttr['coordy'] = 'y'
 
     rows = nf1.variables[maskmapAttr['coordy']].shape[0]
     cols = nf1.variables[maskmapAttr['coordx']].shape[0]
@@ -624,14 +631,20 @@ def checkMeteo_Wordclim(meteodata, wordclimdata):
         msg = "Error 206: Checking netcdf map \n"
         raise CWATMFileError(meteodata, msg)
 
-    lonM0 = nf1.variables['lon'][0]
-    lon1 = nf1.variables['lon'][1]
+    if 'lon' in list(nf1.variables.keys()):
+        xy = ["lon", "lat"]
+    else:
+        xy = ["x", "y"]
+
+    lonM0 = nf1.variables[xy[0]][0]
+    lon1 = nf1.variables[xy[0]][1]
+
     cellM = round(np.abs(lon1 - lonM0) / 2.,8)
     lonM0 = round(lonM0 - cellM,8)
 
-    lonM1 = round(nf1.variables['lon'][-1] + cellM,8)
-    latM0 = nf1.variables['lat'][0]
-    latM1 = nf1.variables['lat'][-1]
+    lonM1 = round(nf1.variables[xy[0]][-1] + cellM,8)
+    latM0 = nf1.variables[xy[1]][0]
+    latM1 = nf1.variables[xy[1]][-1]
     nf1.close()
 
     # swap to make lat0 the biggest number
@@ -647,15 +660,15 @@ def checkMeteo_Wordclim(meteodata, wordclimdata):
         msg = "Error 207: Checking netcdf map \n"
         raise CWATMFileError(wordclimdata, msg)
 
-    lonW0 = nf1.variables['lon'][0]
-    lon1 = nf1.variables['lon'][1]
+    lonW0 = nf1.variables[xy[0]][0]
+    lon1 = nf1.variables[xy[0]][1]
     cellW = round(np.abs(lon1 - lonW0) / 2.,8)
     lonW0 = round(lonW0 - cellW,8)
-    lonW1 = round(nf1.variables['lon'][-1] + cellW,8)
+    lonW1 = round(nf1.variables[xy[0]][-1] + cellW,8)
 
 
-    latW0 = nf1.variables['lat'][0]
-    latW1 = nf1.variables['lat'][-1]
+    latW0 = nf1.variables[xy[1]][0]
+    latW1 = nf1.variables[xy[1]][-1]
     nf1.close()
     # swap to make lat0 the biggest number
     if latW0 < latW1:
@@ -851,14 +864,13 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
             except:
                 datediv = 1
 
-            datestart = num2date(nctime[:][0] ,units=nctime.units,calendar=nctime.calendar)
+            datestart = num2date(int(round(nctime[:][0],0)), units=nctime.units,calendar=nctime.calendar)
 
             # sometime daily records have a strange hour to start with -> it is changed to 0:00 to haqve the same record
             datestart = datestart.replace(hour=0, minute=0)
-            dateend = num2date(nctime[:][-1], units=nctime.units, calendar=nctime.calendar)
-
-            datestartint = int(nctime[0]) // datediv
-            dateendint = int(nctime[:][-1]) // datediv
+            dateend = num2date(int(round(nctime[:][-1],0)), units=nctime.units, calendar=nctime.calendar)
+            datestartint = int(round(nctime[0].data.tolist(),0)) // datediv
+            dateendint = int(round(nctime[:][-1].data.tolist(),0)) // datediv
 
             dateend = dateend.replace(hour=0, minute=0)
             #if dateVar['leapYear'] > 0:
@@ -873,7 +885,8 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
             #    start = dateVar[startcheck]
 
             if startfile == 0:  # search first file where dynamic run starts
-                if (dateendint >= startint) and (datestartint <= startint):  # if enddate of a file is bigger than the start of run
+                if (dateendint >= startint): # if enddate of a file is bigger than the start of run
+                    # and (datestartint <= startint):  # remove thiis, because glacier maps could start latter, than the day of the year of first year is  use
                     startfile = 1
                     #indstart = (start - datestart).days
                     indstart = startint - datestartint
@@ -887,6 +900,9 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
                     #start = start.replace(hour=0, minute=0)
                     startint = dateendint + 1
                     start = num2date(startint * datediv, units=nctime.units, calendar=nctime.calendar)
+
+                    # counter is set to a minus value - for some maps (e.g. glacier) if the counter is negativ
+                    # the doy of a year of first year is loaded -> to use runs  before glacier maps are calculated
 
             else:
                 if (datestartint >= startint) and (datestartint < endint ):
@@ -906,7 +922,7 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
 
 
 
-def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapsscale = True, buffering=False):
+def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapsscale = True, buffering=False, extendback = False):
     """
     load stack of maps 1 at each timestamp in netcdf format
 
@@ -932,6 +948,15 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
         msg = "Error 210: Netcdf map error for: " + name + " -> " + cbinding(name) + " on: " + date1 + ": \n"
         raise CWATMError(msg)
 
+    # for glaciermaps extend back into past if glaciermaps start later -> use day of the year of first year
+    if idx < 0:
+        if extendback:
+            idx = dateVar['doy'] - 1
+        else:
+            date1 = "%02d/%02d/%02d" % (date.day, date.month, date.year)
+            msg = "Error 211: Netcdf map: " + name + " -> " + cbinding(name) + " starts later than first date of simulation on: " + date1 + ": \n"
+            raise CWATMError(msg)
+
     try:
        nf1 = Dataset(filename, 'r')
     except:
@@ -941,10 +966,10 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
     warnings.filterwarnings("ignore")
     if value == "None":
         value = list(nf1.variables.items())[-1][0]  # get the last variable name
-        if value in ["x","y","lon","lat","time"]:
+        if value in ["X","Y","x","y","lon","lat","time"]:
             for i in range(2,5):
                value = list(nf1.variables.items())[-i][0]
-               if not(value in ["x","y","lon","lat","time"]) : break
+               if not(value in ["X","Y","x","y","lon","lat","time"]) : break
 
     # check if mask = map size -> if yes do not cut the map
     cutcheckmask = maskinfo['shape'][0] * maskinfo['shape'][1]
@@ -952,9 +977,15 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
     cutcheck = True
     if cutcheckmask == cutcheckmap: cutcheck = False
 
+    # check if it is x or X
+    yy = maskmapAttr['coordy']
+    if yy == "y":
+        if "Y" in nf1.variables.keys():
+            yy = "Y"
+
     #checkif latitude is reversed
     turn_latitude = False
-    if (nf1.variables[maskmapAttr['coordy']][0] - nf1.variables[maskmapAttr['coordy']][-1]) < 0:
+    if (nf1.variables[yy][0] - nf1.variables[yy][-1]) < 0:
         turn_latitude = True
         mapnp = nf1.variables[value][idx].astype(np.float64)
         mapnp = np.flipud(mapnp)
@@ -1135,7 +1166,13 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
            mapnp = np.flipud(mapnp)
     except:
        ii = 1
-       
+
+    if 'Glacier' in namebinding:
+        cutcheckmask = maskinfo['shape'][0] * maskinfo['shape'][1]
+        cutcheckmap = nf1.variables[value].shape[1] * nf1.variables[value].shape[2]
+        cut = True
+        if cutcheckmask == cutcheckmap: cut = False
+
     if cut:
         if turn_latitude:
             #mapnp = mapnp[cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]]
@@ -1226,6 +1263,12 @@ def readnetcdfInitial(name, value,default = 0.0):
         raise CWATMFileError(filename,msg)
     if value in list(nf1.variables.keys()):
         try:
+            if 'X' in nf1.variables.keys():
+                maskmapAttr['coordx'] = 'X'
+                maskmapAttr['coordy'] = 'Y'
+            if 'x' in nf1.variables.keys():
+                maskmapAttr['coordx'] = 'x'
+                maskmapAttr['coordy'] = 'y'
 
             if (nf1.variables[maskmapAttr['coordy']][0] - nf1.variables[maskmapAttr['coordy']][-1]) < 0:
                 msg = "Error 112: Latitude is in wrong order\n"
@@ -1336,27 +1379,41 @@ def writenetcdf(netfile,prename,addname,varunits,inputmap, timeStamp, posCnt, fl
                 exec('%s="%s"' % ("latitude." + i, metadataNCDF['modflow_y'][i]))
 
         else:
+            latlon = True
             if 'x' in list(metadataNCDF.keys()):
                 lon = nf1.createDimension('x', col)  # x 1000
                 longitude = nf1.createVariable('x', 'f8', ('x',))
+                latlon = False
                 for i in metadataNCDF['x']:
                     exec('%s="%s"' % ("longitude." + i, metadataNCDF['x'][i]))
-            if 'lon' in list(metadataNCDF.keys()):
-                lon = nf1.createDimension('lon', col)
-                longitude = nf1.createVariable('lon', 'f8', ('lon',))
-                for i in metadataNCDF['lon']:
-                    exec('%s="%s"' % ("longitude." + i, metadataNCDF['lon'][i]))
             if 'y' in list(metadataNCDF.keys()):
                 lat = nf1.createDimension('y', row)  # x 950
                 latitude = nf1.createVariable('y', 'f8', 'y')
                 for i in metadataNCDF['y']:
                     exec('%s="%s"' % ("latitude." + i, metadataNCDF['y'][i]))
-            if 'lat' in list(metadataNCDF.keys()):
-                lat = nf1.createDimension('lat', row)  # x 950
-                latitude = nf1.createVariable('lat', 'f8', 'lat')
-                for i in metadataNCDF['lat']:
-                    exec('%s="%s"' % ("latitude." + i, metadataNCDF['lat'][i]))
-
+            # SHMI meteorogist have a capital X and Y
+            if 'X' in list(metadataNCDF.keys()):
+                lon = nf1.createDimension('x', col)  # x 1000
+                longitude = nf1.createVariable('x', 'f8', ('x',))
+                latlon = False
+                for i in metadataNCDF['X']:
+                    exec('%s="%s"' % ("longitude." + i, metadataNCDF['X'][i]))
+            if 'Y' in list(metadataNCDF.keys()):
+                lat = nf1.createDimension('y', row)  # x 950
+                latitude = nf1.createVariable('y', 'f8', 'y')
+                for i in metadataNCDF['Y']:
+                    exec('%s="%s"' % ("latitude." + i, metadataNCDF['Y'][i]))
+            if latlon:
+                if 'lon' in list(metadataNCDF.keys()):
+                    lon = nf1.createDimension('lon', col)
+                    longitude = nf1.createVariable('lon', 'f8', ('lon',))
+                    for i in metadataNCDF['lon']:
+                        exec('%s="%s"' % ("longitude." + i, metadataNCDF['lon'][i]))
+                if 'lat' in list(metadataNCDF.keys()):
+                    lat = nf1.createDimension('lat', row)  # x 950
+                    latitude = nf1.createVariable('lat', 'f8', 'lat')
+                    for i in metadataNCDF['lat']:
+                        exec('%s="%s"' % ("latitude." + i, metadataNCDF['lat'][i]))
         # projection
         if 'laea' in list(metadataNCDF.keys()):
             proj = nf1.createVariable('laea', 'i4')
@@ -1410,22 +1467,34 @@ def writenetcdf(netfile,prename,addname,varunits,inputmap, timeStamp, posCnt, fl
                 value = nf1.createVariable(varname, 'f4', ('time', 'y', 'x'), zlib=True, fill_value=1e20,
                                            chunksizes=(1, row, col))
             else:
+                latlon = True
                 if 'x' in list(metadataNCDF.keys()):
+                    latlon = False
                     value = nf1.createVariable(varname, 'f4', ('time', 'y', 'x'), zlib=True, fill_value=1e20,
                                                chunksizes=(1, row, col))
-                if 'lon' in list(metadataNCDF.keys()):
-                    #value = nf1.createVariable(varname, 'f4', ('time', 'lat', 'lon'), zlib=True, fill_value=1e20)
-                    value = nf1.createVariable(varname, 'f4', ('time', 'lat', 'lon'), zlib=True, fill_value=1e20,chunksizes=(1,row,col))
+                if 'X' in list(metadataNCDF.keys()):
+                    latlon = False
+                    value = nf1.createVariable(varname, 'f4', ('time', 'y', 'x'), zlib=True, fill_value=1e20,
+                                               chunksizes=(1, row, col))
+                if latlon:
+                    if 'lon' in list(metadataNCDF.keys()):
+                        #value = nf1.createVariable(varname, 'f4', ('time', 'lat', 'lon'), zlib=True, fill_value=1e20)
+                        value = nf1.createVariable(varname, 'f4', ('time', 'lat', 'lon'), zlib=True, fill_value=1e20,chunksizes=(1,row,col))
         else:
           if modflow:
               value = nf1.createVariable(varname, 'f4', ('y', 'x'), zlib=True, fill_value=1e20)
           else:
+              latlon = True
               if 'x' in list(metadataNCDF.keys()):
+                  latlon = False
                   value = nf1.createVariable(varname, 'f4', ('y', 'x'), zlib=True,fill_value=1e20)
-              if 'lon' in list(metadataNCDF.keys()):
-                  # for world lat/lon coordinates
-                  value = nf1.createVariable(varname, 'f4', ('lat', 'lon'), zlib=True, fill_value=1e20)
-
+              if 'X' in list(metadataNCDF.keys()):
+                  latlon = False
+                  value = nf1.createVariable(varname, 'f4', ('y', 'x'), zlib=True,fill_value=1e20)
+              if latlon:
+                  if 'lon' in list(metadataNCDF.keys()):
+                     # for world lat/lon coordinates
+                     value = nf1.createVariable(varname, 'f4', ('lat', 'lon'), zlib=True, fill_value=1e20)
         value.standard_name = getmeta("standard_name",prename,varname)
         p1 = getmeta("long_name",prename,prename)
         p2 = getmeta("time", addname, addname)
@@ -1523,26 +1592,40 @@ def writeIniNetcdf(netfile,varlist, inputlist):
 
 
     # Dimension
+    latlon = True
     if 'x' in list(metadataNCDF.keys()):
+        latlon = False
         lon = nf1.createDimension('x', col)  # x 1000
         longitude = nf1.createVariable('x', 'f8', ('x',))
         for i in metadataNCDF['x']:
             exec('%s="%s"' % ("longitude." + i, metadataNCDF['x'][i]))
-    if 'lon' in list(metadataNCDF.keys()):
-        lon = nf1.createDimension('lon', col)
-        longitude = nf1.createVariable('lon', 'f8', ('lon',))
-        for i in metadataNCDF['lon']:
-            exec('%s="%s"' % ("longitude." + i, metadataNCDF['lon'][i]))
     if 'y' in list(metadataNCDF.keys()):
         lat = nf1.createDimension('y', row)  # x 950
         latitude = nf1.createVariable('y', 'f8', 'y')
         for i in metadataNCDF['y']:
             exec('%s="%s"' % ("latitude." + i, metadataNCDF['y'][i]))
-    if 'lat' in list(metadataNCDF.keys()):
-        lat = nf1.createDimension('lat', row)  # x 950
-        latitude = nf1.createVariable('lat', 'f8', 'lat')
-        for i in metadataNCDF['lat']:
-            exec('%s="%s"' % ("latitude." + i, metadataNCDF['lat'][i]))
+    if 'X' in list(metadataNCDF.keys()):
+        latlon = False
+        lon = nf1.createDimension('x', col)  # x 1000
+        longitude = nf1.createVariable('x', 'f8', ('x',))
+        for i in metadataNCDF['X']:
+            exec('%s="%s"' % ("longitude." + i, metadataNCDF['X'][i]))
+    if 'Y' in list(metadataNCDF.keys()):
+        lat = nf1.createDimension('y', row)  # x 950
+        latitude = nf1.createVariable('y', 'f8', 'y')
+        for i in metadataNCDF['Y']:
+            exec('%s="%s"' % ("latitude." + i, metadataNCDF['Y'][i]))
+    if latlon:
+        if 'lon' in list(metadataNCDF.keys()):
+            lon = nf1.createDimension('lon', col)
+            longitude = nf1.createVariable('lon', 'f8', ('lon',))
+            for i in metadataNCDF['lon']:
+                exec('%s="%s"' % ("longitude." + i, metadataNCDF['lon'][i]))
+        if 'lat' in list(metadataNCDF.keys()):
+            lat = nf1.createDimension('lat', row)  # x 950
+            latitude = nf1.createVariable('lat', 'f8', 'lat')
+            for i in metadataNCDF['lat']:
+                exec('%s="%s"' % ("latitude." + i, metadataNCDF['lat'][i]))
 
     # projection
     if 'laea' in list(metadataNCDF.keys()):
@@ -1569,13 +1652,17 @@ def writeIniNetcdf(netfile,varlist, inputlist):
 
     i = 0
     for varname in varlist:
-
+        latlon = True
         if 'x' in list(metadataNCDF.keys()):
+            latlon = False
             value = nf1.createVariable(varname, 'f8', ('y', 'x'), zlib=True,fill_value=1e20)
-        if 'lon' in list(metadataNCDF.keys()):
-            # for world lat/lon coordinates
-            value = nf1.createVariable(varname, 'f8', ('lat', 'lon'), zlib=True, fill_value=1e20)
-
+        if 'X' in list(metadataNCDF.keys()):
+            latlon = False
+            value = nf1.createVariable(varname, 'f8', ('y', 'x'), zlib=True,fill_value=1e20)
+        if latlon:
+            if 'lon' in list(metadataNCDF.keys()):
+                # for world lat/lon coordinates
+                value = nf1.createVariable(varname, 'f8', ('lat', 'lon'), zlib=True, fill_value=1e20)
         value.standard_name= getmeta("standard_name",varname,varname)
         value.long_name= getmeta("long_name",varname,varname)
         value.units= getmeta("unit",varname,"undefined")
@@ -1658,8 +1745,8 @@ def report(valueIn,name,compr=True):
         outband = ds.GetRasterBand(1)
         # set NoData value
         outband.SetNoDataValue(-9999)
-        outband.SetStatistics(np.nanmin(value).astype(np.float), np.nanmax(value).astype(np.float),
-                              np.nanmean(value).astype(np.float), np.nanstd(value).astype(np.float))
+        outband.SetStatistics(np.nanmin(value).astype(float), np.nanmax(value).astype(float),
+                              np.nanmean(value).astype(float), np.nanstd(value).astype(float))
 
     outband.WriteArray(value)
     ds.FlushCache()
