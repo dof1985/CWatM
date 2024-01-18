@@ -96,9 +96,9 @@ class waterquality_erosed(object):
         """
         # load initial MUSLE maps
         # map with percentage of rock in first soil layer (%) must be provided, e.g., SoilGrids Parameter cfvo for depth 0-5cm
-        rock = loadmap('rock')
-        self.var.CFRG = np.exp(-0.053 * rock)
-        i=1
+        self.var.CFRG = np.exp(-0.053 * loadmap('rockFrac'))
+        
+        #i=1
         # K_usle: USLE soil erodibility factor
         self.var.kFactor = loadmap('kFactor')
 
