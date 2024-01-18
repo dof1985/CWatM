@@ -497,7 +497,7 @@ class water_demand:
                 if 'reservoir_command_areas' in binding:
                     self.var.load_command_areas = True
 
-                if 'reservoir_command_areas_restricted' in binding:
+                if 'reservoir_command_areas_restricted' in binding and self.var.includeWastewater:
                     self.var.load_command_areas_wwt = True
 
                 if self.var.modflow and 'Water_conveyance_efficiency' in binding:
