@@ -96,9 +96,9 @@ class waterquality_erosed(object):
         """
         # load initial MUSLE maps
         # map with percentage of rock in first soil layer (%) must be provided, e.g., SoilGrids Parameter cfvo for depth 0-5cm
-        rock = loadmap('rock')
-        self.var.CFRG = np.exp(-0.053 * rock)
-        i=1
+        self.var.CFRG = np.exp(-0.053 * loadmap('rockFrac'))
+        
+        #i=1
         # K_usle: USLE soil erodibility factor
         self.var.kFactor = loadmap('kFactor')
 
@@ -190,7 +190,7 @@ class waterquality_erosed(object):
         directRunoff_m3sec = self.var.directRunoff[0:4] * self.var.cellArea / self.var.DtSec
         runoffm3s = self.var.runoff * self.var.cellArea / self.var.DtSec
 
-        self.var.directRunoff_mm = self.var.directRunoff[0:4]/1000
+        self.var.directRunoff_mm = self.var.directRunoff[0:4] * 1000
         
 
 
@@ -220,7 +220,7 @@ class waterquality_erosed(object):
                                       3600. * self.var.tconc)  # [m3s-1]
 
         # MUSLE: sediment yield per day and grid in [1000 kg]
-        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea,loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
+        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
 
         # self.var.sedYieldLand_sum = np.nansum(self.var.fracVegCover[0:4]*self.var.sedYieldLand, axis=0)
         erosedVarsSum = ['sedYieldLand', 'channel_sed', 'channel_sedConc']

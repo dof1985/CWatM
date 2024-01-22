@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------------
 # Name:        Water demand module
 #
-# Author:      PB, MS, LG, JdeB
+# Author:      PB, MS, LG, JdeB, DF
 #
 # Created:     15/07/2016
 # Copyright:   (c) PB 2016
@@ -37,216 +37,255 @@ class water_demand:
     =====================================  ======================================================================  =====
     Variable [self.var]                    Description                                                             Unit 
     =====================================  ======================================================================  =====
+    modflow                                Flag: True if modflow_coupling = True in settings file                  --   
     load_initial                           Settings initLoad holds initial conditions for variables                input
     readAvlStorGroundwater                 same as storGroundwater but equal to 0 when inferior to a treshold      m    
+    includeDesal                                                                                                   --   
+    unlimitedDesal                                                                                                 --   
+    desalAnnualCap                                                                                                 --   
     reservoir_transfers                    [['Giving reservoir'][i], ['Receiving reservoir'][i], ['Fraction of li  array
     loadInit                               Flag: if true initial conditions are loaded                             --   
     efficiencyPaddy                        Input, irrPaddy_efficiency, paddy irrigation efficiency, the amount of  frac 
     efficiencyNonpaddy                     Input, irrNonPaddy_efficiency, non-paddy irrigation efficiency, the am  frac 
     returnfractionIrr                      Input, irrigation_returnfraction, the fraction of non-efficient water   frac 
     irrPaddyDemand                         Paddy irrigation demand                                                 m    
-    waterBodyBuffer                                                                                                     
     compress_LR                            boolean map as mask map for compressing lake/reservoir                  --   
     decompress_LR                          boolean map as mask map for decompressing lake/reservoir                --   
-    waterBodyID_C                                                                                                       
+    waterBodyID_C                                                                                                  --   
     resYearC                               Compressed map of resYear                                               --   
+    waterBodyTyp_unchanged                                                                                         --   
     resVolumeC                             compressed map of reservoir volume                                      Milli
+    resId_restricted                                                                                               --   
+    waterBodyBuffer                                                                                                --   
+    waterBodyBuffer_wwt                                                                                            --   
     reservoir_transfers_net_M3             net reservoir transfers, after exports, transfers, and imports          m3   
     reservoir_transfers_in_M3              water received into reservoirs                                          m3   
     reservoir_transfers_out_M3             water given from reservoirs                                             m3   
     reservoir_transfers_from_outside_M3    water received into reservoirs from Outside                             m3   
     reservoir_transfers_to_outside_M3      water given from reservoirs to the Outside                              m3   
     MtoM3C                                 conversion factor from m to m3 (compressed map)                         --   
-    waterBodyTypCTemp                                                                                                   
-    pot_livestockConsumption                                                                                            
-    MtoM3                                  Coefficient to change units                                             --   
-    InvDtSec                                                                                                            
+    waterBodyTypCTemp                                                                                              --   
+    pot_livestockConsumption                                                                                       --   
     cellArea                               Area of cell                                                            m2   
+    MtoM3                                  Coefficient to change units                                             --   
+    InvDtSec                                                                                                       --   
+    InvCellArea                            Inverse of cell area of each simulated mesh                             1/m2 
     M3toM                                  Coefficient to change units                                             --   
-    modflow                                Flag: True if modflow_coupling = True in settings file                  --   
     GW_pumping                             Input, True if Groundwater_pumping=True                                 bool 
-    availableGWStorageFraction                                                                                          
-    groundwater_storage_available                                                                                       
+    availableGWStorageFraction                                                                                     --   
+    groundwater_storage_available          Groundwater storage. Used with MODFLOW.                                 m    
     gwstorage_full                         Groundwater storage at full capacity                                    m    
-    wwtUrbanLeakage                                                                                                     
-    wwtColArea                                                                                                          
-    wwtColShare                                                                                                         
-    wwtSewerCollected                                                                                                   
-    wwtOverflowOutM                                                                                                     
-    nonFossilGroundwaterAbs                groundwater abstraction which is sustainable and not using fossil reso  m    
-    reservoir_transfers_net_M3C                                                                                    m3   
-    reservoir_transfers_in_M3C                                                                                     m3   
-    reservoir_transfers_out_M3C                                                                                    m3   
-    reservoir_transfers_from_outside_M3C                                                                           m3   
-    reservoir_transfers_to_outside_M3C                                                                             m3   
-    lakeVolumeM3C                          compressed map of lake volume                                           m3   
-    lakeStorageC                                                                                                   m3   
-    reservoirStorageM3C                                                                                                 
-    lakeResStorageC                                                                                                     
-    lakeResStorage                                                                                                      
-    smalllakeVolumeM3                                                                                                   
-    smalllakeStorage                                                                                                    
-    act_SurfaceWaterAbstract               Surface water abstractions                                              m    
+    wwtColArea                                                                                                     --   
+    wwtSewerCollection                                                                                             --   
+    wwtOverflowOutM                                                                                                --   
     fracVegCover                           Fraction of specific land covers (0=forest, 1=grasslands, etc.)         %    
-    includeWastewater                                                                                                   
-    readAvlChannelStorageM                                                                                              
-    leakageCanals_M                                                                                                     
+    adminSegments                          Domestic agents                                                         Int  
+    nonFossilGroundwaterAbs                Non-fossil groundwater abstraction. Used primarily without MODFLOW.     m    
+    includeWastewater                                                                                              --   
+    reservoir_transfers_net_M3C                                                                                    --   
+    reservoir_transfers_in_M3C                                                                                     --   
+    reservoir_transfers_out_M3C                                                                                    --   
+    reservoir_transfers_from_outside_M3C                                                                           --   
+    reservoir_transfers_to_outside_M3C                                                                             --   
+    lakeVolumeM3C                          compressed map of lake volume                                           m3   
+    lakeStorageC                                                                                                   --   
+    reservoirStorageM3C                                                                                            --   
+    lakeResStorageC                                                                                                --   
+    lakeResStorage                                                                                                 --   
+    smalllakeVolumeM3                                                                                              --   
+    smalllakeStorage                                                                                               --   
+    act_SurfaceWaterAbstract               Surface water abstractions                                              m    
+    readAvlChannelStorageM                                                                                         --   
+    leakageCanals_M                                                                                                --   
     addtoevapotrans                        Irrigation application loss to evaporation                              m    
     act_irrWithdrawal                      Irrigation withdrawals                                                  m    
     act_nonIrrConsumption                  Non-irrigation consumption                                              m    
-    returnFlow                                                                                                          
+    returnFlow                                                                                                     --   
     act_irrConsumption                     actual irrigation water consumption                                     m    
     act_irrNonpaddyWithdrawal              non-paddy irrigation withdrawal                                         m    
-    adminSegments                          Domestic agents                                                         Int  
     act_irrPaddyWithdrawal                 paddy irrigation withdrawal                                             m    
-    unmetDemand                            Unmet demand                                                            m    
+    unmetDemand                            Unmet groundwater demand to determine potential fossil groundwaterwate  m    
     act_nonIrrWithdrawal                   Non-irrigation withdrawals                                              m    
-    returnflowIrr                                                                                                       
-    nonIrrReturnFlowFraction                                                                                            
+    returnflowIrr                                                                                                  --   
+    nonIrrReturnFlowFraction                                                                                       --   
     unmet_lost                             Fossil water that disappears instead of becoming return flow            m    
     channelStorage                         Channel water storage                                                   m3   
     act_totalWaterWithdrawal               Total water withdrawals                                                 m    
     act_bigLakeResAbst                     Abstractions to satisfy demands from lakes and reservoirs               m    
     act_smallLakeResAbst                   Abstractions from small lakes at demand location                        m    
-    waterdemandFixed                                                                                                    
-    modfPumpingM                                                                                                        
+    waterdemandFixed                                                                                               --   
+    modfPumpingM                                                                                                   --   
     activate_domestic_agents               Input, True if activate_domestic_agents = True                          bool 
     domesticDemand                         Domestic demand                                                         m    
     swAbstractionFraction_domestic         With domestic agents, derived from surface water over total water requ  %    
-    demand_unit                                                                                                         
-    pot_domesticConsumption                                                                                             
-    sectorSourceAbstractionFractions                                                                                    
+    demand_unit                                                                                                    --   
+    pot_domesticConsumption                                                                                        --   
+    sectorSourceAbstractionFractions                                                                               --   
     swAbstractionFraction_Channel_Domesti  Input, Fraction of Domestic demands to be satisfied with Channel        %    
     swAbstractionFraction_Lift_Domestic    Input, Fraction of Domestic demands to be satisfied with Lift           %    
     swAbstractionFraction_Res_Domestic     Input, Fraction of Domestic demands to be satisfied with Reservoirs     %    
     swAbstractionFraction_Lake_Domestic    Input, Fraction of Domestic demands to be satisfied with Lake           %    
     gwAbstractionFraction_Domestic         Fraction of domestic water demand to be satisfied by groundwater        %    
-    dom_efficiency                                                                                                      
-    envFlow                                                                                                             
-    industryDemand                                                                                                      
-    pot_industryConsumption                                                                                             
-    WB_elec                                Fractions of live storage to be exported from basin                     366-d
-    swAbstractionFraction_Lake_Industry    Input, Fraction of Industrial water demand to be satisfied by Lakes     %    
-    swAbstractionFraction_Channel_Industr  Input, Fraction of Industrial water demand to be satisfied by Channels  %    
-    swAbstractionFraction_Res_Industry     Input, Fraction of Industrial water demand to be satisfied by Reservoi  %    
-    gwAbstractionFraction_Industry         Fraction of industrial water demand to be satisfied by groundwater      %    
-    swAbstractionFraction                  Input, Fraction of demands to be satisfied with surface water           %    
-    swAbstractionFraction_nonIrr           Input, Fraction of non-irrigation demands to be satisfied with surface  %    
-    ind_efficiency                                                                                                      
+    dom_efficiency                                                                                                 --   
+    envFlow                                                                                                        --   
+    industryDemand                                                                                                 --   
+    pot_industryConsumption                                                                                        --   
+    ind_efficiency                                                                                                 --   
     unmetDemandPaddy                       Unmet paddy demand                                                      m    
     unmetDemandNonpaddy                    Unmet nonpaddy demand                                                   m    
     irrDemand                              Cover-specific Irrigation demand                                        m/m  
-    irrNonpaddyDemand                                                                                                   
+    irrNonpaddyDemand                                                                                              --   
     totalIrrDemand                         Irrigation demand                                                       m    
-    livestockDemand                                                                                                     
-    liv_efficiency                                                                                                      
-    wwtEffluentsGenerated                                                                                               
-    wwtSewerCollection                                                                                                  
-    wwtExportedCollected                                                                                                
+    livestockDemand                                                                                                --   
+    liv_efficiency                                                                                                 --   
+    wwtEffluentsGenerated                                                                                          --   
+    wwtSewerCollection_domestic                                                                                    --   
+    wwtSewerCollection_industry                                                                                    --   
     includeIndusDomesDemand                Input, True if includeIndusDomesDemand = True                           bool 
     activate_irrigation_agents             Input, True if activate_irrigation_agents = True                        bool 
-    relaxGWagent                                                                                                        
-    relaxSWagent                                                                                                        
-    irrWithdrawalSW_max                                                                                                 
-    irrWithdrawalGW_max                                                                                                 
-    relax_irrigation_agents                                                                                             
-    relax_abstraction_fraction_initial                                                                                  
-    waterdemandFixedYear                                                                                                
+    relaxGWagent                                                                                                   --   
+    relaxSWagent                                                                                                   --   
+    irrWithdrawalSW_max                                                                                            --   
+    irrWithdrawalGW_max                                                                                            --   
+    relax_irrigation_agents                                                                                        --   
+    relax_abstraction_fraction_initial                                                                             --   
+    waterdemandFixedYear                                                                                           --   
     swAbstractionFraction_Channel_Livesto  Input, Fraction of Livestock demands to be satisfied from Channels      %    
+    swAbstractionFraction_Channel_Industr  Input, Fraction of Industrial water demand to be satisfied by Channels  %    
     swAbstractionFraction_Channel_Irrigat  Input, Fraction of Irrigation demand to be satisfied from Channels      %    
     swAbstractionFraction_Lake_Livestock   Input, Fraction of Livestock water demands to be satisfied by Lakes     %    
+    swAbstractionFraction_Lake_Industry    Input, Fraction of Industrial water demand to be satisfied by Lakes     %    
     swAbstractionFraction_Lake_Irrigation  Input, Fraction of Irrigation demand to be satisfied by Lakes           %    
     swAbstractionFraction_Res_Livestock    Input, Fraction of Livestock water demands to be satisfied by Reservoi  %    
+    swAbstractionFraction_Res_Industry     Input, Fraction of Industrial water demand to be satisfied by Reservoi  %    
     swAbstractionFraction_Res_Irrigation   Input, Fraction of Irrigation demand to be satisfied by Reservoirs      %    
+    othAbstractionFraction_Desal_Domestic                                                                          --   
+    othAbstractionFraction_Desal_Livestoc                                                                          --   
+    othAbstractionFraction_Desal_Industry                                                                          --   
+    othAbstractionFraction_Desal_Irrigati                                                                          --   
+    wwtAbstractionFraction_Res_Domestic                                                                            --   
+    wwtAbstractionFraction_Res_Livestock                                                                           --   
+    wwtAbstractionFraction_Res_Industry                                                                            --   
+    wwtAbstractionFraction_Res_Irrigation                                                                          --   
     gwAbstractionFraction_Livestock        Fraction of livestock water demand to be satisfied by groundwater       %    
+    gwAbstractionFraction_Industry         Fraction of industrial water demand to be satisfied by groundwater      %    
     gwAbstractionFraction_Irrigation       Fraction of irrigation water demand to be satisfied by groundwater      %    
     using_reservoir_command_areas          True if using_reservoir_command_areas = True, False otherwise           bool 
-    reservoir_command_areas                                                                                             
-    segmentArea                                                                                                         
-    canals                                                                                                              
-    canalsArea                                                                                                          
-    canalsAreaC                                                                                                         
+    load_command_areas                                                                                             --   
+    load_command_areas_wwt                                                                                         --   
+    reservoir_command_areas                                                                                        --   
+    reservoir_command_areas_wwt                                                                                    --   
+    Water_conveyance_efficiency                                                                                    --   
+    segmentArea                                                                                                    --   
+    segmentArea_wwt                                                                                                --   
+    canals                                                                                                         --   
+    canals_wwt                                                                                                     --   
+    canalsArea                                                                                                     --   
+    canalsAreaC                                                                                                    --   
+    canalsArea_wwt                                                                                                 --   
+    canalsArea_wwtC                                                                                                --   
     swAbstractionFraction_Lift_Livestock   Input, Fraction of Livestock water demands to be satisfied from Lift a  %    
     swAbstractionFraction_Lift_Industry    Input, Fraction of Industrial water demand to be satisfied from Lift a  %    
     swAbstractionFraction_Lift_Irrigation  Input, Fraction of Irrigation demand to be satisfied from Lift areas    %    
     using_lift_areas                       True if using_lift_areas = True in Settings, False otherwise            bool 
-    lift_command_areas                                                                                                  
-    allocSegments                                                                                                       
-    allocation_zone                                                                                                     
-    modflowPumping                                                                                                      
-    leakage                                                                                                             
-    pumping                                                                                                             
-    Pumping_daily                                                                                                       
-    modflowDepth2                                                                                                       
-    modflowTopography                                                                                                   
-    allowedPumping                                                                                                      
-    ratio_irrWithdrawalGW_month                                                                                         
-    ratio_irrWithdrawalSW_month                                                                                         
+    lift_command_areas                                                                                             --   
+    allocSegments                                                                                                  --   
+    swAbstractionFraction                  Input, Fraction of demands to be satisfied with surface water           %    
+    allocation_zone                                                                                                --   
+    modflowPumping                                                                                                 --   
+    leakage                                Canal leakage leading to either groundwater recharge or runoff          m3   
+    pumping                                                                                                        --   
+    Pumping_daily                          Groundwater abstraction asked of MODFLOW. modfPumpingM_actual is the r  m    
+    modflowDepth2                                                                                                  --   
+    modflowTopography                                                                                              --   
+    allowedPumping                                                                                                 --   
+    ratio_irrWithdrawalGW_month                                                                                    --   
+    ratio_irrWithdrawalSW_month                                                                                    --   
     act_irrWithdrawalSW_month              Running total agent surface water withdrawals for the month             m    
     act_irrWithdrawalGW_month              Running total agent groundwater withdrawals for the month               m    
+    Desal_Domestic                                                                                                 --   
+    Desal_Industry                                                                                                 --   
+    Desal_Livestock                                                                                                --   
+    Desal_Irrigation                                                                                               --   
     Channel_Domestic                       Channel water abstracted for domestic                                   m    
     Channel_Industry                       Channel water abstracted for industry                                   m    
     Channel_Livestock                      Channel water abstracted for livestock                                  m    
     Channel_Irrigation                     Channel water abstracted for irrigation                                 m    
-    Lake_Domestic                                                                                                       
-    Lake_Industry                                                                                                       
-    Lake_Livestock                                                                                                      
-    Lake_Irrigation                                                                                                     
-    Res_Domestic                                                                                                        
-    Res_Industry                                                                                                        
-    Res_Livestock                                                                                                       
-    Res_Irrigation                                                                                                      
+    Lift_Domestic                                                                                                  --   
+    Lift_Industry                                                                                                  --   
+    Lift_Livestock                                                                                                 --   
+    Lift_Irrigation                                                                                                --   
+    wwt_Domestic                                                                                                   --   
+    wwt_Industry                                                                                                   --   
+    wwt_Livestock                                                                                                  --   
+    wwt_Irrigation                                                                                                 --   
+    Lake_Domestic                                                                                                  --   
+    Lake_Industry                                                                                                  --   
+    Lake_Livestock                                                                                                 --   
+    Lake_Irrigation                                                                                                --   
+    Res_Domestic                                                                                                   --   
+    Res_Industry                                                                                                   --   
+    Res_Livestock                                                                                                  --   
+    Res_Irrigation                                                                                                 --   
     GW_Domestic                            Groundwater withdrawals to satisfy domestic water requests              m    
     GW_Industry                            Groundwater withdrawals to satisfy Industrial water requests            m    
     GW_Livestock                           Groundwater withdrawals to satisfy Livestock water requests             m    
     GW_Irrigation                          Groundwater withdrawals for Irrigation                                  m    
     abstractedLakeReservoirM3              Abstractions from lakes and reservoirs at the location of the waterbod  m3   
-    nonIrruse                                                                                                           
-    act_indDemand                          Industrial demand                                                       m    
-    act_domDemand                          Domestic demand                                                         m    
-    act_livDemand                          Livestock demands                                                       m    
-    nonIrrDemand                                                                                                        
-    totalWaterDemand                       Irrigation and non-irrigation demand                                    m    
+    leakage_wwtC_daily                                                                                             --   
+    act_bigLakeResAbst_wwt                                                                                         --   
+    act_DesalWaterAbstractM                                                                                        --   
+    act_totalIrrConsumption                Total irrigation consumption                                            m    
+    act_totalWaterConsumption              Total water consumption                                                 m    
     act_indConsumption                     Industrial consumption                                                  m    
     act_domConsumption                     Domestic consumption                                                    m    
     act_livConsumption                     Livestock consumptions                                                  m    
-    act_totalIrrConsumption                Total irrigation consumption                                            m    
-    act_totalWaterConsumption              Total water consumption                                                 m    
-    act_bigLakeResAbst_R                                                                                                
-    act_bigLakeResAbst_NR                                                                                               
-    pot_GroundwaterAbstract                                                                                             
-    pot_nonIrrConsumption                                                                                               
-    act_channelAbst                        Abstractions to satisfy demands from channels                           m    
-    swAbstractionFraction_Irr              Input, Fraction of demands to be satisfied with Surface water           %    
-    act_SurfaceWaterAbstract_Irr           Surface water abstractions for irrigation                               m    
-    metRemainSegment_lift                                                                                               
-    act_channelAbstract_Lift               Abstractions from the channel in lift areas at the location of the cha  m    
-    abstractedLakeReservoirM3C             Compressed abstractedLakeReservoirM3                                    m3   
-    act_lakeAbst                           Abstractions from lakes at demand location                              m    
-    inZero_C                                                                                                            
-    act_ResAbst                            Abstractions from reservoirs at demand location                         m    
-    leakageC_daily                                                                                                      
-    leakageCanalsC_M                                                                                                    
-    act_irrPaddyDemand                     paddy irrigation demand                                                 m    
-    act_irrNonpaddyDemand                  non-paddy irrigation demand                                             m    
-    Channel_Domestic_fromZone                                                                                           
-    Channel_Livestock_fromZone                                                                                          
-    Channel_Industry_fromZone                                                                                           
-    Channel_Irrigation_fromZone                                                                                         
-    GW_Domestic_fromZone                                                                                                
-    GW_Livestock_fromZone                                                                                               
-    GW_Industry_fromZone                                                                                                
-    GW_Irrigation_fromZone                                                                                              
-    PumpingM3_daily                                                                                                     
+    returnflowNonIrr                                                                                               --   
+    nonIrruse                                                                                                      --   
+    act_indDemand                          Industrial demand                                                       m    
+    act_domDemand                          Domestic demand                                                         m    
+    act_livDemand                          Livestock demands                                                       m    
+    nonIrrDemand                                                                                                   --   
+    totalWaterDemand                       Irrigation and non-irrigation demand                                    m    
     act_indWithdrawal                      Industrial withdrawal                                                   m    
     act_domWithdrawal                      Domestic withdrawal                                                     m    
     act_livWithdrawal                      Livestock withdrawals                                                   m    
-    act_paddyConsumption                   Paddy consumption                                                       m    
+    pot_GroundwaterAbstract                Potential groundwater abstraction. Primarily used without MODFLOW.      m    
+    WB_elec                                Fractions of live storage to be exported from basin                     366-d
     act_nonpaddyConsumption                Non-paddy irrigation consumption                                        m    
-    returnflowNonIrr                                                                                                    
+    act_paddyConsumption                   Paddy consumption                                                       m    
+    pot_nonIrrConsumption                                                                                          --   
+    act_DesalWaterAbstractM3                                                                                       --   
+    AvlDesalM3                                                                                                     --   
+    act_channelAbst                        Abstractions to satisfy demands from channels                           m    
+    metRemainSegment_lift                                                                                          --   
+    act_channelAbstract_Lift               Abstractions from the channel in lift areas at the location of the cha  m    
+    abstractedLakeReservoirM3C             Compressed abstractedLakeReservoirM3                                    m3   
+    remainNeed                                                                                                     --   
+    act_ResAbst_wwt                                                                                                --   
+    act_lakeAbst                           Abstractions from lakes at demand location                              m    
+    inZero_C                                                                                                       --   
+    swAbstractionFraction_nonIrr           Input, Fraction of non-irrigation demands to be satisfied with surface  %    
+    act_ResAbst                            Abstractions from reservoirs at demand location                         m    
+    leakageC_daily                                                                                                 --   
+    leakageCanalsC_M                                                                                               --   
+    act_irrPaddyDemand                     paddy irrigation demand                                                 m    
+    act_irrNonpaddyDemand                  non-paddy irrigation demand                                             m    
+    Channel_Domestic_fromZone                                                                                      --   
+    Channel_Livestock_fromZone                                                                                     --   
+    Channel_Industry_fromZone                                                                                      --   
+    Channel_Irrigation_fromZone                                                                                    --   
+    GW_Domestic_fromZone                                                                                           --   
+    GW_Livestock_fromZone                                                                                          --   
+    GW_Industry_fromZone                                                                                           --   
+    GW_Irrigation_fromZone                                                                                         --   
+    PumpingM3_daily                                                                                                --   
     unmet_lostirr                          Fossil water for irrigation that disappears instead of becoming return  m    
     unmet_lostNonirr                       Fossil water for non-irrigation that disappears instead of becoming re  m    
-    waterabstraction                                                                                                    
+    wwtEffluentsGenerated_domestic                                                                                 --   
+    wwtEffluentsGenerated_industry                                                                                 --   
+    wwtSewerCollectedBySoruce                                                                                      --   
+    waterabstraction                                                                                               --   
     =====================================  ======================================================================  =====
 
     **Functions**
@@ -268,7 +307,11 @@ class water_demand:
         Initial part of the water demand module
         """
 
-        self.var.includeIndusDomesDemand = True
+        if checkOption('includeWaterDemand'):
+            self.var.includeIndusDomesDemand = True
+        else:
+            self.var.includeIndusDomesDemand = False
+
         # True if all demands are taken into account,
         # False if not only irrigation is considered
         # This variable has no impact if includeWaterDemand is False
@@ -337,9 +380,15 @@ class water_demand:
             else:
                 self.var.relax_abstraction_fraction_initial = 0.5 + globals.inZero.copy()
 
+        self.var.includeWastewaterPits = False
+        if 'includePitLatrine' in option:
+            self.var.includeWastewaterPits = checkOption('includePitLatrine')
+
         # =======================================================
 
         if checkOption('includeWaterDemand'):
+
+
 
             if self.var.includeIndusDomesDemand:  # all demands are taken into account
 
@@ -369,7 +418,7 @@ class water_demand:
 
             if 'sectorSourceAbstractionFractions' in option:
                 if checkOption('sectorSourceAbstractionFractions'):
-                    print('Sector- and source-specific abstraction fractions are activated (water_demand.py)')
+                    #print('Sector- and source-specific abstraction fractions are activated (water_demand.py)')
                     self.var.sectorSourceAbstractionFractions = True
 
                     self.var.swAbstractionFraction_Channel_Domestic = loadmap(
@@ -398,6 +447,26 @@ class water_demand:
                         'swAbstractionFraction_Res_Industry')
                     self.var.swAbstractionFraction_Res_Irrigation = loadmap(
                         'swAbstractionFraction_Res_Irrigation')
+                        
+                    if self.var.includeDesal:
+                        self.var.othAbstractionFraction_Desal_Domestic = loadmap(
+                            'othAbstractionFraction_Desal_Domestic')
+                        self.var.othAbstractionFraction_Desal_Livestock = loadmap(
+                            'othAbstractionFraction_Desal_Livestock')
+                        self.var.othAbstractionFraction_Desal_Industry = loadmap(
+                            'othAbstractionFraction_Desal_Industry')
+                        self.var.othAbstractionFraction_Desal_Irrigation = loadmap(
+                            'othAbstractionFraction_Desal_Irrigation')
+                            
+                    if self.var.includeWastewater:
+                        self.var.wwtAbstractionFraction_Res_Domestic = loadmap(
+                            'wwtAbstractionFraction_Res_Domestic')
+                        self.var.wwtAbstractionFraction_Res_Livestock = loadmap(
+                            'wwtAbstractionFraction_Res_Livestock')
+                        self.var.wwtAbstractionFraction_Res_Industry = loadmap(
+                            'wwtAbstractionFraction_Res_Industry')
+                        self.var.wwtAbstractionFraction_Res_Irrigation = loadmap(
+                            'wwtAbstractionFraction_Res_Irrigation')
 
                     if not checkOption('limitAbstraction'):
                         self.var.gwAbstractionFraction_Domestic = 1 + globals.inZero.copy()
@@ -414,38 +483,82 @@ class water_demand:
                         self.var.gwAbstractionFraction_Irrigation = loadmap(
                             'gwAbstractionFraction_Irrigation')
 
+
             self.var.using_reservoir_command_areas = False
-            if 'using_reservoir_command_areas' in option:
-                if checkOption('using_reservoir_command_areas'):
+            self.var.load_command_areas = False
+            self.var.load_command_areas_wwt = False
+            
+            if checkOption('includeWaterBodies'):
+                    
+                # initiate reservoir_command_areas & reservoir_command_areas_wwt
+                self.var.reservoir_command_areas = globals.inZero.copy()
+                self.var.reservoir_command_areas_wwt = globals.inZero.copy()
 
-                    self.var.using_reservoir_command_areas = True
+                if 'reservoir_command_areas' in binding:
+                    self.var.load_command_areas = True
+
+                if 'reservoir_command_areas_restricted' in binding and self.var.includeWastewater:
+                    self.var.load_command_areas_wwt = True
+
+                if self.var.modflow and 'Water_conveyance_efficiency' in binding:
+                    self.var.Water_conveyance_efficiency = loadmap('Water_conveyance_efficiency') + globals.inZero
+                else:
+                    self.var.Water_conveyance_efficiency = 1.0 + globals.inZero
+
+                # load command areas & command areas_wwt
+                if self.var.load_command_areas:
                     self.var.reservoir_command_areas = loadmap('reservoir_command_areas').astype(int)
+                    self.var.reservoir_command_areas = np.where(self.var.reservoir_command_areas<0,
+                                                                0,
+                                                                self.var.reservoir_command_areas)
+                else:
+                    self.var.reservoir_command_areas = self.var.waterBodyBuffer
 
-                    # Lakes within command areas are removed from the command area
-                    self.var.reservoir_command_areas = np.where(loadmap('waterBodyTyp').astype(int) == 1,
-                                                                0, self.var.reservoir_command_areas)
-                    self.var.segmentArea = np.where(self.var.reservoir_command_areas > 0,
+                # Lakes/restricted reservoirs within command areas are removed from the command area
+                self.var.reservoir_command_areas = np.where(self.var.waterBodyTyp_unchanged == 1,
+                                                        0, np.where(self.var.resId_restricted > 0, 0, self.var.reservoir_command_areas))
+                self.var.segmentArea = np.where(self.var.reservoir_command_areas > 0,
+                                                npareatotal(self.var.cellArea,
+                                                            self.var.reservoir_command_areas), self.var.cellArea)
+
+                if self.var.load_command_areas_wwt:
+                    self.var.reservoir_command_areas_wwt = loadmap('reservoir_command_areas_restricted').astype(int)
+                    # Lakes & all non-restricted res. within command areas are removed from the command area
+                    self.var.reservoir_command_areas_wwt = np.where(self.var.waterBodyTyp_unchanged == 1,
+                                                                0, np.where((self.var.resId_restricted == 0) * (self.var.waterBodyTyp_unchanged == 2), 0, self.var.reservoir_command_areas_wwt))
+                    self.var.segmentArea_wwt = np.where(self.var.reservoir_command_areas_wwt > 0,
                                                     npareatotal(self.var.cellArea,
-                                                                self.var.reservoir_command_areas), self.var.cellArea)
+                                                                self.var.reservoir_command_areas_wwt), self.var.cellArea)
+                # Water abstracted from reservoirs leaks along canals related to conveyance efficiency.
+                # Canals are a map where canal cells have the number of the command area they are associated with
+                # Command areas without canals experience leakage equally throughout the command area
 
-                    # Water abstracted from reservoirs leaks along canals related to conveyance efficiency.
-                    # Canals are a map where canal cells have the number of the command area they are associated with
-                    # Command areas without canals experience leakage equally throughout the command area
+                if 'canals' in binding:
+                    self.var.canals = loadmap('canals').astype(int)
+                    self.var.canals_wwt = self.var.canals.copy()
+                else:
+                    self.var.canals = globals.inZero.copy().astype(int)
+                    self.var.canals_wwt = self.var.canals.copy()
 
-                    if 'canals' in binding:
-                        self.var.canals = loadmap('canals').astype(int)
-                    else:
-                        self.var.canals = globals.inZero.copy()
+                # canals for reservoir conveyance and loss
+                self.var.canals = np.where(self.var.canals != self.var.reservoir_command_areas, 0, self.var.canals)
 
-                    self.var.canals = np.where(self.var.canals != self.var.reservoir_command_areas, 0, self.var.canals)
+                # When there are no set canals, the entire command area expereinces leakage
+                self.var.canals = np.where(npareamaximum(self.var.canals, self.var.reservoir_command_areas) == 0,
+                                        self.var.reservoir_command_areas, self.var.canals)
+                self.var.canalsArea = np.where(self.var.canals > 0, npareatotal(self.var.cellArea, self.var.canals),
+                                            0)
+                self.var.canalsAreaC = np.compress(self.var.compress_LR, self.var.canalsArea)
 
-                    # When there are no set canals, the entire command area expereinces leakage
-                    self.var.canals = np.where(npareamaximum(self.var.canals, self.var.reservoir_command_areas) == 0,
-                                               self.var.reservoir_command_areas, self.var.canals)
+                if self.var.load_command_areas_wwt:
+                    # canals for wwt reclaimed water
+                    self.var.canals_wwt = np.where(self.var.canals_wwt != self.var.reservoir_command_areas_wwt, 0, self.var.canals_wwt)
 
-                    self.var.canalsArea = np.where(self.var.canals > 0, npareatotal(self.var.cellArea, self.var.canals),
-                                                   0)
-                    self.var.canalsAreaC = np.compress(self.var.compress_LR, self.var.canalsArea)
+                    self.var.canals_wwt = np.where(npareamaximum(self.var.canals_wwt, self.var.reservoir_command_areas_wwt) == 0,
+                                            self.var.reservoir_command_areas_wwt, self.var.canals_wwt)
+
+                    self.var.canalsArea_wwt = np.where(self.var.canals_wwt > 0, npareatotal(self.var.cellArea, self.var.canals_wwt), 0)
+                    self.var.canalsArea_wwtC = np.compress(self.var.compress_LR, self.var.canalsArea_wwt)
 
             self.var.swAbstractionFraction_Lift_Domestic = globals.inZero.copy()
             self.var.swAbstractionFraction_Lift_Livestock = globals.inZero.copy()
@@ -553,7 +666,11 @@ class water_demand:
             self.var.ratio_irrWithdrawalSW_month = globals.inZero.copy()
             self.var.act_irrWithdrawalSW_month = globals.inZero.copy()
             self.var.act_irrWithdrawalGW_month = globals.inZero.copy()
-            self.var.act_DesalWaterAbstractM = globals.inZero.copy()
+
+            self.var.Desal_Domestic = globals.inZero.copy()
+            self.var.Desal_Industry = globals.inZero.copy()
+            self.var.Desal_Livestock = globals.inZero.copy()
+            self.var.Desal_Irrigation = globals.inZero.copy()
             
             self.var.Channel_Domestic = globals.inZero.copy()
             self.var.Channel_Industry = globals.inZero.copy()
@@ -570,6 +687,11 @@ class water_demand:
             self.var.Lake_Livestock = globals.inZero.copy()
             self.var.Lake_Irrigation = globals.inZero.copy()
 
+            self.var.wwt_Domestic = globals.inZero.copy()
+            self.var.wwt_Industry = globals.inZero.copy()
+            self.var.wwt_Livestock = globals.inZero.copy()
+            self.var.wwt_Irrigation = globals.inZero.copy()
+            
             self.var.Res_Domestic = globals.inZero.copy()
             self.var.Res_Industry = globals.inZero.copy()
             self.var.Res_Livestock = globals.inZero.copy()
@@ -580,14 +702,35 @@ class water_demand:
             self.var.GW_Livestock = globals.inZero.copy()
             self.var.GW_Irrigation = globals.inZero.copy()
             self.var.abstractedLakeReservoirM3 = globals.inZero.copy()
-
             self.var.swAbstractionFraction_domestic = 1 + globals.inZero.copy()
+            
             self.var.ind_efficiency = 1.
             self.var.dom_efficiency = 1.
             self.var.liv_efficiency = 1
-
+ 
+            # for wastewater package
+            if checkOption('includeWaterBodies'):
+                self.var.leakage_wwtC_daily = np.compress(self.var.compress_LR, globals.inZero.copy())
+            self.var.act_bigLakeResAbst_wwt = globals.inZero.copy()
+            
+            self.var.act_DesalWaterAbstractM = globals.inZero.copy()
+            
+            self.var.act_nonIrrConsumption = globals.inZero.copy()
+            self.var.act_totalIrrConsumption = globals.inZero.copy()
+            self.var.act_totalWaterConsumption = globals.inZero.copy()
+            self.var.act_indConsumption = globals.inZero.copy()
+            self.var.act_domConsumption = globals.inZero.copy()
+            self.var.act_livConsumption = globals.inZero.copy()
+            self.var.returnflowIrr = globals.inZero.copy()
+            self.var.returnflowNonIrr = globals.inZero.copy()
+            self.var.pitLatrinToGW = globals.inZero.copy()
+            self.var.act_irrNonpaddyWithdrawal = globals.inZero.copy()
+            self.var.act_irrPaddyWithdrawal = globals.inZero.copy()
 
         else:  # no water demand
+            self.var.ratio_irrWithdrawalGW_month = globals.inZero.copy()
+            self.var.ratio_irrWithdrawalSW_month = globals.inZero.copy()
+
             self.var.nonIrrReturnFlowFraction = globals.inZero.copy()
             self.var.nonFossilGroundwaterAbs = globals.inZero.copy()
             self.var.nonIrruse = globals.inZero.copy()
@@ -608,10 +751,10 @@ class water_demand:
             self.var.act_domWithdrawal = globals.inZero.copy()
             self.var.act_livWithdrawal = globals.inZero.copy()
 
-            self.var.act_nonIrrConsumption = globals.inZero.copy()
             self.var.act_totalIrrConsumption = globals.inZero.copy()
             self.var.act_totalWaterConsumption = globals.inZero.copy()
             self.var.unmetDemand = globals.inZero.copy()
+            self.var.unmetDemand_runningSum = globals.inZero.copy()
             self.var.addtoevapotrans = globals.inZero.copy()
             self.var.returnflowIrr = globals.inZero.copy()
             self.var.returnflowNonIrr = globals.inZero.copy()
@@ -625,27 +768,42 @@ class water_demand:
             self.var.modflowDepth2 = 0
             self.var.modflowTopography = 0
             self.var.act_bigLakeResAbst = globals.inZero.copy()
-            self.var.act_bigLakeResAbst_R = globals.inZero.copy()
-            self.var.act_bigLakeResAbst_NR = globals.inZero.copy()
-
+            self.var.act_bigLakeResAbst_wwt = globals.inZero.copy()
+    
             self.var.leakage = globals.inZero.copy()
             self.var.pumping = globals.inZero.copy()
             self.var.unmet_lost = globals.inZero.copy()
             self.var.pot_GroundwaterAbstract = globals.inZero.copy()
+            self.var.leakageCanals_M = globals.inZero.copy()
 
             self.var.WB_elec = globals.inZero.copy()
             self.var.relaxSWagent = globals.inZero.copy()
             self.var.relaxGWagent = globals.inZero.copy()
-
+            
+            self.var.Desal_Domestic = globals.inZero.copy()
+            self.var.Desal_Industry = globals.inZero.copy()
+            self.var.Desal_Livestock = globals.inZero.copy()
+            self.var.Desal_Irrigation = globals.inZero.copy()
+            
             self.var.Channel_Domestic = globals.inZero.copy()
             self.var.Channel_Industry = globals.inZero.copy()
             self.var.Channel_Livestock = globals.inZero.copy()
             self.var.Channel_Irrigation = globals.inZero.copy()
 
+            self.var.Lift_Domestic = globals.inZero.copy()
+            self.var.Lift_Industry = globals.inZero.copy()
+            self.var.Lift_Livestock = globals.inZero.copy()
+            self.var.Lift_Irrigation = globals.inZero.copy()
+
             self.var.Lake_Domestic = globals.inZero.copy()
             self.var.Lake_Industry = globals.inZero.copy()
             self.var.Lake_Livestock = globals.inZero.copy()
             self.var.Lake_Irrigation = globals.inZero.copy()
+            
+            self.var.wwt_Domestic = globals.inZero.copy()
+            self.var.wwt_Industry = globals.inZero.copy()
+            self.var.wwt_Livestock = globals.inZero.copy()
+            self.var.wwt_Irrigation = globals.inZero.copy()
 
             self.var.Res_Domestic = globals.inZero.copy()
             self.var.Res_Industry = globals.inZero.copy()
@@ -662,6 +820,27 @@ class water_demand:
 
             self.var.act_nonpaddyConsumption = globals.inZero.copy()
             self.var.act_paddyConsumption = globals.inZero.copy()
+            self.var.act_irrNonpaddyWithdrawal = globals.inZero.copy()
+            self.var.act_irrPaddyWithdrawal = globals.inZero.copy()
+
+            self.var.modfPumpingM = globals.inZero.copy()
+            self.var.Pumping_daily = globals.inZero.copy()
+
+            self.var.act_irrPaddyDemand = globals.inZero.copy()
+            self.var.act_irrNonpaddyDemand = globals.inZero.copy()
+            self.var.domesticDemand = globals.inZero.copy()
+            self.var.industryDemand = globals.inZero.copy()
+            self.var.livestockDemand = globals.inZero.copy()
+
+            # for wastewater package
+            if checkOption('includeWaterBodies'):
+                self.var.leakage_wwtC_daily = np.compress(self.var.compress_LR, globals.inZero.copy())
+            self.var.act_bigLakeResAbst_wwt = globals.inZero.copy()
+            
+            self.var.act_DesalWaterAbstractM = globals.inZero.copy()
+
+            self.var.act_nonIrrConsumption = globals.inZero.copy()
+
 
     def dynamic(self):
         """
@@ -716,7 +895,7 @@ class water_demand:
 
             if self.var.includeIndusDomesDemand:  # all demands are taken into account
                 if globals.dateVar['newStart'] or globals.dateVar['newMonth'] \
-                        or 'basin_transfers_daily_operations' in option or 'reservoir_transfers' in option:
+                        or 'reservoir_transfers' in option:
                     # total (potential) non irrigation water demand
                     self.var.nonIrrDemand = self.var.domesticDemand + self.var.industryDemand + self.var.livestockDemand
                     self.var.pot_nonIrrConsumption = np.minimum(self.var.nonIrrDemand,
@@ -824,20 +1003,59 @@ class water_demand:
                     self.var.gwAbstractionFraction_Irrigation = np.where(self.var.reservoir_command_areas > 0,
                                                                          loadmap('commandAreasRelaxGwAbstraction'),
                                                                          self.var.gwAbstractionFraction_Irrigation)
+            
+            
+            # Desalination
+            
+            self.var.act_DesalWaterAbstractM3 = globals.inZero.copy()
+            # Desalination is not allowed without sectorSourceAbstractionFractions
+            if self.var.sectorSourceAbstractionFractions:
+                if self.var.includeDesal:
+                    pot_Desal_Domestic = self.var.othAbstractionFraction_Desal_Domestic * self.var.domesticDemand
+                    pot_Desal_Livestock = self.var.othAbstractionFraction_Desal_Livestock * self.var.livestockDemand
+                    pot_Desal_Industry = self.var.othAbstractionFraction_Desal_Industry * self.var.industryDemand
+                    pot_Desal_Irrigation = self.var.othAbstractionFraction_Desal_Irrigation * self.var.totalIrrDemand
 
+                    pot_DesalAbst = pot_Desal_Domestic + pot_Desal_Livestock + pot_Desal_Industry + pot_Desal_Irrigation
+                    if not self.var.unlimitedDesal:
+                        self.var.AvlDesalM3 = self.var.desalAnnualCap[dateVar['currDate'].year] / 365
+                        abstractLimitCoeff = np.minimum(np.nansum(pot_DesalAbst * self.var.cellArea), self.var.AvlDesalM3) / np.nansum(pot_DesalAbst * self.var.cellArea)
+                        self.var.act_DesalWaterAbstractM = pot_DesalAbst * abstractLimitCoeff
+                    else:
+                        self.var.act_DesalWaterAbstractM = pot_DesalAbst
+     
+                    #self.var.act_DesalWaterAbstractM = self.var.act_DesalWaterAbstractM3 / self.var.cellArea
+            if self.var.sectorSourceAbstractionFractions:
+                if self.var.includeDesal:
+                    self.var.Desal_Domestic = np.minimum(self.var.act_DesalWaterAbstractM,
+                                                        self.var.othAbstractionFraction_Desal_Domestic * self.var.domesticDemand)
+                    self.var.Desal_Livestock = np.minimum(self.var.act_DesalWaterAbstractM - self.var.Desal_Domestic,
+                                                            self.var.othAbstractionFraction_Desal_Livestock * self.var.livestockDemand)
+                    self.var.Desal_Industry = np.minimum(
+                        self.var.act_DesalWaterAbstractM - self.var.Desal_Domestic - self.var.Desal_Livestock,
+                        self.var.othAbstractionFraction_Desal_Industry * self.var.industryDemand)
+                    self.var.Desal_Irrigation = np.minimum(
+                        self.var.act_DesalWaterAbstractM - self.var.Desal_Domestic - self.var.Desal_Livestock - self.var.Desal_Industry,
+                        self.var.othAbstractionFraction_Desal_Irrigation * self.var.totalIrrDemand)
+               
+                
+            
             # surface water abstraction that can be extracted to fulfill totalDemand
             # - based on ChannelStorage and swAbstractionFraction * totalDemand
             # sum up potential surface water abstraction (no groundwater abstraction under water and sealed area)
 
-            if self.var.sectorSourceAbstractionFractions:
-
-                pot_Channel_Domestic = self.var.swAbstractionFraction_Channel_Domestic * self.var.domesticDemand
-                pot_Channel_Livestock = self.var.swAbstractionFraction_Channel_Livestock * self.var.livestockDemand
-                pot_Channel_Industry = self.var.swAbstractionFraction_Channel_Industry * self.var.industryDemand
-                pot_Channel_Irrigation = self.var.swAbstractionFraction_Channel_Irrigation * self.var.totalIrrDemand
+            if self.var.sectorSourceAbstractionFractions:                            
+                pot_Channel_Domestic = np.minimum(self.var.swAbstractionFraction_Channel_Domestic * self.var.domesticDemand, \
+                    self.var.domesticDemand - self.var.Desal_Domestic)                
+                pot_Channel_Livestock = np.minimum(self.var.swAbstractionFraction_Channel_Livestock * self.var.livestockDemand, \
+                    self.var.livestockDemand - self.var.Desal_Livestock)
+                pot_Channel_Industry = np.minimum(self.var.swAbstractionFraction_Channel_Industry * self.var.industryDemand, \
+                    self.var.industryDemand - self.var.Desal_Industry)
+                pot_Channel_Irrigation = np.minimum(self.var.swAbstractionFraction_Channel_Irrigation * self.var.totalIrrDemand, \
+                    self.var.totalIrrDemand - self.var.Desal_Irrigation)
 
                 if 'irrigation_agent_SW_request_month_m3' in binding and self.var.activate_irrigation_agents:
-                    pot_Channel_Irrigation = np.maximum(pot_Channel_Irrigation,
+                    pot_Channel_Irrigation = np.minimum(pot_Channel_Irrigation,
                                                         self.var.irrWithdrawalSW_max*self.var.InvCellArea)
 
                 pot_channelAbst = pot_Channel_Domestic + pot_Channel_Livestock + pot_Channel_Industry + pot_Channel_Irrigation
@@ -874,11 +1092,15 @@ class water_demand:
                 # 0 if < (0.0005 * self.var.cellArea) Note: Due to the shared use of abstracted channel storage,
                 # a cell may abstract more than its pot_SurfaceAbstract, as well as not necessarily satisfy its
                 # pot_SurfaceAbstract
-
-                pot_Lift_Domestic = self.var.swAbstractionFraction_Lift_Domestic * self.var.domesticDemand-self.var.Channel_Domestic
-                pot_Lift_Livestock = self.var.swAbstractionFraction_Lift_Livestock * self.var.livestockDemand-self.var.Channel_Livestock
-                pot_Lift_Industry = self.var.swAbstractionFraction_Lift_Industry * self.var.industryDemand-self.var.Channel_Industry
-                pot_Lift_Irrigation = self.var.swAbstractionFraction_Lift_Irrigation * self.var.totalIrrDemand-self.var.Channel_Irrigation
+                
+                pot_Lift_Domestic = np.minimum(self.var.swAbstractionFraction_Lift_Domestic * self.var.domesticDemand, \
+                    self.var.domesticDemand - self.var.Desal_Domestic - self.var.Channel_Domestic )                
+                pot_Lift_Livestock = np.minimum(self.var.swAbstractionFraction_Lift_Livestock * self.var.livestockDemand, \
+                    self.var.livestockDemand - self.var.Desal_Livestock - self.var.Channel_Livestock)
+                pot_Lift_Industry = np.minimum(self.var.swAbstractionFraction_Lift_Industry * self.var.industryDemand, \
+                    self.var.industryDemand - self.var.Desal_Industry - self.var.Channel_Industry )
+                pot_Lift_Irrigation = np.minimum(self.var.swAbstractionFraction_Lift_Irrigation * self.var.totalIrrDemand, \
+                    self.var.totalIrrDemand - self.var.Desal_Irrigation - self.var.Channel_Irrigation)
 
                 if 'irrigation_agent_SW_request_month_m3' in binding and self.var.activate_irrigation_agents:
                     pot_Lift_Irrigation = np.maximum(pot_Lift_Irrigation,
@@ -932,7 +1154,302 @@ class water_demand:
                         pot_Lift_Irrigation)
 
             if checkOption('includeWaterBodies'):
+                self.var.abstractedLakeReservoirM3C = np.compress(self.var.compress_LR, globals.inZero.copy())
 
+                if self.var.includeWastewater:
+                    if not self.var.load_command_areas_wwt:
+                        wwtDemandAreaMask =  self.var.waterBodyBuffer_wwt > 0
+                    else:
+                        wwtDemandAreaMask =  self.var.reservoir_command_areas_wwt > 0
+                        
+                        
+                        
+                # First apply to wastewater reclamation, e.g., restricted use reservoirs. Follow by lakes and reservoirs (not restricted)                
+                if self.var.includeWastewater:
+                    if self.var.sectorSourceAbstractionFractions:
+                        pot_wwt_Domestic = np.minimum(
+                            self.var.wwtAbstractionFraction_Res_Domestic * self.var.domesticDemand,
+                            self.var.domesticDemand - self.var.Desal_Domestic - self.var.Channel_Domestic - self.var.Lift_Domestic) * wwtDemandAreaMask
+                
+                        pot_wwt_Livestock = np.minimum(
+                            self.var.wwtAbstractionFraction_Res_Livestock * self.var.livestockDemand,
+                            self.var.livestockDemand - self.var.Desal_Livestock - self.var.Channel_Livestock - self.var.Lift_Livestock) * wwtDemandAreaMask
+
+                        pot_wwt_Industry = np.minimum(
+                            self.var.wwtAbstractionFraction_Res_Industry * self.var.industryDemand,
+                            self.var.industryDemand - self.var.Desal_Industry - self.var.Channel_Industry - self.var.Lift_Industry) * wwtDemandAreaMask
+                        
+                        pot_wwt_Irrigation = np.minimum(
+                            self.var.wwtAbstractionFraction_Res_Irrigation * self.var.totalIrrDemand,
+                            self.var.totalIrrDemand - self.var.Desal_Irrigation - self.var.Channel_Irrigation - self.var.Lift_Irrigation) * wwtDemandAreaMask
+                        
+                        remainNeed = pot_wwt_Domestic + pot_wwt_Livestock + pot_wwt_Industry + pot_wwt_Irrigation
+                        self.var.remainNeed = remainNeed.copy()
+                        
+                        # UPDATE ALL SECTORSOURCEABSTRACTIONFRACTIONS BELOW
+                    else:
+                        irrFracDemand = divideValues(self.var.totalIrrDemand, self.var.nonIrrDemand + self.var.totalIrrDemand)
+
+                        # water that is still needed from surface water  - in this case only consider irrigation
+                        remainNeed = np.maximum(pot_SurfaceAbstract - self.var.act_SurfaceWaterAbstract, 0) * wwtDemandAreaMask * irrFracDemand
+                    # start wastewater allocation
+                   
+                    if not self.var.load_command_areas_wwt:
+                        ## opt 1: buffer with no command areas is used
+                        # remainNeedBig = npareatotal(remainNeed, self.var.waterBodyID)
+                        remainNeedBig_wwt = npareatotal(remainNeed,  self.var.waterBodyBuffer_wwt)
+                        remainNeedBig_wwtC = np.compress(self.var.compress_LR, remainNeedBig_wwt)
+                        #print(np.compress(self.var.compress_LR, npareatotal(remainNeed * self.var.cellArea,  self.var.waterBodyBuffer_wwt)))
+                        # Storage of a big lake
+                        ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2, \
+                                    self.var.reservoirStorageM3C, np.where(self.var.waterBodyTypCTemp == 4, self.var.reservoirStorageM3C, 0))
+                        
+                        ReservoirsThatAreCurrentlyReservoirs = np.where(np.compress(self.var.compress_LR, self.var.resId_restricted) > 0, ReservoirsThatAreCurrentlyReservoirs, 0)
+                        
+                        
+                        lakeResStorageC = np.where(self.var.waterBodyTypCTemp == 0, 0.,
+                                            np.where(self.var.waterBodyTypCTemp == 1, self.var.lakeStorageC,
+                                                        ReservoirsThatAreCurrentlyReservoirs)) / self.var.MtoM3C
+
+                        minlake = np.maximum(0., 0.98 * lakeResStorageC)  # reasonable but arbitrary limit
+                        act_bigLakeAbst_wwtC = np.minimum(minlake, remainNeedBig_wwtC)
+                     
+                        # substract from both, because it is sorted by self.var.waterBodyTypCTemp
+                        self.var.lakeStorageC = self.var.lakeStorageC - act_bigLakeAbst_wwtC * self.var.MtoM3C
+                        self.var.lakeVolumeM3C = self.var.lakeVolumeM3C - act_bigLakeAbst_wwtC * self.var.MtoM3C
+                        self.var.reservoirStorageM3C = self.var.reservoirStorageM3C - act_bigLakeAbst_wwtC * self.var.MtoM3C
+                        # and from the combined onenpfor waterbalance issues
+                        self.var.lakeResStorageC = self.var.lakeResStorageC - act_bigLakeAbst_wwtC * self.var.MtoM3C
+    
+                        self.var.abstractedLakeReservoirM3C += act_bigLakeAbst_wwtC.copy() * self.var.MtoM3C
+                        self.var.lakeResStorage = globals.inZero.copy()
+                        np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
+                        bigLakesFactor_wwtC = divideValues(act_bigLakeAbst_wwtC, remainNeedBig_wwtC)
+                        # and back to the big array
+                        bigLakesFactor_wwt = globals.inZero.copy()
+                        np.put(bigLakesFactor_wwt, self.var.decompress_LR, bigLakesFactor_wwtC)
+
+                        # bigLakesFactorAllaroundlake = npareamaximum(bigLakesFactor, self.var.waterBodyID)
+                        bigLakesFactorAllaroundlake_wwt = npareamaximum(bigLakesFactor_wwt, self.var.waterBodyBuffer_wwt)
+                        #print(np.compress(self.var.compress_LR, bigLakesFactorAllaroundlake_wwt))
+                        # abstraction from big lakes is partioned to the users around the lake
+                        self.var.act_bigLakeResAbst_wwt = remainNeed * bigLakesFactorAllaroundlake_wwt
+                        # remaining need is used from lakes and reservoirs without water use restrictions
+                        #remainNeed0 = remainNeed * (1 - bigLakesFactorAllaroundlake_wwt)
+                       
+                        
+                        # allocate water demand in case sectorSourceAbstractionFractions = True
+                        if self.var.sectorSourceAbstractionFractions:
+                            self.var.wwt_Domestic = np.minimum(self.var.act_bigLakeResAbst_wwt,
+                                                           pot_wwt_Domestic)
+                            self.var.wwt_Livestock = np.minimum(self.var.act_bigLakeResAbst_wwt - self.var.wwt_Domestic,
+                                                                pot_wwt_Livestock)
+                            self.var.wwt_Industry = np.minimum(
+                                self.var.act_bigLakeResAbst_wwt - self.var.wwt_Domestic - self.var.wwt_Livestock,
+                                pot_wwt_Industry)
+                            
+                            self.var.wwt_Irrigation = np.minimum(
+                                self.var.act_bigLakeResAbst_wwt - self.var.wwt_Domestic - self.var.wwt_Livestock - self.var.wwt_Industry,
+                                pot_wwt_Irrigation)
+                    else:
+                        ## opt 2:  command areas are used
+                        #self.var.abstractedLakeReservoirM3C = np.compress(self.var.compress_LR, globals.inZero.copy())
+                        self.var.act_ResAbst_wwt = globals.inZero.copy()
+                        self.var.act_bigLakeResAbst_wwt = globals.inZero.copy()
+
+                        if 'Reservoir_releases' in binding:
+                        # resStorage_maxFracForIrrigation = 0.5 + globals.inZero.copy()
+                            resStorage_maxFracForIrrigation = readnetcdf2('Reservoir_releases', day_of_year,
+                                                                        useDaily='DOY', value='Fraction of Volume')
+                        elif 'wwt_reservoir_releases' in binding:
+                            resStorage_maxFracForIrrigation = np.maximum(np.minimum(loadmap('wwt_reservoir_releases'), 1.), 0.) + globals.inZero.copy()
+                        else:
+                            resStorage_maxFracForIrrigation = 0.05 + globals.inZero.copy()
+                                
+                        if self.var.sectorSourceAbstractionFractions:
+                            remainNeedPre = pot_wwt_Domestic + pot_wwt_Livestock + pot_wwt_Industry
+                            remainNeed = pot_wwt_Irrigation
+                            
+                            demand_Segment = np.where(self.var.reservoir_command_areas_wwt > 0,
+                                                    npareatotal(remainNeedPre * self.var.cellArea,
+                                                                self.var.reservoir_command_areas_wwt),
+                                                        0)  # [M3]
+                            # Reservoir associated with the Command Area
+                            #
+                            # If there is more than one reservoir in a command area, the storage of the reservoir with
+                            # maximum storage in this time-step is chosen. The map resStorageTotal_alloc holds this
+                            # maximum reservoir storage within a command area in all cells within that command area
+                            
+                            # Non Irrigation
+                            
+                            ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2, \
+                                    self.var.reservoirStorageM3C, np.where(self.var.waterBodyTypCTemp == 4, self.var.reservoirStorageM3C, 0))
+                            ReservoirsThatAreCurrentlyReservoirs = np.where(np.compress(self.var.compress_LR, self.var.resId_restricted) > 0, ReservoirsThatAreCurrentlyReservoirs, 0)
+                            reservoirStorageM3 = globals.inZero.copy()
+                            # np.put(reservoirStorageM3, self.var.decompress_LR, self.var.reservoirStorageM3C)
+                            np.put(reservoirStorageM3, self.var.decompress_LR, ReservoirsThatAreCurrentlyReservoirs)
+                            resStorageTotal_alloc = np.where(self.var.reservoir_command_areas_wwt > 0,
+                                                            npareamaximum(reservoirStorageM3,
+                                                                        self.var.reservoir_command_areas_wwt), 0)  # [M3]
+
+                            # In the map resStorageTotal_allocC, the maximum storage from each allocation segment is held
+                            # in all reservoir cells within that allocation segment. We now correct to remove the
+                            # reservoirs that are not this maximum-storage-reservoir for the command area.
+                            resStorageTotal_allocC = np.compress(self.var.compress_LR, resStorageTotal_alloc)
+                            resStorageTotal_allocC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
+                                                                resStorageTotal_allocC)
+                            
+                            day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
+                         
+                            # resStorage_maxFracForIrrigationC holds the fractional rules found for each reservoir,
+                            # so we must null those that are not the maximum-storage reservoirs
+                            resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR,
+                                                                       resStorage_maxFracForIrrigation)
+                            if self.var.reservoir_releases_excel_option:
+                                resStorage_maxFracForIrrigationC = np.where(self.var.lakeResStorage_release_ratioC > -1,
+                                                                            self.var.reservoir_supply[dateVar['doy']-1],
+                                                                            0.03)
+
+                            resStorage_maxFracForIrrigationC = np.multiply(
+                                resStorageTotal_allocC == self.var.reservoirStorageM3C, resStorage_maxFracForIrrigationC)
+                            np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR,
+                                resStorage_maxFracForIrrigationC)
+
+                            resStorage_maxFracForIrrigation_CA = np.where(self.var.reservoir_command_areas_wwt > 0,
+                                                                      npareamaximum(resStorage_maxFracForIrrigation,
+                                                                                    self.var.reservoir_command_areas_wwt),
+                                                                      0)
+                                                                      
+                            act_bigLakeResAbst_alloc_wwt = np.minimum(
+                                resStorage_maxFracForIrrigation_CA * resStorageTotal_alloc,
+                                demand_Segment / self.var.Water_conveyance_efficiency)  # [M3]
+                            
+                            # fraction of water abstracted versus water available for total segment reservoir volumes
+                            ResAbstractFactor = np.where(resStorageTotal_alloc > 0,
+                                                        divideValues(act_bigLakeResAbst_alloc_wwt, resStorageTotal_alloc),
+                                                        0)
+                            
+                            # Compressed version needs to be corrected as above
+                            ResAbstractFactorC = np.compress(self.var.compress_LR, ResAbstractFactor)
+                            ResAbstractFactorC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
+                                                            ResAbstractFactorC)
+                            self.var.lakeStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                            self.var.lakeVolumeM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                            self.var.lakeResStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                            self.var.abstractedLakeReservoirM3C += self.var.reservoirStorageM3C * ResAbstractFactorC
+                            self.var.reservoirStorageM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
+
+                            np.put(self.var.abstractedLakeReservoirM3, self.var.decompress_LR,
+                                self.var.abstractedLakeReservoirM3C)
+
+                            self.var.lakeResStorage = globals.inZero.copy()
+                            np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
+
+                            metRemainSegment = np.where(demand_Segment > 0,
+                                                        divideValues(act_bigLakeResAbst_alloc_wwt * self.var.Water_conveyance_efficiency,
+                                                                    demand_Segment), 0)  # by definition <= 1
+                            
+                            self.var.act_bigLakeResAbst_wwt = remainNeedPre * metRemainSegment
+                            self.var.act_SurfaceWaterAbstract += remainNeedPre * metRemainSegment
+
+                            self.var.act_ResAbst_wwt = remainNeedPre * metRemainSegment
+                        
+                        if self.var.sectorSourceAbstractionFractions:
+                            self.var.wwt_Domestic = np.minimum(self.var.act_ResAbst_wwt,
+                                                           pot_wwt_Domestic)
+                            self.var.wwt_Livestock = np.minimum(self.var.act_ResAbst_wwt - self.var.wwt_Domestic,
+                                                                pot_wwt_Livestock)
+                            self.var.wwt_Industry = np.minimum(
+                                self.var.act_ResAbst_wwt - self.var.wwt_Domestic - self.var.wwt_Livestock,
+                                pot_wwt_Industry)
+                         
+                        # Irrigation
+
+                        demand_Segment = np.where(self.var.reservoir_command_areas_wwt > 0,
+                                            npareatotal(remainNeed * self.var.cellArea,
+                                                        self.var.reservoir_command_areas_wwt),
+                                            0)  # [M3]
+
+
+                        ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2,
+                                                                        self.var.reservoirStorageM3C, np.where(self.var.waterBodyTypCTemp == 4, self.var.reservoirStorageM3C, 0))
+                        
+                        ReservoirsThatAreCurrentlyReservoirs = np.where(np.compress(self.var.compress_LR, self.var.resId_restricted) > 0, ReservoirsThatAreCurrentlyReservoirs, 0)
+                        reservoirStorageM3 = globals.inZero.copy()
+                        # np.put(reservoirStorageM3, self.var.decompress_LR, self.var.reservoirStorageM3C)
+                        np.put(reservoirStorageM3, self.var.decompress_LR, ReservoirsThatAreCurrentlyReservoirs)
+
+                        resStorageTotal_alloc = np.where(self.var.reservoir_command_areas_wwt > 0,
+                                                    npareamaximum(reservoirStorageM3,
+                                                                self.var.reservoir_command_areas_wwt), 0)  # [M3]
+
+                        # In the map resStorageTotal_allocC, the maximum storage from each allocation segment
+                        #   is held in all reservoir cells within that allocation segment.
+                        # We now correct to remove the reservoirs
+                        #   that are not this maximum-storage-reservoir for the command area.
+                        resStorageTotal_allocC = np.compress(self.var.compress_LR, resStorageTotal_alloc)
+                        resStorageTotal_allocC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
+                                                            resStorageTotal_allocC)
+
+                        # resStorage_maxFracForIrrigationC holds the fractional rules found for each reservoir,
+                        #   so we must null those that are not the maximum-storage reservoirs
+                        resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR,
+                                                                    resStorage_maxFracForIrrigation)
+                        resStorage_maxFracForIrrigationC = np.multiply(
+                        resStorageTotal_allocC == self.var.reservoirStorageM3C, resStorage_maxFracForIrrigationC)                        
+                        np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR,
+                               resStorage_maxFracForIrrigationC)
+                        
+
+                        resStorage_maxFracForIrrigation_CA = np.where(self.var.reservoir_command_areas_wwt > 0,
+                                                                    npareamaximum(resStorage_maxFracForIrrigation,
+                                                                                    self.var.reservoir_command_areas_wwt), 0)
+
+
+                        act_bigLakeResAbst_alloc_wwt = np.minimum(resStorage_maxFracForIrrigation_CA * resStorageTotal_alloc,
+                                                            demand_Segment / self.var.Water_conveyance_efficiency)  # [M3]
+
+                        ResAbstractFactor = np.where(resStorageTotal_alloc > 0,
+                                                    divideValues(act_bigLakeResAbst_alloc_wwt, resStorageTotal_alloc),
+                                                    0)
+                                                    
+                        # fraction of water abstracted versus water available for total segment reservoir volumes
+                        # Compressed version needs to be corrected as above
+                        ResAbstractFactorC = np.compress(self.var.compress_LR, ResAbstractFactor)
+                        ResAbstractFactorC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
+                                                        ResAbstractFactorC)
+
+                        self.var.lakeStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                        self.var.lakeVolumeM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                        self.var.lakeResStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                        self.var.abstractedLakeReservoirM3C += self.var.reservoirStorageM3C * ResAbstractFactorC
+                        self.var.reservoirStorageM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
+
+                        np.put(self.var.abstractedLakeReservoirM3, self.var.decompress_LR,
+                            self.var.abstractedLakeReservoirM3C)
+
+                        self.var.lakeResStorage = globals.inZero.copy()
+                        np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
+
+                        metRemainSegment = np.where(demand_Segment > 0,
+                                                    divideValues(act_bigLakeResAbst_alloc_wwt * self.var.Water_conveyance_efficiency,
+                                                                demand_Segment), 0)  # by definition <= 1
+                            
+                        self.var.act_bigLakeResAbst_wwt += remainNeed * metRemainSegment
+                        self.var.act_ResAbst_wwt += remainNeed * metRemainSegment
+                            
+                        self.var.leakage_wwtC_daily = resStorageTotal_allocC * ResAbstractFactorC * (
+                                1 - np.compress(self.var.compress_LR, self.var.Water_conveyance_efficiency))
+
+                        
+                        if self.var.sectorSourceAbstractionFractions:
+                            self.var.wwt_Irrigation = np.minimum(
+                                remainNeed * metRemainSegment,
+                                pot_wwt_Irrigation)
+                        
+                        ## End of using_reservoir_command_areas_wwt
+
+                    self.var.act_SurfaceWaterAbstract += self.var.act_bigLakeResAbst_wwt
                 # Lakes and reservoirs are both considered lakes for purposes of lake abstraction,
                 # both satisfying demands within waterbody cells or within self.var.waterBodyBuffer
                 # depending on abstraction fractions
@@ -941,34 +1458,41 @@ class water_demand:
 
                     pot_Lake_Domestic = np.minimum(
                         self.var.swAbstractionFraction_Lake_Domestic * self.var.domesticDemand,
-                        self.var.domesticDemand * self.var.swAbstractionFraction_domestic.copy()
-                        - self.var.Channel_Domestic - self.var.Lift_Domestic)
+                        self.var.domesticDemand - self.var.Desal_Domestic - \
+                            self.var.Channel_Domestic - self.var.Lift_Domestic - self.var.wwt_Domestic)
 
                     pot_Lake_Livestock = np.minimum(
                         self.var.swAbstractionFraction_Lake_Livestock * self.var.livestockDemand,
-                        self.var.livestockDemand - self.var.Channel_Livestock - self.var.Lift_Livestock)
+                        self.var.livestockDemand - self.var.Desal_Livestock - self.var.Channel_Livestock - \
+                            self.var.Lift_Livestock - self.var.wwt_Livestock)
 
                     pot_Lake_Industry = np.minimum(
                         self.var.swAbstractionFraction_Lake_Industry * self.var.industryDemand,
-                        self.var.industryDemand - self.var.Channel_Industry - self.var.Lift_Industry)
+                        self.var.industryDemand - self.var.Desal_Industry - \
+                        self.var.Channel_Industry - self.var.Lift_Industry - self.var.wwt_Industry)
 
                     pot_Lake_Irrigation = np.minimum(
                         self.var.swAbstractionFraction_Lake_Irrigation * self.var.totalIrrDemand,
-                        self.var.totalIrrDemand - self.var.Channel_Irrigation - self.var.Lift_Irrigation)
+                        self.var.totalIrrDemand - self.var.Desal_Irrigation - \
+                            self.var.Channel_Irrigation - self.var.Lift_Irrigation - self.var.wwt_Irrigation)
 
-                    remainNeed = pot_Lake_Domestic + pot_Lake_Livestock + pot_Lake_Industry + pot_Lake_Irrigation
+                    remainNeed0 = pot_Lake_Domestic + pot_Lake_Livestock + pot_Lake_Industry + pot_Lake_Irrigation
 
                 else:
 
                     # water that is still needed from surface water
-                    remainNeed = np.maximum(pot_SurfaceAbstract - self.var.act_SurfaceWaterAbstract, 0)
-
+                    remainNeed0 = np.maximum(pot_SurfaceAbstract - self.var.act_SurfaceWaterAbstract, 0)
+                
+                if not self.var.includeWastewater:
+                    self.var.abstractedLakeReservoirM3C = np.compress(self.var.compress_LR, globals.inZero.copy())  
+                mskWtrBody_unrestricted = self.var.waterBodyBuffer > 0
+                
                 # first from big Lakes and reservoirs, big lakes cover several gridcells
                 # collect all water demand from lake pixels of the same id
 
                 # remainNeedBig = npareatotal(remainNeed, self.var.waterBodyID)
                 # not only the lakes and reservoirs but the command areas around water bodies e.g. here a buffer
-                remainNeedBig = npareatotal(remainNeed, self.var.waterBodyBuffer)
+                remainNeedBig = npareatotal(remainNeed0, self.var.waterBodyBuffer)
                 remainNeedBigC = np.compress(self.var.compress_LR, remainNeedBig)
 
                 # Storage of a big lake
@@ -1000,15 +1524,11 @@ class water_demand:
                 # bigLakesFactorAllaroundlake = npareamaximum(bigLakesFactor, self.var.waterBodyID)
                 bigLakesFactorAllaroundlake = npareamaximum(bigLakesFactor, self.var.waterBodyBuffer)
 
-                # abstraction from big lakes is partitioned to the users around the lake
-                self.var.act_bigLakeResAbst = remainNeed * bigLakesFactorAllaroundlake
-
-                # TEMPORARY BY DOR FRIDMAN
-                self.var.act_bigLakeResAbst_NR = self.var.act_bigLakeResAbst
-                self.var.act_bigLakeResAbst_R = globals.inZero.copy()
+                # abstraction from big lakes is partioned to the users around the lake
+                self.var.act_bigLakeResAbst = remainNeed0  * mskWtrBody_unrestricted * bigLakesFactorAllaroundlake   
 
                 # remaining need is used from small lakes
-                remainNeed1 = remainNeed * (1 - bigLakesFactorAllaroundlake)
+                remainNeed1 = remainNeed0 * (1 - bigLakesFactorAllaroundlake)
                 # minlake = np.maximum(0.,self.var.smalllakeStorage - self.var.minsmalllakeStorage) * self.var.M3toM
 
                 if returnBool('useSmallLakes'):
@@ -1092,6 +1612,8 @@ class water_demand:
                                     self.var.reservoir_transfers_to_outside_M3C[index_giver] \
                                         += reservoir_transfer_actual
 
+
+
                                 self.var.lakeStorageC += self.var.inZero_C
                                 self.var.lakeVolumeM3C += self.var.inZero_C
                                 self.var.lakeResStorageC += self.var.inZero_C
@@ -1103,18 +1625,19 @@ class water_demand:
                                 if transfer[1] == 0:
                                     to_outside_basin = globals.inZero.copy()
                                     np.put(to_outside_basin, self.var.decompress_LR, self.var.inZero_C)
-
                                     pot_Lake_Industry -= to_outside_basin * self.var.M3toM
                                     # self.var.Lake_Industry is updated below
                                     self.var.act_lakeAbst -= to_outside_basin * self.var.M3toM
 
                                     self.var.act_SurfaceWaterAbstract -= to_outside_basin * self.var.M3toM
                                     self.var.act_bigLakeResAbst -= to_outside_basin * self.var.M3toM
-
+                                    self.var.act_bigLakeResAbst_wwt -= to_outside_basin * self.var.M3toM
+                                    
                                     self.var.industryDemand -= to_outside_basin * self.var.M3toM
                                     self.var.pot_industryConsumption -= to_outside_basin * self.var.M3toM
                                     self.var.ind_efficiency = divideValues(self.var.pot_industryConsumption,
                                                                            self.var.industryDemand)
+
 
                         np.put(self.var.reservoir_transfers_net_M3, self.var.decompress_LR,
                                self.var.reservoir_transfers_net_M3C)
@@ -1176,23 +1699,26 @@ class water_demand:
                     # B
                     pot_Res_Domestic = np.minimum(
                         self.var.swAbstractionFraction_Res_Domestic * self.var.domesticDemand,
-                        self.var.domesticDemand * self.var.swAbstractionFraction_domestic.copy() -
-                        self.var.Channel_Domestic - self.var.Lift_Domestic - self.var.Lake_Domestic)
+                        self.var.domesticDemand - self.var.Desal_Domestic - self.var.Channel_Domestic - \
+                            self.var.Lift_Domestic - self.var.wwt_Domestic - self.var.Lake_Domestic)
 
                     pot_Res_Livestock = np.minimum(
                         self.var.swAbstractionFraction_Res_Livestock * self.var.livestockDemand,
-                        self.var.livestockDemand - self.var.Channel_Livestock - self.var.Lift_Livestock- self.var.Lake_Livestock)
+                        self.var.livestockDemand - self.var.Desal_Livestock - self.var.Channel_Livestock - \
+                            self.var.Lift_Livestock - self.var.wwt_Livestock - self.var.Lake_Livestock)
 
                     pot_Res_Industry = np.minimum(
                         self.var.swAbstractionFraction_Res_Industry * self.var.industryDemand,
-                        self.var.industryDemand - self.var.Channel_Industry - self.var.Lift_Industry - self.var.Lake_Industry)
+                        self.var.industryDemand - self.var.Desal_Industry - self.var.Channel_Industry - \
+                            self.var.Lift_Industry - self.var.wwt_Industry - self.var.Lake_Industry)
 
                     pot_Res_Irrigation = np.minimum(
                         self.var.swAbstractionFraction_Res_Irrigation * self.var.totalIrrDemand,
-                        self.var.totalIrrDemand - self.var.Channel_Irrigation - self.var.Lift_Irrigation - self.var.Lake_Irrigation)
+                        self.var.totalIrrDemand - self.var.Desal_Irrigation - self.var.Channel_Irrigation - \
+                            self.var.Lift_Irrigation - self.var.wwt_Irrigation - self.var.Lake_Irrigation)
 
                     if 'irrigation_agent_SW_request_month_m3' in binding and self.var.activate_irrigation_agents:
-                        pot_Res_Irrigation = np.maximum(pot_Res_Irrigation,
+                        pot_Res_Irrigation = np.minimum(pot_Res_Irrigation,
                                                         self.var.irrWithdrawalSW_max*self.var.InvCellArea)
 
                     # remainNeed2 = pot_Res_Domestic + pot_Res_Livestock + pot_Res_Industry + pot_Res_Irrigation
@@ -1202,155 +1728,60 @@ class water_demand:
 
                     remainNeed2 = pot_SurfaceAbstract - self.var.act_SurfaceWaterAbstract
 
-                if self.var.using_reservoir_command_areas:
+                #if self.var.load_command_areas:
 
-                    # The command area of a reservoir is the area that can receive water from this reservoir. Before
-                    # this step, each cell has attempted to satisfy its demands with local water using in-cell
-                    # channel, lift area, and lake. The remaining demand within each command area is totaled and
-                    # requested from the associated reservoir. The reservoir offers this water up to a daily maximum
-                    # relating to the available storage in the reservoir, defined in the Reservoir_releases_input_file.
-                    #
-                    # SETTINGS FILE AND INPUTS
+                # The command area of a reservoir is the area that can receive water from this reservoir. Before
+                # this step, each cell has attempted to satisfy its demands with local water using in-cell
+                # channel, lift area, and lake. The remaining demand within each command area is totaled and
+                # requested from the associated reservoir. The reservoir offers this water up to a daily maximum
+                # relating to the available storage in the reservoir, defined in the Reservoir_releases_input_file.
+                #
+                # SETTINGS FILE AND INPUTS
 
-                    # -Activating
-                    # In the OPTIONS section towards the beginning of the settings file, add/set
-                    # using_reservoir_command_areas = True
+                # -Activating
+                # In the OPTIONS section towards the beginning of the settings file, add/set
+                # using_reservoir_command_areas = True
 
-                    # - Command areas raster map Anywhere after the OPTIONS section (in WATERDEMAND, for example),
-                    # add/set reservoir_command_areas to a path holding... information about the command areas. This
-                    # Command areas raster map should assign the same positive integer coding to each cell within the
-                    # same segment. All other cells must Nan values, or values <= 0.
+                # - Command areas raster map Anywhere after the OPTIONS section (in WATERDEMAND, for example),
+                # add/set reservoir_command_areas to a path holding... information about the command areas. This
+                # Command areas raster map should assign the same positive integer coding to each cell within the
+                # same segment. All other cells must Nan values, or values <= 0.
 
-                    # -Optional inputs
-                    #
-                    # Anywhere after the OPTIONS section, add/set Reservoir_releases_input_file to a path holding
-                    # information about irrigation releases. This should be a raster map (netCDF) of 366 values
-                    # determining the maximum fraction of available storage to be used for meeting water demand... in
-                    # the associated command area on the day of the year. If this is not included, a value of 0.01
-                    # will be assumed, i.e. 1% of the reservoir storage can be at most released into the command area
-                    # on each day.
-                    self.var.act_ResAbst = globals.inZero.copy()
-                    if self.var.sectorSourceAbstractionFractions:
+                # -Optional inputs
+                #
+                # Anywhere after the OPTIONS section, add/set Reservoir_releases_input_file to a path holding
+                # information about irrigation releases. This should be a raster map (netCDF) of 366 values
+                # determining the maximum fraction of available storage to be used for meeting water demand... in
+                # the associated command area on the day of the year. If this is not included, a value of 0.01
+                # will be assumed, i.e. 1% of the reservoir storage can be at most released into the command area
+                # on each day.
+                self.var.act_ResAbst = globals.inZero.copy()
+                if self.var.sectorSourceAbstractionFractions:
 
-                        # Domestic, livestock, and industrial demands are satisfied before irrigation
+                    # Domestic, livestock, and industrial demands are satisfied before irrigation
 
-                        remainNeedPre = pot_Res_Domestic + pot_Res_Livestock + pot_Res_Industry
+                    remainNeedPre = pot_Res_Domestic + pot_Res_Livestock + pot_Res_Industry
+                    #print('water_demand.py: np.sum(remainNeedPre) with reservoirs', np.sum(remainNeedPre))
 
-                        demand_Segment = np.where(self.var.reservoir_command_areas > 0,
-                                                  npareatotal(remainNeedPre * self.var.cellArea,
-                                                              self.var.reservoir_command_areas),
-                                                  0)  # [M3]
-
-                        # Reservoir associated with the Command Area
-                        #
-                        # If there is more than one reservoir in a command area, the storage of the reservoir with
-                        # maximum storage in this time-step is chosen. The map resStorageTotal_alloc holds this
-                        # maximum reservoir storage within a command area in all cells within that command area
-
-                        ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2,
-                                                                        self.var.reservoirStorageM3C, 0)
-                        reservoirStorageM3 = globals.inZero.copy()
-                        # np.put(reservoirStorageM3, self.var.decompress_LR, self.var.reservoirStorageM3C)
-                        np.put(reservoirStorageM3, self.var.decompress_LR, ReservoirsThatAreCurrentlyReservoirs)
-
-                        resStorageTotal_alloc = np.where(self.var.reservoir_command_areas > 0,
-                                                         npareamaximum(reservoirStorageM3,
-                                                                       self.var.reservoir_command_areas), 0)  # [M3]
-
-                        # In the map resStorageTotal_allocC, the maximum storage from each allocation segment is held
-                        # in all reservoir cells within that allocation segment. We now correct to remove the
-                        # reservoirs that are not this maximum-storage-reservoir for the command area.
-                        resStorageTotal_allocC = np.compress(self.var.compress_LR, resStorageTotal_alloc)
-                        resStorageTotal_allocC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
-                                                             resStorageTotal_allocC)
-
-                        day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
-
-                        if 'Reservoir_releases' in binding:
-                            # resStorage_maxFracForIrrigation = 0.5 + globals.inZero.copy()
-                            resStorage_maxFracForIrrigation = readnetcdf2('Reservoir_releases', day_of_year,
-                                                                          useDaily='DOY', value='Fraction of Volume')
-                        else:
-                            resStorage_maxFracForIrrigation = 0.05 + globals.inZero.copy()
-
-                        # resStorage_maxFracForIrrigationC holds the fractional rules found for each reservoir,
-                        # so we must null those that are not the maximum-storage reservoirs
-                        resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR,
-                                                                       resStorage_maxFracForIrrigation)
-                        resStorage_maxFracForIrrigationC = np.multiply(
-                            resStorageTotal_allocC == self.var.reservoirStorageM3C, resStorage_maxFracForIrrigationC)
-                        np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR,
-                               resStorage_maxFracForIrrigationC)
-
-                        resStorage_maxFracForIrrigation_CA = np.where(self.var.reservoir_command_areas > 0,
-                                                                      npareamaximum(resStorage_maxFracForIrrigation,
-                                                                                    self.var.reservoir_command_areas),
-                                                                      0)
-
-                        Water_conveyance_efficiency = 1.0 + globals.inZero
-
-                        act_bigLakeResAbst_alloc = np.minimum(
-                            resStorage_maxFracForIrrigation_CA * resStorageTotal_alloc,
-                            demand_Segment / Water_conveyance_efficiency)  # [M3]
-
-                        # fraction of water abstracted versus water available for total segment reservoir volumes
-                        ResAbstractFactor = np.where(resStorageTotal_alloc > 0,
-                                                     divideValues(act_bigLakeResAbst_alloc, resStorageTotal_alloc),
-                                                     0)
-                        # Compressed version needs to be corrected as above
-                        ResAbstractFactorC = np.compress(self.var.compress_LR, ResAbstractFactor)
-                        ResAbstractFactorC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
-                                                         ResAbstractFactorC)
-
-                        self.var.lakeStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
-                        self.var.lakeVolumeM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
-                        self.var.lakeResStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
-                        self.var.reservoirStorageM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
-
-                        self.var.abstractedLakeReservoirM3C += self.var.reservoirStorageM3C * ResAbstractFactorC
-                        np.put(self.var.abstractedLakeReservoirM3, self.var.decompress_LR,
-                               self.var.abstractedLakeReservoirM3C)
-
-                        self.var.lakeResStorage = globals.inZero.copy()
-                        np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
-
-                        metRemainSegment = np.where(demand_Segment > 0,
-                                                    divideValues(act_bigLakeResAbst_alloc * Water_conveyance_efficiency,
-                                                                 demand_Segment), 0)  # by definition <= 1
-
-                        self.var.act_bigLakeResAbst += remainNeedPre * metRemainSegment
-                        self.var.act_SurfaceWaterAbstract += remainNeedPre * metRemainSegment
-
-                        self.var.act_ResAbst = remainNeedPre * metRemainSegment
-
-                        self.var.Res_Domestic = np.minimum(self.var.act_ResAbst,
-                                                           pot_Res_Domestic)
-                        self.var.Res_Livestock = np.minimum(self.var.act_ResAbst - self.var.Res_Domestic,
-                                                            pot_Res_Livestock)
-                        self.var.Res_Industry = np.minimum(
-                            self.var.act_ResAbst - self.var.Res_Domestic - self.var.Res_Livestock,
-                            pot_Res_Industry)
-
-                    # If sector- and source-specific abstractions are activated, then domestic, industrial, and
-                    #  livestock demands were attempted to be satisfied in the previous step. Otherwise, total demands
-                    #  not satisfied by previous sources is attempted.
-                    #
-                    # The remaining demand within each command area [M3] is put into a map where each cell in the
-                    # command area holds this total demand
                     demand_Segment = np.where(self.var.reservoir_command_areas > 0,
-                                              npareatotal(remainNeed2 * self.var.cellArea,
+                                              npareatotal(remainNeedPre * self.var.cellArea,
                                                           self.var.reservoir_command_areas),
                                               0)  # [M3]
 
-                    ## Reservoir associated with the Command Area
-                    #
-                    # If there is more than one reservoir in a command area,
-                    #   the storage of the reservoir with maximum storage in this time-step is chosen.
-                    # The map resStorageTotal_alloc holds this maximum reservoir storage
-                    #   within a command area in all cells within that command area
+                    #print('water_demand.py: np.sum(demand_Segment) with reservoirs', np.sum(demand_Segment))
 
-                    ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2,
-                                                                    self.var.reservoirStorageM3C, 0)
+                    # Reservoir associated with the Command Area
+                    #
+                    # If there is more than one reservoir in a command area, the storage of the reservoir with
+                    # maximum storage in this time-step is chosen. The map resStorageTotal_alloc holds this
+                    # maximum reservoir storage within a command area in all cells within that command area
+
+                    # filter reservoirs so only non-restricted res. are acccounted for
+                    ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2, \
+                                self.var.reservoirStorageM3C, np.where(self.var.waterBodyTypCTemp == 4, self.var.reservoirStorageM3C, 0))
+                    ReservoirsThatAreCurrentlyReservoirs = np.where(np.compress(self.var.compress_LR, self.var.resId_restricted) == 0, \
+                        ReservoirsThatAreCurrentlyReservoirs, 0)
+
                     reservoirStorageM3 = globals.inZero.copy()
                     # np.put(reservoirStorageM3, self.var.decompress_LR, self.var.reservoirStorageM3C)
                     np.put(reservoirStorageM3, self.var.decompress_LR, ReservoirsThatAreCurrentlyReservoirs)
@@ -1359,48 +1790,55 @@ class water_demand:
                                                      npareamaximum(reservoirStorageM3,
                                                                    self.var.reservoir_command_areas), 0)  # [M3]
 
-                    # In the map resStorageTotal_allocC, the maximum storage from each allocation segment
-                    #   is held in all reservoir cells within that allocation segment.
-                    # We now correct to remove the reservoirs
-                    #   that are not this maximum-storage-reservoir for the command area.
+                    # In the map resStorageTotal_allocC, the maximum storage from each allocation segment is held
+                    # in all reservoir cells within that allocation segment. We now correct to remove the
+                    # reservoirs that are not this maximum-storage-reservoir for the command area.
                     resStorageTotal_allocC = np.compress(self.var.compress_LR, resStorageTotal_alloc)
                     resStorageTotal_allocC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
                                                          resStorageTotal_allocC)
 
-                    # The rules for the maximum amount of water to be released for irrigation
-                    #   are found for the chosen maximum-storage reservoir in each command area
                     day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
 
+
                     if 'Reservoir_releases' in binding:
+                        # resStorage_maxFracForIrrigation = 0.5 + globals.inZero.copy()
                         resStorage_maxFracForIrrigation = readnetcdf2('Reservoir_releases', day_of_year,
                                                                       useDaily='DOY', value='Fraction of Volume')
+                        resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR,
+                                                                       resStorage_maxFracForIrrigation)
+                    elif self.var.reservoir_releases_excel_option:
+                        resStorage_maxFracForIrrigation = globals.inZero.copy()
+                        resStorage_maxFracForIrrigationC = np.where(self.var.lakeResStorage_release_ratioC > -1,
+                                                                    self.var.reservoir_supply[dateVar['doy']-1],
+                                                                    0.03)
                     else:
-                        resStorage_maxFracForIrrigation = 0.05 + globals.inZero.copy()
+                        resStorage_maxFracForIrrigation = 0.03 + globals.inZero.copy()
+                        resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR,
+                                                                       resStorage_maxFracForIrrigation)
 
                     # resStorage_maxFracForIrrigationC holds the fractional rules found for each reservoir,
-                    #   so we must null those that are not the maximum-storage reservoirs
-                    resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR,
-                                                                   resStorage_maxFracForIrrigation)
+                    # so we must null those that are not the maximum-storage reservoirs
+
                     resStorage_maxFracForIrrigationC = np.multiply(
                         resStorageTotal_allocC == self.var.reservoirStorageM3C, resStorage_maxFracForIrrigationC)
-                    np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR, resStorage_maxFracForIrrigationC)
+
+                    np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR,
+                           resStorage_maxFracForIrrigationC)
+
 
                     resStorage_maxFracForIrrigation_CA = np.where(self.var.reservoir_command_areas > 0,
                                                                   npareamaximum(resStorage_maxFracForIrrigation,
-                                                                                self.var.reservoir_command_areas), 0)
+                                                                                self.var.reservoir_command_areas),
+                                                                  0)
 
-                    if self.var.modflow and 'Water_conveyance_efficiency' in binding:
-                        Water_conveyance_efficiency = loadmap('Water_conveyance_efficiency') + globals.inZero
-                    else:
-                        Water_conveyance_efficiency = 1.0 + globals.inZero
+                    act_bigLakeResAbst_alloc = np.minimum(
+                        resStorage_maxFracForIrrigation_CA * resStorageTotal_alloc,
+                        demand_Segment / self.var.Water_conveyance_efficiency)  # [M3]
 
-                    act_bigLakeResAbst_alloc = np.minimum(resStorage_maxFracForIrrigation_CA * resStorageTotal_alloc,
-                                                          demand_Segment / Water_conveyance_efficiency)  # [M3]
-
+                    # fraction of water abstracted versus water available for total segment reservoir volumes
                     ResAbstractFactor = np.where(resStorageTotal_alloc > 0,
                                                  divideValues(act_bigLakeResAbst_alloc, resStorageTotal_alloc),
                                                  0)
-                    # fraction of water abstracted versus water available for total segment reservoir volumes
                     # Compressed version needs to be corrected as above
                     ResAbstractFactorC = np.compress(self.var.compress_LR, ResAbstractFactor)
                     ResAbstractFactorC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
@@ -1419,39 +1857,141 @@ class water_demand:
                     np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
 
                     metRemainSegment = np.where(demand_Segment > 0,
-                                                divideValues(act_bigLakeResAbst_alloc * Water_conveyance_efficiency,
+                                                divideValues(act_bigLakeResAbst_alloc * self.var.Water_conveyance_efficiency,
                                                              demand_Segment), 0)  # by definition <= 1
 
-                    # self.var.leakageC_daily = resStorageTotal_allocC * ResAbstractFactorC * (
-                    #            1 - Water_conveyance_efficiency)
-                    self.var.leakageC_daily = resStorageTotal_allocC * ResAbstractFactorC * (
-                            1 - np.compress(self.var.compress_LR, Water_conveyance_efficiency))
+                    self.var.act_bigLakeResAbst += remainNeedPre * metRemainSegment
+                    self.var.act_SurfaceWaterAbstract += remainNeedPre * metRemainSegment
 
-                    self.var.leakage = globals.inZero.copy()
-                    np.put(self.var.leakage, self.var.decompress_LR, self.var.leakageC_daily)
+                    self.var.act_ResAbst = remainNeedPre * metRemainSegment
 
-                    # self.var.leakageC += self.var.leakageC_daily
+                    self.var.Res_Domestic = np.minimum(self.var.act_ResAbst,
+                                                       pot_Res_Domestic)
+                    self.var.Res_Livestock = np.minimum(self.var.act_ResAbst - self.var.Res_Domestic,
+                                                        pot_Res_Livestock)
+                    self.var.Res_Industry = np.minimum(
+                        self.var.act_ResAbst - self.var.Res_Domestic - self.var.Res_Livestock,
+                        pot_Res_Industry)
 
-                    self.var.leakageCanalsC_M = np.where(self.var.canalsAreaC > 0,
-                                                         self.var.leakageC_daily / self.var.canalsAreaC, 0)
+                # If sector- and source-specific abstractions are activated, then domestic, industrial, and
+                #  livestock demands were attempted to be satisfied in the previous step. Otherwise, total demands
+                #  not satisfied by previous sources is attempted.
+                #
+                # The remaining demand within each command area [M3] is put into a map where each cell in the
+                # command area holds this total demand
+                demand_Segment = np.where(self.var.reservoir_command_areas > 0,
+                                          npareatotal(remainNeed2 * self.var.cellArea,
+                                                      self.var.reservoir_command_areas),
+                                          0)  # [M3]
 
-                    # Without this, npareamaximum uses the historical maximum
-                    self.var.leakageCanals_M = globals.inZero.copy()
-                    np.put(self.var.leakageCanals_M, self.var.decompress_LR, self.var.leakageCanalsC_M)  # good
-                    self.var.leakageCanals_M = npareamaximum(self.var.leakageCanals_M,
-                                                             self.var.canals)
+                ## Reservoir associated with the Command Area
+                #
+                # If there is more than one reservoir in a command area,
+                #   the storage of the reservoir with maximum storage in this time-step is chosen.
+                # The map resStorageTotal_alloc holds this maximum reservoir storage
+                #   within a command area in all cells within that command area
 
-                    self.var.act_bigLakeResAbst += remainNeed2 * metRemainSegment
-                    self.var.act_SurfaceWaterAbstract += remainNeed2 * metRemainSegment
+                ReservoirsThatAreCurrentlyReservoirs = np.where(self.var.waterBodyTypCTemp == 2,
+                                                                self.var.reservoirStorageM3C, 0)
+                reservoirStorageM3 = globals.inZero.copy()
+                # np.put(reservoirStorageM3, self.var.decompress_LR, self.var.reservoirStorageM3C)
+                np.put(reservoirStorageM3, self.var.decompress_LR, ReservoirsThatAreCurrentlyReservoirs)
 
-                    self.var.act_ResAbst += remainNeed2 * metRemainSegment
+                resStorageTotal_alloc = np.where(self.var.reservoir_command_areas > 0,
+                                                 npareamaximum(reservoirStorageM3,
+                                                               self.var.reservoir_command_areas), 0)  # [M3]
 
-                    ## End of using_reservoir_command_areas
+                # In the map resStorageTotal_allocC, the maximum storage from each allocation segment
+                #   is held in all reservoir cells within that allocation segment.
+                # We now correct to remove the reservoirs
+                #   that are not this maximum-storage-reservoir for the command area.
+                resStorageTotal_allocC = np.compress(self.var.compress_LR, resStorageTotal_alloc)
+                resStorageTotal_allocC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
+                                                     resStorageTotal_allocC)
 
-                    if self.var.sectorSourceAbstractionFractions:
-                        self.var.Res_Irrigation = np.minimum(
-                            remainNeed2 * metRemainSegment,
-                            pot_Res_Irrigation)
+                # The rules for the maximum amount of water to be released for irrigation
+                #   are found for the chosen maximum-storage reservoir in each command area
+                day_of_year = globals.dateVar['currDate'].timetuple().tm_yday
+
+                if 'Reservoir_releases' in binding:
+                    # resStorage_maxFracForIrrigation = 0.5 + globals.inZero.copy()
+                    resStorage_maxFracForIrrigation = readnetcdf2('Reservoir_releases', day_of_year,
+                                                                  useDaily='DOY', value='Fraction of Volume')
+                elif self.var.reservoir_releases_excel_option:
+                    resStorage_maxFracForIrrigation = globals.inZero.copy()
+                    resStorage_maxFracForIrrigationC = np.where(self.var.lakeResStorage_release_ratioC > -1,
+                                                                self.var.reservoir_supply[dateVar['doy']-1],
+                                                                0.03)
+                    np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR, resStorage_maxFracForIrrigationC)
+                else:
+                    resStorage_maxFracForIrrigation = 0.03 + globals.inZero.copy()
+
+                # resStorage_maxFracForIrrigationC holds the fractional rules found for each reservoir,
+                #   so we must null those that are not the maximum-storage reservoirs
+                resStorage_maxFracForIrrigationC = np.compress(self.var.compress_LR, resStorage_maxFracForIrrigation)
+                resStorage_maxFracForIrrigationC = np.multiply(
+                    resStorageTotal_allocC == self.var.reservoirStorageM3C, resStorage_maxFracForIrrigationC)
+                np.put(resStorage_maxFracForIrrigation, self.var.decompress_LR, resStorage_maxFracForIrrigationC)
+
+                resStorage_maxFracForIrrigation_CA = np.where(self.var.reservoir_command_areas > 0,
+                                                              npareamaximum(resStorage_maxFracForIrrigation,
+                                                                            self.var.reservoir_command_areas), 0)
+
+                act_bigLakeResAbst_alloc = np.minimum(resStorage_maxFracForIrrigation_CA * resStorageTotal_alloc,
+                                                      demand_Segment / self.var.Water_conveyance_efficiency)  # [M3]
+
+                ResAbstractFactor = np.where(resStorageTotal_alloc > 0,
+                                             divideValues(act_bigLakeResAbst_alloc, resStorageTotal_alloc),
+                                             0)
+                # fraction of water abstracted versus water available for total segment reservoir volumes
+                # Compressed version needs to be corrected as above
+                ResAbstractFactorC = np.compress(self.var.compress_LR, ResAbstractFactor)
+                ResAbstractFactorC = np.multiply(resStorageTotal_allocC == self.var.reservoirStorageM3C,
+                                                 ResAbstractFactorC)
+
+                self.var.lakeStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                self.var.lakeVolumeM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                self.var.lakeResStorageC -= self.var.reservoirStorageM3C * ResAbstractFactorC
+                self.var.reservoirStorageM3C -= self.var.reservoirStorageM3C * ResAbstractFactorC
+
+                self.var.abstractedLakeReservoirM3C += self.var.reservoirStorageM3C * ResAbstractFactorC
+                np.put(self.var.abstractedLakeReservoirM3, self.var.decompress_LR,
+                       self.var.abstractedLakeReservoirM3C)
+
+                self.var.lakeResStorage = globals.inZero.copy()
+                np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
+
+                metRemainSegment = np.where(demand_Segment > 0,
+                                            divideValues(act_bigLakeResAbst_alloc * self.var.Water_conveyance_efficiency,
+                                                         demand_Segment), 0)  # by definition <= 1
+
+                self.var.leakageC_daily = resStorageTotal_allocC * ResAbstractFactorC * (
+                        1 - np.compress(self.var.compress_LR, self.var.Water_conveyance_efficiency))
+
+                self.var.leakage = globals.inZero.copy()
+                np.put(self.var.leakage, self.var.decompress_LR, self.var.leakageC_daily + self.var.leakage_wwtC_daily)
+
+                # self.var.leakageC += self.var.leakageC_daily
+                divleak_canal = divideValues((self.var.leakageC_daily +  self.var.leakage_wwtC_daily) ,self.var.canalsAreaC)
+                self.var.leakageCanalsC_M = np.where(self.var.canalsAreaC > 0,divleak_canal, 0)
+
+                # Without this, npareamaximum uses the historical maximum
+                self.var.leakageCanals_M = globals.inZero.copy()
+                np.put(self.var.leakageCanals_M, self.var.decompress_LR, self.var.leakageCanalsC_M)  # good
+                self.var.leakageCanals_M = npareamaximum(self.var.leakageCanals_M,
+                                                         self.var.canals)
+
+                self.var.act_bigLakeResAbst += remainNeed2 * metRemainSegment
+                self.var.act_SurfaceWaterAbstract += remainNeed2 * metRemainSegment
+
+                self.var.act_ResAbst += remainNeed2 * metRemainSegment
+
+                ## End of using_reservoir_command_areas
+
+                if self.var.sectorSourceAbstractionFractions:
+                    self.var.Res_Irrigation = np.minimum(
+                        remainNeed2 * metRemainSegment,
+                        pot_Res_Irrigation)
 
                 # B
 
@@ -1459,23 +1999,29 @@ class water_demand:
             if self.var.sectorSourceAbstractionFractions:
                 pot_GW_Domestic = np.minimum(
                     self.var.gwAbstractionFraction_Domestic * self.var.domesticDemand,
-                    self.var.domesticDemand - self.var.Channel_Domestic - self.var.Lift_Domestic - self.var.Lake_Domestic - self.var.Res_Domestic)
-
+                    self.var.domesticDemand - self.var.Desal_Domestic - self.var.Channel_Domestic - \
+                    self.var.Lift_Domestic - self.var.wwt_Domestic - self.var.Lake_Domestic - self.var.Res_Domestic)
+                    
                 pot_GW_Livestock = np.minimum(
                     self.var.gwAbstractionFraction_Livestock * self.var.livestockDemand,
-                    self.var.livestockDemand - self.var.Channel_Livestock - self.var.Lift_Livestock - self.var.Lake_Livestock - self.var.Res_Livestock)
+                    self.var.livestockDemand - self.var.Desal_Livestock - self.var.Channel_Livestock - \
+                    self.var.Lift_Livestock - self.var.wwt_Livestock - self.var.Lake_Livestock - self.var.Res_Livestock)
 
                 pot_GW_Industry = np.minimum(
                     self.var.gwAbstractionFraction_Industry * self.var.industryDemand,
-                    self.var.industryDemand - self.var.Channel_Industry - self.var.Lift_Industry - self.var.Lake_Industry - self.var.Res_Industry)
+                    self.var.industryDemand - self.var.Desal_Industry - self.var.Channel_Industry - \
+                    self.var.Lift_Industry - self.var.wwt_Industry - self.var.Lake_Industry - self.var.Res_Industry)
 
                 pot_GW_Irrigation = np.minimum(
-                    self.var.gwAbstractionFraction_Irrigation * self.var.totalIrrDemand,
-                    self.var.totalIrrDemand - self.var.Channel_Irrigation - self.var.Lift_Irrigation - self.var.Lake_Irrigation - self.var.Res_Irrigation)
+                    self.var.gwAbstractionFraction_Irrigation * self.var.totalIrrDemand,                    
+                    self.var.totalIrrDemand - self.var.Desal_Irrigation - self.var.Channel_Irrigation - \
+                    self.var.Lift_Irrigation - self.var.wwt_Irrigation - self.var.Lake_Irrigation - self.var.Res_Irrigation)
+
 
                 if 'irrigation_agent_GW_request_month_m3' in binding and self.var.activate_irrigation_agents:
-                    pot_GW_Irrigation = np.maximum(pot_GW_Irrigation,
+                    pot_GW_Irrigation = np.minimum(pot_GW_Irrigation,
                                                         self.var.irrWithdrawalGW_max*self.var.InvCellArea)
+
 
                 self.var.pot_GroundwaterAbstract = pot_GW_Domestic + pot_GW_Livestock + pot_GW_Industry + pot_GW_Irrigation
             else:
@@ -1508,10 +2054,14 @@ class water_demand:
                     self.var.nonFossilGroundwaterAbs - self.var.GW_Domestic - self.var.GW_Livestock - self.var.GW_Industry,
                     pot_GW_Irrigation)
 
-                unmet_Domestic = self.var.domesticDemand - self.var.Channel_Domestic - self.var.Lift_Domestic- self.var.Lake_Domestic - self.var.Res_Domestic - self.var.GW_Domestic
-                unmet_Livestock = self.var.livestockDemand - self.var.Channel_Livestock - self.var.Lift_Livestock - self.var.Lake_Livestock - self.var.Res_Livestock - self.var.GW_Livestock
-                unmet_Industry = self.var.industryDemand - self.var.Channel_Industry - self.var.Lift_Industry - self.var.Lake_Industry - self.var.Res_Industry - self.var.GW_Industry
-                unmet_Irrigation = self.var.totalIrrDemand - self.var.Channel_Irrigation - self.var.Lift_Industry - self.var.Lake_Irrigation - self.var.Res_Irrigation - self.var.GW_Irrigation
+                unmet_Domestic = self.var.domesticDemand - self.var.Desal_Domestic - self.var.Channel_Domestic - \
+                    self.var.wwt_Domestic - self.var.Lift_Domestic - self.var.Lake_Domestic - self.var.Res_Domestic - self.var.GW_Domestic
+                unmet_Livestock = self.var.livestockDemand - self.var.Desal_Livestock - self.var.Channel_Livestock - \
+                    self.var.wwt_Livestock - self.var.Lift_Livestock - self.var.Lake_Livestock - self.var.Res_Livestock - self.var.GW_Livestock
+                unmet_Industry = self.var.industryDemand - self.var.Desal_Industry - self.var.Channel_Industry - \
+                    self.var.wwt_Industry - self.var.Lift_Industry  - self.var.Lake_Industry - self.var.Res_Industry - self.var.GW_Industry
+                unmet_Irrigation = self.var.totalIrrDemand - self.var.Desal_Irrigation - self.var.Channel_Irrigation - \
+                    self.var.wwt_Irrigation - self.var.Lift_Industry - self.var.Lake_Irrigation - self.var.Res_Irrigation - self.var.GW_Irrigation
 
             if checkOption('limitAbstraction'):
                 # real surface water abstraction can be lower, because not all demand can be done from surface water
@@ -1521,13 +2071,18 @@ class water_demand:
 
                 if self.var.sectorSourceAbstractionFractions:
 
-                    self.var.act_nonIrrWithdrawal = self.var.Channel_Domestic + self.var.Channel_Livestock + self.var.Channel_Industry + \
+                    self.var.act_nonIrrWithdrawal = self.var.Desal_Domestic + self.var.Desal_Livestock + self.var.Desal_Industry + \
+                                                    self.var.Channel_Domestic + self.var.Channel_Livestock + self.var.Channel_Industry + \
+                                                    self.var.wwt_Domestic + self.var.wwt_Livestock + self.var.wwt_Industry + \
                                                     self.var.Lift_Domestic + self.var.Lift_Livestock + self.var.Lift_Industry + \
                                                     self.var.Lake_Domestic + self.var.Lake_Livestock + self.var.Lake_Industry + \
                                                     self.var.Res_Domestic + self.var.Res_Livestock + self.var.Res_Industry + \
                                                     self.var.GW_Domestic + self.var.GW_Livestock + self.var.GW_Industry
-                    self.var.act_irrWithdrawal = self.var.Channel_Irrigation + self.var.Lift_Irrigation + self.var.Lake_Irrigation + self.var.Res_Irrigation + self.var.GW_Irrigation
-                    act_irrWithdrawalSW = self.var.Channel_Irrigation + self.var.Lift_Irrigation + self.var.Lake_Irrigation + self.var.Res_Irrigation
+                    self.var.act_irrWithdrawal = self.var.Desal_Irrigation + self.var.Channel_Irrigation + \
+                        self.var.wwt_Irrigation + self.var.Lift_Irrigation + self.var.Lake_Irrigation + self.var.Res_Irrigation + self.var.GW_Irrigation
+                    # Currently wastewater and desalination are accounted as surface water
+                    act_irrWithdrawalSW = self.var.Desal_Irrigation + self.var.Channel_Irrigation + self.var.Lift_Irrigation + \
+                        self.var.wwt_Irrigation + self.var.Lake_Irrigation + self.var.Res_Irrigation
                     act_irrWithdrawalGW = self.var.GW_Irrigation
                     self.var.act_irrNonpaddyWithdrawal = np.minimum(self.var.act_irrWithdrawal,
                                                                     self.var.fracVegCover[3] * self.var.irrDemand[3])
@@ -1630,7 +2185,7 @@ class water_demand:
                         if checkOption('zonal_abstraction'):
 
                             # using allocation from abstraction zone
-                            # this might be a regualr grid e.g. 2x2 for 0.5 deg
+                            # this might be a regular grid e.g. 2x2 for 0.5 deg
                             left_sf = self.var.readAvlChannelStorageM  # already removed - self.var.act_channelAbst
                             # sum demand, surface water - local used, groundwater - local use, not satisfied for allocation zone
 
@@ -1734,8 +2289,21 @@ class water_demand:
 
                             # end of zonal abstraction
 
+                        else:
+                            self.var.unmetDemand = self.var.pot_GroundwaterAbstract - self.var.nonFossilGroundwaterAbs
+                            if self.var.sectorSourceAbstractionFractions:
+                                self.var.GW_Domestic = pot_GW_Domestic
+                                self.var.GW_Industry = pot_GW_Industry
+                                self.var.GW_Livestock = pot_GW_Livestock
+                                self.var.GW_Irrigation = pot_GW_Irrigation
+
                     else:
                         self.var.unmetDemand = self.var.pot_GroundwaterAbstract - self.var.nonFossilGroundwaterAbs
+                        if self.var.sectorSourceAbstractionFractions:
+                            self.var.GW_Domestic = pot_GW_Domestic
+                            self.var.GW_Industry = pot_GW_Industry
+                            self.var.GW_Livestock = pot_GW_Livestock
+                            self.var.GW_Irrigation = pot_GW_Irrigation
 
 
                     if self.var.includeIndusDomesDemand:  # all demands are taken into account
@@ -1766,11 +2334,14 @@ class water_demand:
 
             if self.var.sectorSourceAbstractionFractions:
 
-                self.var.act_domWithdrawal = self.var.Channel_Domestic + self.var.Lift_Domestic + self.var.Lake_Domestic + \
+                self.var.act_domWithdrawal = self.var.Channel_Domestic + self.var.Lift_Domestic + \
+                                             self.var.Desal_Domestic + self.var.wwt_Domestic + self.var.Lake_Domestic + \
                                              self.var.Res_Domestic + self.var.GW_Domestic
-                self.var.act_livWithdrawal = self.var.Channel_Livestock + self.var.Lift_Livestock + self.var.Lake_Livestock + \
+                self.var.act_livWithdrawal = self.var.Channel_Livestock + self.var.Lift_Livestock + \
+                                             self.var.Desal_Livestock + self.var.wwt_Livestock + self.var.Lake_Livestock + \
                                              self.var.Res_Livestock + self.var.GW_Livestock
-                self.var.act_indWithdrawal = self.var.Channel_Industry + self.var.Lift_Industry+ self.var.Lake_Industry + \
+                self.var.act_indWithdrawal = self.var.Channel_Industry + self.var.Lift_Industry + \
+                                             self.var.Desal_Industry + self.var.wwt_Industry + self.var.Lake_Industry + \
                                              self.var.Res_Industry + self.var.GW_Industry
 
                 self.var.act_indConsumption = self.var.ind_efficiency * self.var.act_indWithdrawal
@@ -1826,6 +2397,11 @@ class water_demand:
             unmet_div_ww = 1. - np.minimum(1, divideValues(self.var.unmetDemand,
                                                            self.var.act_totalWaterWithdrawal + self.var.unmetDemand))
 
+            # 'fossil_water_treated_normally' means that there is no lost fossil water
+            if 'fossil_water_treated_normally' in option:
+                if checkOption('fossil_water_treated_normally'):
+                    unmet_div_ww = 1
+
             if checkOption('limitAbstraction'):
                 unmet_div_ww = 1
 
@@ -1844,26 +2420,41 @@ class water_demand:
             self.var.addtoevapotrans = self.var.addtoevapotrans * unmet_div_ww
             if self.var.includeIndusDomesDemand:  # all demands are taken into account
                 self.var.returnflowNonIrr = self.var.returnflowNonIrr * unmet_div_ww
-
+            
+            if self.var.includeWastewaterPits:
+                shareNonIrrReturnFlowToGW = globals.inZero.copy()
+                if 'pitLatrinShare' in binding:
+                    shareNonIrrReturnFlowToGW = loadmap('pitLatrinShare')
+                self.var.pitLatrinToGW = self.var.returnflowNonIrr * shareNonIrrReturnFlowToGW
+                self.var.returnflowNonIrr = self.var.returnflowNonIrr * (1 - shareNonIrrReturnFlowToGW)
+                
             if self.var.includeWastewater & self.var.includeIndusDomesDemand:  # all demands are taken into account
-                self.var.wwtEffluentsGenerated = self.var.returnflowNonIrr.copy() * self.var.cellArea  # [M3]
+                ## create domestic, industry returnFlows
+                # Simple implementation - not precise. Don't allow livestock returnFlow
+                # better, is to calculate sectoral returnflows rate based on withdrawal, 1) for simple approahc 2) sourcesector fraction 3) unmetdemand - limitAbstraction = FALSE
+                self.var.wwtEffluentsGenerated_domestic = self.var.returnflowNonIrr.copy() * divideValues(frac_domestic, frac_domestic + frac_industry) # [M3]
+                self.var.wwtEffluentsGenerated_industry = self.var.returnflowNonIrr.copy() * divideValues(frac_industry, frac_domestic + frac_industry)
+                self.var.wwtEffluentsGenerated = self.var.wwtEffluentsGenerated_domestic + self.var.wwtEffluentsGenerated_industry
+            
+                self.var.wwtSewerCollection_domestic = np.where(self.var.wwtColArea > 0,
+                                                       np.minimum(self.var.wwtEffluentsGenerated_domestic,
+                                                                  self.var.wwtEffluentsGenerated_domestic), 0.)
+                self.var.wwtSewerCollection_industry = np.where(self.var.wwtColArea > 0,
+                                                       np.minimum(self.var.wwtEffluentsGenerated_industry,
+                                                                  self.var.wwtEffluentsGenerated_industry), 0.) 
 
-                ## water quality vars in effluents generated and collected
-                self.var.wwtSewerCollection = np.where(self.var.wwtColArea > 0,
-                                                       np.minimum(self.var.returnflowNonIrr * self.var.wwtColShare,
-                                                                  self.var.returnflowNonIrr), 0.)
-
-                self.var.returnflowNonIrr = np.maximum(self.var.returnflowNonIrr - self.var.wwtSewerCollection, 0.)
-                self.var.wwtSewerCollection = self.var.wwtSewerCollection + self.var.wwtUrbanLeakage
                 self.model.wastewater_module.dynamic()
+                
+                self.var.returnflowNonIrr = np.maximum(self.var.returnflowNonIrr - self.var.wwtSewerCollection, 0.)
+                self.var.wwtSewerCollectedBySoruce = self.var.wwtEffluentsGenerated - self.var.returnflowNonIrr
 
             # returnflow to river and to evapotranspiration
             if self.var.includeIndusDomesDemand:  # all demands are taken into account
-                if self.var.includeWastewater:
+                #if self.var.includeWastewater:
                     # add uncollected wastewater
-                    uncollectedWWT = self.var.wwtSewerCollection * self.var.cellArea - \
-                                     self.var.wwtExportedCollected - self.var.wwtSewerCollected  # M3
-                    self.var.returnflowNonIrr += uncollectedWWT / self.var.cellArea
+                #    uncollectedWWT = self.var.wwtSewerCollection * self.var.cellArea - \
+                #                     self.var.wwtExportedCollected - self.var.wwtSewerCollected  # M3
+                #    self.var.returnflowNonIrr += uncollectedWWT / self.var.cellArea
                 self.var.returnFlow = self.var.returnflowIrr + self.var.returnflowNonIrr
             else:  # only irrigation is considered
                 self.var.returnFlow = self.var.returnflowIrr
@@ -1931,38 +2522,39 @@ class water_demand:
 
             # ---------------------------------------------
             # testing
+            if checkOption('calcWaterBalance'):
+                if self.var.includeIndusDomesDemand:  # all demands are taken into account
+                    self.model.waterbalance_module.waterBalanceCheck(
+                        [self.var.act_irrWithdrawal],  # In
+                        [self.var.act_totalIrrConsumption, self.var.unmet_lostirr, self.var.addtoevapotrans,
+                         self.var.returnflowIrr],  # Out
+                        [globals.inZero],
+                        [globals.inZero],
+                        "Waterdemand5a", False)
 
-            if self.var.includeIndusDomesDemand:  # all demands are taken into account
-                self.model.waterbalance_module.waterBalanceCheck(
-                    [self.var.act_irrWithdrawal],  # In
-                    [self.var.act_totalIrrConsumption, self.var.unmet_lostirr, self.var.addtoevapotrans,
-                     self.var.returnflowIrr],  # Out
-                    [globals.inZero],
-                    [globals.inZero],
-                    "Waterdemand5a", False)
+                    self.model.waterbalance_module.waterBalanceCheck(
+                        [self.var.act_nonIrrWithdrawal],  # In
+                        [self.var.act_nonIrrConsumption, self.var.returnflowNonIrr, self.var.unmet_lostNonirr],  # Out
+                        [globals.inZero],
+                        [globals.inZero],
+                        "Waterdemand5b", False)
 
-                self.model.waterbalance_module.waterBalanceCheck(
-                    [self.var.act_nonIrrWithdrawal],  # In
-                    [self.var.act_nonIrrConsumption, self.var.returnflowNonIrr, self.var.unmet_lostNonirr],  # Out
-                    [globals.inZero],
-                    [globals.inZero],
-                    "Waterdemand5b", False)
+                    self.model.waterbalance_module.waterBalanceCheck(
+                        [self.var.ind_efficiency * frac_industry * self.var.act_nonIrrWithdrawal],  # In
+                        [self.var.act_indConsumption],  # Out
+                        [globals.inZero],
+                        [globals.inZero],
+                        "Waterdemand5c", False)
 
-                self.model.waterbalance_module.waterBalanceCheck(
-                    [self.var.ind_efficiency * frac_industry * self.var.act_nonIrrWithdrawal],  # In
-                    [self.var.act_indConsumption],  # Out
-                    [globals.inZero],
-                    [globals.inZero],
-                    "Waterdemand5c", False)
-
-                self.model.waterbalance_module.waterBalanceCheck(
-                    [self.var.act_indWithdrawal],  # In
-                    [self.var.act_indConsumption / self.var.ind_efficiency],  # Out
-                    [globals.inZero],
-                    [globals.inZero],
-                    "Waterdemand5d", False)
+                    self.model.waterbalance_module.waterBalanceCheck(
+                        [self.var.act_indWithdrawal],  # In
+                        [self.var.act_indConsumption / self.var.ind_efficiency],  # Out
+                        [globals.inZero],
+                        [globals.inZero],
+                        "Waterdemand5d", False)
 
             # ----------------------------------------------------------------
+
             if checkOption('calcWaterBalance'):
                 self.model.waterbalance_module.waterBalanceCheck(
                     [self.var.act_irrWithdrawal],  # In

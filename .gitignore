@@ -37,5 +37,16 @@ share/python-wheels/
 MANIFEST
 /test_framework
 /cwatm/.idea
-
 .idea
+*.nc
+*.tss
+*.xlsx
+/.project
+/.pydevproject
+cwatm/.DS_Store
+cwatm/hydrological_modules/.DS_Store
+.DS_Store
+cwatm/hydrological_modules/routing_reservoirs/.DS_Store
+cwatm/management_modules/.DS_Store
+
+

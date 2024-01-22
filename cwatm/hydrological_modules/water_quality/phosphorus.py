@@ -340,14 +340,18 @@ class waterquality_phosphorus(object):
         soil_depthRatio1 = divideValues(self.var.soildepth[0], self.var.soildepth[0] + self.var.soildepth[1])
     
         # load daily net inputs 
-        # should be at [kg P / m2]
+        # should be at [microgram P / m2]
         croplandInputNet = readnetcdf2('P_Cropland_Input', wd_date, useDaily='monthly', value='P_Cropland') / globals.dateVar['daysInMonth']
-        croplandInputNet1 = croplandInputNet * soil_depthRatio1 * self.var.cellArea
-        croplandInputNet2 = croplandInputNet * (1 - soil_depthRatio1) * self.var.cellArea
+        croplandInputNet1 = croplandInputNet * soil_depthRatio1 * self.var.cellArea / 10**9 # from microgram to kg
+        croplandInputNet2 = croplandInputNet * (1 - soil_depthRatio1) * self.var.cellArea / 10**9
+        
+        shrManureGrassland = readnetcdf2('shareManure_Grassland', wd_date, useDaily='yearly', value='ManureShare_Grassland')
         
         grasslandInputNet = readnetcdf2('P_Grassland_Input', wd_date, useDaily='yearly', value='P_Grassland') / globals.dateVar['daysInYear']
-        grasslandInputNet1 = grasslandInputNet * soil_depthRatio1 * self.var.cellArea
-        grasslandInputNet2 = grasslandInputNet * (1 - soil_depthRatio1) * self.var.cellArea
+        
+        manure_grasslandInput = grasslandInputNet * shrManureGrassland * self.var.cellArea
+        grasslandInputNet1 = grasslandInputNet * (1 - shrManureGrassland) * soil_depthRatio1 * self.var.cellArea
+        grasslandInputNet2 = grasslandInputNet * (1 - shrManureGrassland) * (1 - soil_depthRatio1) * self.var.cellArea
 
         '''
         later change to:
@@ -360,13 +364,16 @@ class waterquality_phosphorus(object):
         self.var.PntSource_NetPload_channel = readnetcdf2('P_sourcePoint', wd_date, useDaily='yearly', value='wwtp')
         self.var.PntSource_NetPload_soil23 = readnetcdf2('P_sourcePoint', wd_date, useDaily='yearly', value='latrines')
 
+        pitLatrinesDepth = 3
+        if 'pitLatrinesDepth' in binding:
+            pitLatrinesDepth = loadmap('pitLatrinesDepth')
+        PntSource_toSoilLyr2 = self.var.soildepth[1] + 0.05 >= pitLatrinesDepth
+        PntSource_toSoilLyr3 = self.var.soildepth[1] + 0.05 < pitLatrinesDepth
         
-        PntSource_toSoilLyr2 = self.var.soildepth[1] + 0.05 >= 3
-        PntSource_toSoilLyr3 = self.var.soildepth[1] + 0.05 < 3
-        
-        self.var.PntSource_toSoil =  self.var.PntSource_NetPload_topsoil + self.var.PntSource_NetPload_soil23
+        #self.var.PntSource_toSoil =  self.var.PntSource_NetPload_topsoil + self.var.PntSource_NetPload_soil23
+        self.var.PntSource_toSoil =   self.var.PntSource_NetPload_soil23
       
-        manureFrac = loadmap('f_Manure')
+        #manureFrac = loadmap('f_Manure')
         
         ## Place holder for P weathering
         self.var.soil_P_weathering = globals.inZero.copy()
@@ -425,7 +432,8 @@ class waterquality_phosphorus(object):
         nonNaturalDirectRunoff[0:2] = globals.inZero.copy()
         
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile1, TDP = self.var.soil_P_dissolved1,\
-            EPC0 =  self.var.EPC1, P_in = self.var.soil_P_input1 + self.var.PntSource_NetPload_topsoil,\
+            EPC0 =  self.var.EPC1, P_in = self.var.soil_P_input1,\
+            # + self.var.PntSource_NetPload_topsoil,\
             Qr = nonNaturalDirectRunoff, Qi = globals.inZero, Qp = self.var.perc1to2,\
             Kf = self.var.Kf, soilmass = self.var.soilM1, Vs = self.var.w1, runoff_adj = self.var.runoff_Padj)
 
@@ -437,6 +445,9 @@ class waterquality_phosphorus(object):
         # update fluxes - no interflow from layer 1
         directRunoff_P =  outputs[3].copy()
         perc1to2_P = outputs[5].copy()
+        
+        # Add Manure from Grassland to runoff
+        directRunoff_P[1] += manure_grasslandInput
         
         # run dynamic soil P - layer 2 ######
         outputs = self.discretizeSoilP(Plab = self.var.soil_P_labile2, TDP = self.var.soil_P_dissolved2,\
@@ -492,7 +503,8 @@ class waterquality_phosphorus(object):
         self.var.interflow_P = np.nansum((interflow2_P + interflow3_P) * self.var.fracVegCover[0:4], axis = 0)
         self.var.baseflow_P = self.var.baseflow * self.var.cellArea * self.var.GW_P_Conc 
         
-        self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, self.var.PntSource_NetPload_channel,0.)
+        #self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, self.var.PntSource_NetPload_channel,0.)
+        self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, self.var.PntSource_NetPload_channel + self.var.PntSource_NetPload_topsoil, 0.)
         
         # to runoff [kg] 
         self.var.runoff_P = self.var.directRunoff_P +  self.var.interflow_P + self.var.baseflow_P + self.var.returnflowNonIrr_P
