@@ -101,11 +101,6 @@ class waterquality_phosphorus(object):
             * Paddy irrigation No.2 (cropland)
             * non-Paddy irrigation No.3 (cropland)
         '''
-        # load initial total soil p concentration [% of weight]
-        # multiply by soil mass [kg] and get mass of initial P per layer in [kg]
-        PSoil_init1 = self.var.soilM1 * loadmap('soilTP1_init') / 100
-        PSoil_init2 = self.var.soilM2 * loadmap('soilTP2_init') / 100
-        PSoil_init3 = self.var.soilM3 * loadmap('soilTP3_init') / 100
         
         # load initial inactive soil p as a fraction of TP; default - 0.85
         soil_P_fracInactive_managed = globals.inZero.copy() + 0.75
@@ -118,51 +113,66 @@ class waterquality_phosphorus(object):
         # load soil absorption coefficient Kf | from mm kgsoil-1 to m kgsoil-1
         self.var.Kf = loadmap('Kf') / 1000 
         
-        # inactive soil P [kg P] - check if 1e-06 or 1e+06 and also check if it results in per m^2 or per grid cell.
-        # natural land - ignores managed grassland for now
-        self.var.soil_P_inactive1[0:2] += soil_P_fracInactive_natural * PSoil_init1
-        self.var.soil_P_inactive2[0:2] += soil_P_fracInactive_natural * PSoil_init2
-        self.var.soil_P_inactive3[0:2] += soil_P_fracInactive_natural * PSoil_init3
-        
-        # managed land - ignores managed grassland for now
-        self.var.soil_P_inactive1[2:4] += soil_P_fracInactive_managed * PSoil_init1
-        self.var.soil_P_inactive2[2:4] += soil_P_fracInactive_managed * PSoil_init2
-        self.var.soil_P_inactive3[2:4] += soil_P_fracInactive_managed * PSoil_init3
+        if not self.var.loadInit:
+            # load initial total soil p concentration [% of weight]
+            # multiply by soil mass [kg] and get mass of initial P per layer in [kg]
+            PSoil_init1 = self.var.soilM1 * loadmap('soilTP1_init') / 100
+            PSoil_init2 = self.var.soilM2 * loadmap('soilTP2_init') / 100
+            PSoil_init3 = self.var.soilM3 * loadmap('soilTP3_init') / 100
 
-        # labile soil P [kg P]
-        # Applied to land cover [1, 2, 3] - natural landcover (forests) initial labile is assumed to be 0. 
-        self.var.soil_P_labile1 += (PSoil_init1 - self.var.soil_P_inactive1) * self.var.naturalLandFrac
-        self.var.soil_P_labile2 += (PSoil_init2 - self.var.soil_P_inactive2) * self.var.naturalLandFrac
-        self.var.soil_P_labile3 += (PSoil_init3 - self.var.soil_P_inactive3) * self.var.naturalLandFrac
-        
-        # calculate dissolved soil P [kg P /m2]
-        '''
-            For each landcover i and WQ soil layer j, the soil equilibrium TDP concentration of zero sorption is
-            EPC_ij = soil_P_labile_ij / (Kf * soilM_j)
+            # inactive soil P [kg P] - check if 1e-06 or 1e+06 and also check if it results in per m^2 or per grid cell.
+            # natural land - ignores managed grassland for now
+            self.var.soil_P_inactive1[0:2] += soil_P_fracInactive_natural * PSoil_init1
+            self.var.soil_P_inactive2[0:2] += soil_P_fracInactive_natural * PSoil_init2
+            self.var.soil_P_inactive3[0:2] += soil_P_fracInactive_natural * PSoil_init3
             
-            Whereas Kf is Soil P adsorption coefficient, default – 1.1*10-4
+            # managed land - ignores managed grassland for now
+            self.var.soil_P_inactive1[2:4] += soil_P_fracInactive_managed * PSoil_init1
+            self.var.soil_P_inactive2[2:4] += soil_P_fracInactive_managed * PSoil_init2
+            self.var.soil_P_inactive3[2:4] += soil_P_fracInactive_managed * PSoil_init3
 
-            later the TDP is
-            self.var.soil_P_dissovled_ij = EPC_ij * wq_soilMoisture_ij 
+            # labile soil P [kg P]
+            # Applied to land cover [1, 2, 3] - natural landcover (forests) initial labile is assumed to be 0. 
+            self.var.soil_P_labile1 += (PSoil_init1 - self.var.soil_P_inactive1) * self.var.naturalLandFrac
+            self.var.soil_P_labile2 += (PSoil_init2 - self.var.soil_P_inactive2) * self.var.naturalLandFrac
+            self.var.soil_P_labile3 += (PSoil_init3 - self.var.soil_P_inactive3) * self.var.naturalLandFrac
             
-            Where wq_soilMoisture_ij is the mositure content of land cover i and soil layer j  in meters
-        '''
-        
-        # calculate  soil equilibrium TDP concentration of zero sorption  [kg / m]
-        self.var.EPC1 = divideArrays(self.var.soil_P_labile1, self.var.Kf * self.var.soilM1)
-        self.var.EPC2 = divideArrays(self.var.soil_P_labile2, self.var.Kf * self.var.soilM2)
-        self.var.EPC3 = divideArrays(self.var.soil_P_labile3, self.var.Kf * self.var.soilM3)
-        
-        # calculate TDP [kg P]
-        self.var.soil_P_dissolved1 = np.minimum(self.var.EPC1 * self.var.w1, self.var.soil_P_labile1) * self.var.naturalLandFrac
-        self.var.soil_P_dissolved2 = np.minimum(self.var.EPC2 * self.var.w2, self.var.soil_P_labile2) * self.var.naturalLandFrac
-        self.var.soil_P_dissolved3 = np.minimum(self.var.EPC3 * self.var.w3, self.var.soil_P_labile3) * self.var.naturalLandFrac
+            # calculate dissolved soil P [kg P /m2]
+            '''
+                For each landcover i and WQ soil layer j, the soil equilibrium TDP concentration of zero sorption is
+                EPC_ij = soil_P_labile_ij / (Kf * soilM_j)
+                
+                Whereas Kf is Soil P adsorption coefficient, default – 1.1*10-4
 
-        # update labile P to keep P balance
-        self.var.soil_P_labile1 -= self.var.soil_P_dissolved1
-        self.var.soil_P_labile2 -= self.var.soil_P_dissolved2
-        self.var.soil_P_labile3 -= self.var.soil_P_dissolved3
+                later the TDP is
+                self.var.soil_P_dissovled_ij = EPC_ij * wq_soilMoisture_ij 
+                
+                Where wq_soilMoisture_ij is the mositure content of land cover i and soil layer j  in meters
+            '''
+            
+            # calculate  soil equilibrium TDP concentration of zero sorption  [kg / m]
+            self.var.EPC1 = divideArrays(self.var.soil_P_labile1, self.var.Kf * self.var.soilM1)
+            self.var.EPC2 = divideArrays(self.var.soil_P_labile2, self.var.Kf * self.var.soilM2)
+            self.var.EPC3 = divideArrays(self.var.soil_P_labile3, self.var.Kf * self.var.soilM3)
+            
+            # calculate TDP [kg P]
+            self.var.soil_P_dissolved1 = np.minimum(self.var.EPC1 * self.var.w1, self.var.soil_P_labile1) * self.var.naturalLandFrac
+            self.var.soil_P_dissolved2 = np.minimum(self.var.EPC2 * self.var.w2, self.var.soil_P_labile2) * self.var.naturalLandFrac
+            self.var.soil_P_dissolved3 = np.minimum(self.var.EPC3 * self.var.w3, self.var.soil_P_labile3) * self.var.naturalLandFrac
+
+            # update labile P to keep P balance
+            self.var.soil_P_labile1 -= self.var.soil_P_dissolved1
+            self.var.soil_P_labile2 -= self.var.soil_P_dissolved2
+            self.var.soil_P_labile3 -= self.var.soil_P_dissolved3
         
+        else:
+            # if self.var.initLoadFile is set to True
+            soil_vars = ["soil_P_inactive1", "soil_P_inactive2", "soil_P_inactive3", "soil_P_labile1", "soil_P_labile2",\
+                    "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]
+            for var in soil_vars:
+                for lc_idx in range(4):
+                    vars(self.var)[var][lc_idx, :] = self.var.load_initial(var + '_' + str(lc_idx), default = globals.inZero.copy())
+                       
         # load data for calculating mineral P weathering and supply to rivers - based on https://doi.org/10.1016/j.chemgeo.2013.10.025
         
         self.var.background_P_mineral = globals.inZero.copy()
@@ -206,12 +216,12 @@ class waterquality_phosphorus(object):
         self.var.mineralWeat_P = globals.inZero.copy()
         
         # channel phsophorus [kg]
-        self.var.channel_P = globals.inZero.copy()
-        self.var.channel_PP = globals.inZero.copy()
-        self.var.channel_inactiveP = globals.inZero.copy()
-        self.var.channel_PConc = globals.inZero.copy()
-        self.var.channel_PPConc = globals.inZero.copy()
-        self.var.channel_inactivePConc = globals.inZero.copy()
+        self.var.channel_P = self.var.load_initial('channel_P', default = globals.inZero.copy())
+        self.var.channel_PP = self.var.load_initial('channel_PP', default = globals.inZero.copy())
+        self.var.channel_inactiveP = self.var.load_initial('channel_inactiveP', default = globals.inZero.copy())
+        self.var.channel_PConc = self.var.load_initial('channel_PConc', default = globals.inZero.copy())
+        self.var.channel_PPConc = self.var.load_initial('channel_PPConc', default = globals.inZero.copy())
+        self.var.channel_inactivePConc = self.var.load_initial('channel_inactivePConc', default = globals.inZero.copy())
         self.var.outlet_P = globals.inZero.copy()
         self.var.outlet_PP = globals.inZero.copy()
         self.var.outlet_inactiveP = globals.inZero.copy()
@@ -223,12 +233,12 @@ class waterquality_phosphorus(object):
         self.var.resLakeOutflow_P = globals.inZero.copy()
         self.var.resLakeOutflow_PP = globals.inZero.copy()
         self.var.resLakeOutflow_inactiveP = globals.inZero.copy()
-        self.var.resLake_P = globals.inZero.copy()
-        self.var.resLake_PP = globals.inZero.copy()
-        self.var.resLake_inactiveP = globals.inZero.copy()
-        self.var.resLake_PConc = globals.inZero.copy()
-        self.var.resLake_PPConc = globals.inZero.copy()
-        self.var.resLake_inactivePConc = globals.inZero.copy()
+        self.var.resLake_P = self.var.load_initial('resLake_P', default = globals.inZero.copy())
+        self.var.resLake_PP = self.var.load_initial('resLake_PP', default = globals.inZero.copy())
+        self.var.resLake_inactiveP = self.var.load_initial('resLake_inactiveP', default = globals.inZero.copy())
+        self.var.resLake_PConc = self.var.load_initial('resLake_PConc', default = globals.inZero.copy())
+        self.var.resLake_PPConc = self.var.load_initial('resLake_PPConc', default = globals.inZero.copy())
+        self.var.resLake_inactivePConc = self.var.load_initial('resLake_inactivePConc', default = globals.inZero.copy())
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
         # abstraction [kg]
