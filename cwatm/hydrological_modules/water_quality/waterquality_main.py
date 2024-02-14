@@ -157,34 +157,16 @@ class water_quality(object):
                     1: water body
                     2: routing step
                 '''
-                self.var.resLakeSubcompartments = np.tile(1., (self.var.n_fluxes, self.var.waterBodyOutC.shape[0], self.var.noRoutingSteps)) 
+                self.var.resLake_mass = np.tile(np.compress(self.var.compress_LR, globals.inZero.copy()), (self.var.n_fluxes, 1))
+                self.var.resLake_conc = np.tile(np.compress(self.var.compress_LR, globals.inZero.copy()), (self.var.n_fluxes, 1))
                 
-                self.var.ResLake_Conc_LRC = np.tile(np.compress(self.var.compress_LR, globals.inZero.copy()), (self.var.n_fluxes, 1))           
-                self.var.resLakeSubcompartments_wtr = np.tile(1., (self.var.waterBodyOutC.shape[0], self.var.noRoutingSteps))
-                
-                # Initial storage
-                if self.var.includeErosed:
-                    # soil index is 0
-                    self.var.resLakeSubcompartments[0, :, :] = self.var.resLakeSubcompartments[0, :, :] * np.transpose(np.tile(self.var.lakeResStorageC * self.var.ResLake_Conc_LRC[0, :] / self.var.noRoutingSteps, (self.var.noRoutingSteps, 1)))
-                    
-                if self.var.includePhosphorus:
-                    # phosphorus index is 1
-                    self.var.resLakeSubcompartments[1, :, :] = self.var.resLakeSubcompartments[1, :, :] * np.transpose(np.tile(self.var.lakeResStorageC * self.var.ResLake_Conc_LRC[1, :]/ self.var.noRoutingSteps, (self.var.noRoutingSteps, 1)))
-
-           
-                # Initital sub-compartments storage water [m3]
-                #self.var.resLakeSubcompartments_wtr = self.var.resLakeSubcompartments_wtr * np.transpose(np.tile(self.var.lakeResStorageC / self.var.noRoutingSteps, (self.var.noRoutingSteps, 1)))
-                
+                # Initital sub-compartments storage water [m3]                
                 
             # Run initial sub-modules
             if self.var.includePhosphorus:
                 self.waterquality_p.initial()
 
             if self.var.includeErosed:
-
-                #erosedVars = ['runoffEnergyMusle']
-                #
-                #for variable in erosedVars: vars(self.var)[variable] = np.title(globals.inZero, (4, 1))
 
                 self.erosed.initial()
 

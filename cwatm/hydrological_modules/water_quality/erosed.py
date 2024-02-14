@@ -132,8 +132,8 @@ class waterquality_erosed(object):
         # tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))
 
         # channel sediment [kg]
-        self.var.channel_sed = globals.inZero.copy()
-        self.var.channel_sedConc = globals.inZero.copy()
+        self.var.channel_sed = self.var.load_initial('channel_sed', default = globals.inZero.copy())
+        self.var.channel_sedConc = self.var.load_initial('channel_sedConc', default = globals.inZero.copy())
         self.var.outlet_sed = globals.inZero.copy()
         self.var.channel_sedDep = globals.inZero.copy()
         # channelbed degradation - input into channels
@@ -142,8 +142,8 @@ class waterquality_erosed(object):
         # lake reservoirs [kg]
         self.var.resLakeInflow_sed = globals.inZero.copy()
         self.var.resLakeOutflow_sed = globals.inZero.copy()
-        self.var.resLake_sed = globals.inZero.copy()
-        self.var.resLake_sedConc = globals.inZero.copy()
+        self.var.resLake_sed = self.var.load_initial('resLake_sed', default = globals.inZero.copy())
+        self.var.resLake_sedConc = self.var.load_initial('resLake_sedConc', default = globals.inZero.copy())
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
         # abstraction [kg]
