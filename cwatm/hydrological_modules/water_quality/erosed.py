@@ -86,6 +86,21 @@ class waterquality_erosed(object):
        
 
         return channel_sed, channel_sedConc, sedDep, sedDeg
+    def sediments_in_lakes_reservoirs(self, conc_i, ks, d_50, V):
+        """
+        conc_eq ... equilibrium conc. of suspended solids in waterbody (Mg/m3)
+        conc_i ... initial conc. of suspended solids in waterbody (Mg/m3)
+        conc_f ... final conc. of suspended solids in waterbody (Mg/m3)
+        ks ... decay constant (1/day)
+        t ... days of timestep (day)
+        d_50 ... median particle size of inflow sediment (um)
+        V ... lake/res volume (m3s-1)
+        sed_stl ... amount of sediments settled in a day (tonnes)
+        """
+        conc_f = np.where(conc_i > conc_f, (conc_i - conc_eq) * np.exp(-ks * t * d_50) + conc_eq, conc_i)
+        sed_stl = (conc_i - conc_f) * V
+
+        return conc_f, sed_settled
 
     def initial(self):
         """
@@ -97,8 +112,9 @@ class waterquality_erosed(object):
         # load initial MUSLE maps
         # map with percentage of rock in first soil layer (%) must be provided, e.g., SoilGrids Parameter cfvo for depth 0-5cm
         self.var.CFRG = np.exp(-0.053 * loadmap('rockFrac'))
-        
-        #i=1
+
+        i=1
+
         # K_usle: USLE soil erodibility factor
         self.var.kFactor = loadmap('kFactor')
 
@@ -168,6 +184,10 @@ class waterquality_erosed(object):
         # spexp
         self.var.spexp = globals.inZero.copy() + loadmap('spexp')
 
+        ### Dummy variables for lakes and reservoir function
+        self.var.ks_sed = globals.inZero.copy() + 0.184
+        self.var.d50_sed = globals.inZero.copy() + 20. 
+
 
     def dynamic(self):
         """
@@ -235,22 +255,30 @@ class waterquality_erosed(object):
         
         # as an output variable
         self.var.sum_sedYieldLand_tonha =  divideValues(self.var.sum_sedYieldLand, self.var.cellArea * 0.0001)
-        
-        erosed_debug = False
+
+        #LAKES AND RESERVOIRS
+        # detention time (storage/outflow)
+        self.var.lakeResOutflowM3s = self.var.lakeResOutflowM * self.var.cellArea / 86400
+        self.var.detentionTime = self.var.lakeResStorage / self.var.lakeResOutflowM3s
+
+
+
+
+        erosed_debug = True
         if erosed_debug:
-            print('runoffm3s', np.nansum(runoffm3s), 'runoffmin', np.nanmin(runoffm3s) , 'runoffmax', np.nanmax(runoffm3s))
+            #print('runoffm3s', np.nansum(runoffm3s), 'runoffmin', np.nanmin(runoffm3s) , 'runoffmax', np.nanmax(runoffm3s))
             #print('runoffm3s', np.nanmean(directRunoff_m3sec), 'runoffmin', np.nanmin(directRunoff_m3sec) , 'runoffmax', np.nanmax(directRunoff_m3sec))
             #print('directRunoffm', self.var.directRunoff)
             #print('directRunoffmm', directRunoff_mm)
-            print('vov', np.nanmean(vov), 'vovmin', np.nanmin(vov) , 'vovmax', np.nanmax(vov))
-            print('Tov', np.nanmean(tov), 'tovmin', np.nanmin(tov) , 'tovmax', np.nanmax(tov))
-            print('Tov2', np.nanmean(tov2), 'tov2min', np.nanmin(tov2) , 'tov2max', np.nanmax(tov))
+            #print('vov', np.nanmean(vov), 'vovmin', np.nanmin(vov) , 'vovmax', np.nanmax(vov))
+            #print('Tov', np.nanmean(tov), 'tovmin', np.nanmin(tov) , 'tovmax', np.nanmax(tov))
+            #print('Tov2', np.nanmean(tov2), 'tov2min', np.nanmin(tov2) , 'tov2max', np.nanmax(tov))
             #print('maxtimerunoff', np.nanmean(self.var.maxtime_runoff_conc))
             #print('tchmean', np.nanmean(tch), 'tchmin', np.nanmin(tch), 'tchmax',np.nanmax(tch))
             #print('tconcmean', np.nanmean(self.var.tconc), 'tconcmin', np.nanmin(self.var.tconc), 'tconcmax', np.nanmax(self.var.tconc))
-            
+            print(np.nanmean(self.var.detentionTime/86400), np.nanmin(self.var.detentionTime/86400), np.nanmax(self.var.detentionTime/86400))
             ### Stop run at step 282 - for debugging purposes
-            if (dateVar['curr'] == 282):
+            if (dateVar['curr'] == 150):
                ii=1
 
         
