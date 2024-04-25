@@ -86,21 +86,23 @@ class waterquality_erosed(object):
        
 
         return channel_sed, channel_sedConc, sedDep, sedDeg
-    def sediments_in_lakes_reservoirs(self, conc_i, ks, d_50, V):
+    def sediments_in_lakes_reservoirs(self, conc_i, conc_eq, ks, d_50, V, t):
         """
-        conc_eq ... equilibrium conc. of suspended solids in waterbody (Mg/m3)
-        conc_i ... initial conc. of suspended solids in waterbody (Mg/m3)
-        conc_f ... final conc. of suspended solids in waterbody (Mg/m3)
+        conc_eq ... equilibrium conc. of suspended solids in waterbody (kg/m3)
+        conc_i ... initial conc. of suspended solids in waterbody (kg/m3)
+        conc_f ... final conc. of suspended solids in waterbody (kg/m3)
         ks ... decay constant (1/day)
         t ... days of timestep (day)
-        d_50 ... median particle size of inflow sediment (um)
-        V ... lake/res volume (m3s-1)
-        sed_stl ... amount of sediments settled in a day (tonnes)
+        d_50 ... median particle size of inflow sediment (um - mikrometer)
+        V ... lake/res volume (m3)
+        sed_stl ... amount of sediments settled in a day (kg)
         """
-        conc_f = np.where(conc_i > conc_f, (conc_i - conc_eq) * np.exp(-ks * t * d_50) + conc_eq, conc_i)
+        print(((conc_i - conc_eq) * np.exp(-ks * t * d_50))[conc_i > conc_eq])
+        conc_f = np.where(conc_i > conc_eq, (conc_i - conc_eq) * np.exp(-ks * t * d_50) + conc_eq, conc_i)
         sed_stl = (conc_i - conc_f) * V
+        mass_f = conc_f * V
 
-        return conc_f, sed_settled
+        return mass_f, sed_stl
 
     def initial(self):
         """
@@ -160,6 +162,7 @@ class waterquality_erosed(object):
         self.var.resLakeOutflow_sed = globals.inZero.copy()
         self.var.resLake_sed = self.var.load_initial('resLake_sed', default = globals.inZero.copy())
         self.var.resLake_sedConc = self.var.load_initial('resLake_sedConc', default = globals.inZero.copy())
+
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
         # abstraction [kg]
@@ -185,8 +188,11 @@ class waterquality_erosed(object):
         self.var.spexp = globals.inZero.copy() + loadmap('spexp')
 
         ### Dummy variables for lakes and reservoir function
-        self.var.ks_sed = globals.inZero.copy() + 0.184
-        self.var.d50_sed = globals.inZero.copy() + 20. 
+        if checkOption('includeWaterBodies'):
+            self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + 0.184)
+            self.var.d50_sed = np.compress(self.var.compress_LR,globals.inZero.copy() + 20.)
+            self.var.conc_sed_eq = np.compress(self.var.compress_LR,globals.inZero.copy() + 1.5) / 1000 # mg per l to kg per m3
+
 
 
     def dynamic(self):
@@ -264,7 +270,7 @@ class waterquality_erosed(object):
 
 
 
-        erosed_debug = True
+        erosed_debug = False
         if erosed_debug:
             #print('runoffm3s', np.nansum(runoffm3s), 'runoffmin', np.nanmin(runoffm3s) , 'runoffmax', np.nanmax(runoffm3s))
             #print('runoffm3s', np.nanmean(directRunoff_m3sec), 'runoffmin', np.nanmin(directRunoff_m3sec) , 'runoffmax', np.nanmax(directRunoff_m3sec))
