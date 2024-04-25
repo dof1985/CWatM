@@ -526,6 +526,8 @@ class routing_kinematic(object):
                 self.var.channel_sedDeg = globals.inZero.copy()
                 channel_sed_Abstracted_Dt  = self.var.channel_sed_Abstracted / self.var.noRoutingSteps
                 returnflowIrr_sed_Dt = self.var.returnflowIrr_sed /  self.var.noRoutingSteps
+                self.var.resLake_sed_depostion = globals.inZero.copy()
+                resLake_sed_depostion_LR = np.compress(self.var.compress_LR, globals.inZero.copy())
                 
             if self.var.includePhosphorus:
                 self.var.resLakeOutflow_P = globals.inZero.copy()
@@ -830,9 +832,9 @@ class routing_kinematic(object):
                     
                     # temporary - reslake depostion - FLORIAN - TO CHECK
                     if checkOption('includeWaterBodies'):
-                        frac_depos = 0.
-                        self.var.resLake_sed_depostion = self.var.resLake_mass[0, :] * frac_depos
-                        self.var.resLake_mass[0, :] = self.var.resLake_mass[0, :] - self.var.resLake_sed_depostion
+                        self.var.resLake_mass[0, :], resLake_sed_settled = self.model.waterquality_module.erosed.sediments_in_lakes_reservoirs(conc_i = divideValues(self.var.resLake_mass[0, :], volResLake), ks=self.var.ks_sed, t=1/self.var.noRoutingSteps ,d_50=self.var.d50_sed, V=volResLake, conc_eq=self.var.conc_sed_eq)
+                        resLake_sed_depostion_LR += resLake_sed_settled
+
                     
                 if self.var.includePhosphorus:
                     self.var.channelLake_P_retention = self.model.waterquality_module.waterquality_p.dynamic_P_retention()
@@ -930,8 +932,11 @@ class routing_kinematic(object):
                     np.put(self.var.resLake_sed, self.var.decompress_LR, self.var.resLake_mass[0, :])
                     # sediment Lake concentration [mg / l]
                     self.var.resLake_sedConc = divideValues(self.var.resLake_sed, self.var.lakeResStorage) * 10**3
+                    # uncompress inflow sediment
                     np.put(self.var.resLakeInflow_sed, self.var.decompress_LR, sumresLake_sed_inflow)
-            
+                    # uncompress sediment deposition in lakes
+                    np.put(self.var.resLake_sed_depostion, self.var.decompress_LR, resLake_sed_depostion_LR)
+
             if self.var.includePhosphorus:
                 # channel TDP concentration [mg / l]
                 self.var.channel_PConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
