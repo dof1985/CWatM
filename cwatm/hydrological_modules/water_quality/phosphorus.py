@@ -239,6 +239,8 @@ class waterquality_phosphorus(object):
         self.var.resLake_PConc = self.var.load_initial('resLake_PConc', default = globals.inZero.copy())
         self.var.resLake_PPConc = self.var.load_initial('resLake_PPConc', default = globals.inZero.copy())
         self.var.resLake_inactivePConc = self.var.load_initial('resLake_inactivePConc', default = globals.inZero.copy())
+        self.var.resLake_TPConc = globals.inZero.copy()
+        self.var.resLake_TDPConc = globals.inZero.copy()
         #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
         # abstraction [kg]
@@ -542,10 +544,13 @@ class waterquality_phosphorus(object):
                 # Water demand ### lift, reservoir type4 is currently excluded
         # Only with self.var.sectorSourceAbstractionFractions = True
         # channel
-        self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  self.var.channel_PConc * 10**3, self.var.channel_P), 0.)
-        self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_PPConc * 10**3 , self.var.channel_PP), 0.)
-        self.var.channel_inactiveP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_inactivePConc * 10**3 , self.var.channel_inactiveP), 0.)
-        
+        if checkOption('includeWaterDemand'):
+            self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  (self.var.channel_PConc / 10**3), self.var.channel_P), 0.)
+            self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_PPConc / 10**3), self.var.channel_PP), 0.)
+            self.var.channel_inactiveP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_inactivePConc / 10**3), self.var.channel_inactiveP), 0.)
+            self.var.channel_sed_Abstracted = np.maximum(
+            np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),
+            0.)
         '''
         # lake/reservoir
         if checkOption('includeWaterBodies'):   

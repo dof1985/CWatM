@@ -91,17 +91,18 @@ class waterquality_erosed(object):
         conc_eq ... equilibrium conc. of suspended solids in waterbody (kg/m3)
         conc_i ... initial conc. of suspended solids in waterbody (kg/m3)
         conc_f ... final conc. of suspended solids in waterbody (kg/m3)
-        ks ... decay constant (1/day)
+        ks ... decay constant (m3/day) ; was (l/day) -> DF
         t ... days of timestep (day)
         d_50 ... median particle size of inflow sediment (um - mikrometer)
         V ... lake/res volume (m3)
         sed_stl ... amount of sediments settled in a day (kg)
         """
-        print(((conc_i - conc_eq) * np.exp(-ks * t * d_50))[conc_i > conc_eq])
+      
         conc_f = np.where(conc_i > conc_eq, (conc_i - conc_eq) * np.exp(-ks * t * d_50) + conc_eq, conc_i)
+
         sed_stl = (conc_i - conc_f) * V
         mass_f = conc_f * V
-
+       
         return mass_f, sed_stl
 
     def initial(self):
@@ -189,10 +190,14 @@ class waterquality_erosed(object):
 
         ### Dummy variables for lakes and reservoir function
         if checkOption('includeWaterBodies'):
-            self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + 0.184)
-            self.var.d50_sed = np.compress(self.var.compress_LR,globals.inZero.copy() + 20.)
-            self.var.conc_sed_eq = np.compress(self.var.compress_LR,globals.inZero.copy() + 1.5) / 1000 # mg per l to kg per m3
-
+            self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + 184.) # 0..184 l per day -> m3 per day
+            
+            if 'ks_sediment' in binding:
+                self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('ks_sediment') * 1000) # l day-1 -> m3 kg-1
+          
+            self.var.d50_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('d50_sediment'))
+            self.var.conc_sed_eq = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('eq_conc_sediment') / 1000) # mg per l to kg per m3
+            
 
 
     def dynamic(self):
@@ -263,9 +268,10 @@ class waterquality_erosed(object):
         self.var.sum_sedYieldLand_tonha =  divideValues(self.var.sum_sedYieldLand, self.var.cellArea * 0.0001)
 
         #LAKES AND RESERVOIRS
-        # detention time (storage/outflow)
-        self.var.lakeResOutflowM3s = self.var.lakeResOutflowM * self.var.cellArea / 86400
-        self.var.detentionTime = self.var.lakeResStorage / self.var.lakeResOutflowM3s
+        # detention time (storage/outflow) # is it used ? DF
+        if checkOption('includeWaterBodies'):
+            self.var.lakeResOutflowM3s = self.var.lakeResOutflowM * self.var.cellArea / 86400
+            self.var.detentionTime = self.var.lakeResStorage / self.var.lakeResOutflowM3s
 
 
 
