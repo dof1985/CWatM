@@ -270,7 +270,7 @@ class waterquality_phosphorus(object):
         # 1.612 - m3/kg <--> 1612 l/kg
         self.var.kf_water = globals.inZero.copy() + 1.612 # [l/kg]
         if 'kf_water' in binding:
-            self.var.kf_water = loadmap('kf_water')
+            self.var.kf_water = globals.inZero.copy() + loadmap('kf_water')
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         

@@ -189,7 +189,11 @@ class water_quality(object):
 
                 
                 self.var.sum_soil_TP_urbanLoss = globals.inZero.copy()
-
+        
+        phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
+                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
+                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
+                                
         if dateVar['newYear'] and not dateVar['newStart']:
             delta_LC = self.var.fracVegCover - self.var.fracVegCover_former
             
@@ -245,6 +249,15 @@ class water_quality(object):
                           
             self.waterquality_p.dynamic()
             
+            # sum total soil P stocks [kg / m2] 
+            phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
+                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
+                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
+                                
+            for variable in phosphorusVarsSum:
+                # make sure no negative values
+                vars(self.var)[variable] = np.where(vars(self.var)[variable] < 0., 0. , vars(self.var)[variable])
+                
             # update nutrients soil stocks due to land cover change; note sigma(deltaP_j) = 0; i.e., P mass is balanced 
 
             if dateVar['newYear'] and not dateVar['newStart']:
@@ -263,7 +276,7 @@ class water_quality(object):
                 allLoss = np.nansum(np.where(delta_LC < 0, np.abs(delta_LC), 0.), axis = 0) 
                 wghts = divideArrays(np.where(delta_LC < 0, np.abs(delta_LC), 0.), allLoss)[0:4]
                 # update all landcovers to new fractions
-                wghts_add = globals.inZero.copy()
+                #wghts_add = globals.inZero.copy()
                 
 
                 '''
@@ -340,14 +353,6 @@ class water_quality(object):
                 
             ## End phosphorus balance #######
                 
-                           
-
-            # sum total soil P stocks [kg / m2] 
-            phosphorusVarsSum = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3', 'soil_P_labile1', 'soil_P_labile2', \
-                                'soil_P_labile3', 'soil_P_dissolved1', 'soil_P_dissolved2', 'soil_P_dissolved3', 'EPC1', 'EPC2', 'EPC3',\
-                                'soil_P_input1', 'soil_P_input2', 'irrigation_P_Applied', 'irrigation_inactiveP_Applied']
-            
-            
             
             for variable in phosphorusVarsSum:
                 vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis = 0)
