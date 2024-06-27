@@ -206,7 +206,7 @@ class routing_kinematic(object):
     
     def updateLakeMass(self, lake_mass, lake_inflow, flowfrac):
 
-                        lake_outflow = flowfrac * lake_mass
+                        lake_outflow = flowfrac * lake_mass # assuming fully-mixed water column (also across space)
                         lake_mass = lake_mass + lake_inflow - lake_outflow
                         
                         return lake_mass, lake_outflow
@@ -503,7 +503,7 @@ class routing_kinematic(object):
             outletID = np.where(downdirID == downdirID.shape[0])[0]
             downdirID[outletID] = outletID
             
-            # build flux arrays [erosed, TDP, PP]
+            # build flux arrays [erosed, TDP, PP, inactiveP]
             massFluxArray = np.tile(globals.inZero.copy(), (self.var.n_fluxes,1))
             if checkOption('includeWaterBodies'):
                 resLake_inflow =  np.tile(np.compress(self.var.compress_LR, globals.inZero.copy()), (self.var.n_fluxes, 1))
@@ -527,7 +527,8 @@ class routing_kinematic(object):
                 channel_sed_Abstracted_Dt  = self.var.channel_sed_Abstracted / self.var.noRoutingSteps
                 returnflowIrr_sed_Dt = self.var.returnflowIrr_sed /  self.var.noRoutingSteps
                 self.var.resLake_sed_depostion = globals.inZero.copy()
-                resLake_sed_depostion_LR = np.compress(self.var.compress_LR, globals.inZero.copy())
+                if checkOption('includeWaterBodies'):
+                    resLake_sed_depostion_LR = np.compress(self.var.compress_LR, self.var.resLake_sed_depostion)
                 
             if self.var.includePhosphorus:
                 self.var.resLakeOutflow_P = globals.inZero.copy()
@@ -540,8 +541,7 @@ class routing_kinematic(object):
                 # INPUTS
                 runoff_P_Dt = self.var.runoff_P / self.var.noRoutingSteps
                 mineralWeat_P_Dt = self.var.mineralWeat_P / self.var.noRoutingSteps
-                returnflowIrr_P_Dt = globals.inZero.copy()
-                #self.var.returnflowIrr_P /  self.var.noRoutingSteps
+                returnflowIrr_P_Dt = self.var.returnflowIrr_P /  self.var.noRoutingSteps
                 input_PP_Dt = self.var.sedYieldLand_PP / self.var.noRoutingSteps
                 input_inactiveP_Dt = self.var.sedYieldLand_inactiveP / self.var.noRoutingSteps
                 
@@ -821,7 +821,7 @@ class routing_kinematic(object):
                     # Update channel_sedConc
                     self.var.channel_sedConc = np.where(self.var.substepChannelStorage > 1, divideValues(self.var.channel_sed, self.var.substepChannelStorage), 0.)
 
-                    
+                    preChannel_sed = self.var.channel_sed.copy()
                     self.var.channel_sed, self.var.channel_sedConc, sed_dep_dt, sed_deg_dt = self.model.waterquality_module.erosed.sediments_in_channel(
                         channel_sed = self.var.channel_sed, channel_sedConc = self.var.channel_sedConc, prf=self.var.prf, \
                         Q=self.var.discharge, A=self.var.crossArea, csp=self.var.csp, spexp=self.var.spexp,
@@ -830,28 +830,41 @@ class routing_kinematic(object):
                     self.var.channel_sedDep += sed_dep_dt
                     self.var.channel_sedDeg += sed_deg_dt
                     
-                    # temporary - reslake depostion - FLORIAN - TO CHECK
+  
                     if checkOption('includeWaterBodies'):
-                        self.var.resLake_mass[0, :], resLake_sed_settled = self.model.waterquality_module.erosed.sediments_in_lakes_reservoirs(conc_i = divideValues(self.var.resLake_mass[0, :], volResLake), ks=self.var.ks_sed, t=1/self.var.noRoutingSteps ,d_50=self.var.d50_sed, V=volResLake, conc_eq=self.var.conc_sed_eq)
+                        preresLake_sed = self.var.resLake_mass[0, :].copy()
+                        self.var.resLake_mass[0, :], resLake_sed_settled = self.model.waterquality_module.erosed.sediments_in_lakes_reservoirs(conc_i = divideValues(self.var.resLake_mass[0, :], self.var.lakeResStorageC),\
+                        ks=self.var.ks_sed, t=1/self.var.noRoutingSteps ,d_50=self.var.d50_sed, V=self.var.lakeResStorageC, conc_eq=self.var.conc_sed_eq) # 
+                        
                         resLake_sed_depostion_LR += resLake_sed_settled
 
-                    
+                        
                 if self.var.includePhosphorus:
-                    self.var.channelLake_P_retention = self.model.waterquality_module.waterquality_p.dynamic_P_retention()
-                    self.var.avg_channelLake_P_retention += self.var.channelLake_P_retention / self.var.noRoutingSteps
-                
+                                    
                     # apply retention to mass fluxes
                     if checkOption('includeWaterBodies'):
                     
                         # deposition of PP and inactiveP - temporary
-                        resLake_PP_deposition_tmp = self.var.resLake_mass[2, :] * frac_depos
-                        resLake_inactiveP_deposition_tmp = self.var.resLake_mass[3, :] * frac_depos
+                        resLake_PP_deposition_tmp = self.var.resLake_mass[2, :] * divideValues(resLake_sed_settled, preresLake_sed)
+                        resLake_inactiveP_deposition_tmp = self.var.resLake_mass[3, :] * divideValues(resLake_sed_settled, preresLake_sed)
                         
                         self.var.resLake_mass[2, :] = self.var.resLake_mass[2, :] - resLake_PP_deposition_tmp
                         self.var.resLake_mass[3, :] = self.var.resLake_mass[3, :] - resLake_inactiveP_deposition_tmp
-                     
-                        onlyLakesRetention = np.compress(self.var.compress_LR, np.where(self.var.waterBodyTypTemp > 0, self.var.avg_channelLake_P_retention, 0.))
+                    
+                    
+                    ## TEST DF##
+                    #chanel_PP_deposition = self.var.channel_PP * (1 - divideValues(self.var.channel_sed, preChannel_sed))
+                    #chanel_inactiveP_deposition = self.var.channel_inactiveP * (1 - divideValues(self.var.channel_sed, preChannel_sed))
 
+                    #self.var.channel_PP -= chanel_PP_deposition
+                    #self.var.channel_inactiveP -= chanel_inactiveP_deposition
+                   
+                    self.var.channelLake_P_retention = self.model.waterquality_module.waterquality_p.dynamic_P_retention()
+                    self.var.avg_channelLake_P_retention += self.var.channelLake_P_retention / self.var.noRoutingSteps
+                      
+                    if checkOption('includeWaterBodies'):
+                        onlyLakesRetention = np.compress(self.var.compress_LR, np.where(self.var.waterBodyTypTemp > 0, self.var.avg_channelLake_P_retention, 0.))
+                        
                         self.var.avg_channelLake_P_retention = np.where(self.var.waterBodyTypTemp > 0, 0., self.var.avg_channelLake_P_retention)
                         
                         # CALCULATE AND UPDATE - RESLAKE RETENTION
@@ -882,9 +895,9 @@ class routing_kinematic(object):
 
                     # CALCULATE AND UPDATE - CHANNEL RETENTION
                     channel_P_retention_tmp = np.minimum(self.var.channel_P * self.var.avg_channelLake_P_retention  / self.var.noRoutingSteps, self.var.channel_P / self.var.noRoutingSteps)
-                    channel_PP_retention_tmp= np.minimum(self.var.channel_PP * self.var.avg_channelLake_P_retention / self.var.noRoutingSteps, self.var.channel_PP / self.var.noRoutingSteps)
-                    channel_inactiveP_retention_tmp= np.minimum(self.var.channel_inactiveP * self.var.avg_channelLake_P_retention / self.var.noRoutingSteps, self.var.channel_inactiveP / self.var.noRoutingSteps)
-                  
+                    channel_PP_retention_tmp= np.minimum(self.var.channel_PP * self.var.avg_channelLake_P_retention / self.var.noRoutingSteps, self.var.channel_PP / self.var.noRoutingSteps) # chanel_PP_deposition + 
+                    channel_inactiveP_retention_tmp= np.minimum(self.var.channel_inactiveP * self.var.avg_channelLake_P_retention / self.var.noRoutingSteps, self.var.channel_inactiveP / self.var.noRoutingSteps) # chanel_inactiveP_deposition + 
+                                          
                     self.var.channel_P_retention += channel_P_retention_tmp
                     self.var.channel_PP_retention += channel_PP_retention_tmp
                     self.var.channel_inactiveP_retention += channel_inactiveP_retention_tmp
@@ -892,10 +905,11 @@ class routing_kinematic(object):
                     self.var.channel_P -= channel_P_retention_tmp
                     self.var.channel_PP -= channel_PP_retention_tmp
                     self.var.channel_inactiveP -= channel_inactiveP_retention_tmp
+
                     
-            
             # SORPTION/DE-SORPTION RES/LAKE
             #TDP, PP, Mss, Kf_w, n_w, v, t
+          
                     if checkOption('includeWaterBodies'):
                         resLake_P_tmp = self.var.resLake_mass[1, :].copy()
                         resLake_PP_tmp = self.var.resLake_mass[2, :].copy()
@@ -903,7 +917,7 @@ class routing_kinematic(object):
                         
                         resLake_P_tmp, resLake_PP_tmp, EPC0t_lake = self.model.waterquality_module.waterquality_p.dynamic_channel_sorption(TDP = resLake_P_tmp,\
                             PP = resLake_PP_tmp, Mss = resLake_sed_tmp, Kf_w = np.compress(self.var.compress_LR, self.var.kf_water),\
-                            n_w = np.compress(self.var.compress_LR, self.var.n_water), v =  volResLake, t = self.var.noRoutingSteps)
+                            n_w = np.compress(self.var.compress_LR, self.var.n_water), v =  self.var.lakeResStorageC, t = self.var.noRoutingSteps)
                         
                         #print((np.compress(self.var.compress_LR, self.var.resLake_P) + np.compress(self.var.compress_LR, self.var.resLake_PP)) - resLake_Psmall - resLake_PPsmall)
                         EPC0t_lakeBig = globals.inZero.copy()
@@ -920,14 +934,14 @@ class routing_kinematic(object):
                     self.var.channel_P, self.var.channel_PP, EPC0t_w = self.model.waterquality_module.waterquality_p.dynamic_channel_sorption(TDP = self.var.channel_P,\
                         PP = self.var.channel_PP, Mss = self.var.channel_sed, Kf_w = self.var.kf_water, n_w = self.var.n_water, v =  self.var.substepChannelStorage, t = self.var.noRoutingSteps)
                     self.var.EPC0_w += EPC0t_w / self.var.noRoutingSteps
-
+            
         # -- end substeping ---------------------
         
-
+        minDischarge = 1
         if self.var.includeWaterQuality:
             if self.var.includeErosed: 
                 # sediment channel concentration [kg / m3]
-                self.var.channel_sedConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_sed, self.var.channelStorage), 0.)
+                self.var.channel_sedConc = np.where(self.var.channelStorage > minDischarge, divideValues(self.var.channel_sed, self.var.channelStorage), 0.)
                 if checkOption('includeWaterBodies'):
                     np.put(self.var.resLake_sed, self.var.decompress_LR, self.var.resLake_mass[0, :])
                     # sediment Lake concentration [mg / l]
@@ -938,14 +952,18 @@ class routing_kinematic(object):
                     np.put(self.var.resLake_sed_depostion, self.var.decompress_LR, resLake_sed_depostion_LR)
 
             if self.var.includePhosphorus:
-                # channel TDP concentration [mg / l]
-                self.var.channel_PConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
                 
-                # channel PP concentration [mg /  l]       
-                self.var.channel_PPConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_PP, self.var.channelStorage), 0.) * 10**3 
+                # channel TDP concentration [mg / l]
+                self.var.channel_P = np.where(self.var.channelStorage > minDischarge, self.var.channel_P, 0.)
+                self.var.channel_PConc = np.where(self.var.channelStorage > minDischarge, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
+                
+                # channel PP concentration [mg /  l]   
+                self.var.channel_PP = np.where(self.var.channelStorage > minDischarge, self.var.channel_PP, 0.)                
+                self.var.channel_PPConc = np.where(self.var.channelStorage > minDischarge, divideValues(self.var.channel_PP, self.var.channelStorage), 0.) * 10**3 
                 
                 # channel inactivePConc entration [mg /  l]  
-                self.var.channel_inactivePConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_inactiveP, self.var.channelStorage), 0.) * 10**3 
+                self.var.channel_inactiveP = np.where(self.var.channelStorage > minDischarge, self.var.channel_inactiveP, 0.)
+                self.var.channel_inactivePConc = np.where(self.var.channelStorage > minDischarge, divideValues(self.var.channel_inactiveP, self.var.channelStorage), 0.) * 10**3 
                 
                 #self.var.channel_PPConc = np.where(self.var.channelStorage > 1, divideValues(self.var.channel_PP, self.var.channel_sed), 0.) * 10**6 
                 
