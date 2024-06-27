@@ -175,6 +175,9 @@ class waterquality_erosed(object):
         self.var.industry_sed_Abstracted = globals.inZero.copy()
         self.var.irrigation_sed_Abstracted = globals.inZero.copy()
         self.var.returnflowIrr_sed = globals.inZero.copy()
+        
+        # Sediment loss depth (mm)         
+        self.var.sedimentLossDepth_mm = globals.inZero.copy()
 
         # instream routing
         # channel erodibility factor
@@ -219,24 +222,28 @@ class waterquality_erosed(object):
         
         self.waterquality_vars.dynamic()  # TO FIX
         directRunoff_m3sec = self.var.directRunoff[0:4] * self.var.cellArea / self.var.DtSec
-        runoffm3s = self.var.runoff * self.var.cellArea / self.var.DtSec
-
+        #runoffm3s = self.var.runoff * self.var.cellArea / self.var.DtSec
+        
+        runoffm3s = self.var.sum_directRunoff * self.var.cellArea / self.var.DtSec
         self.var.directRunoff_mm = self.var.directRunoff[0:4] * 1000
         
 
 
         #tov = divideArrays(np.power(self.var.lsFactor, 0.6) * np.power(self.var.manOverland, 0.6),
         #                  18 * np.power(self.var.tanslope, 0.3))
-        vov = divideArrays(np.power(runoffm3s, 0.4)*np.power(self.var.tanslope, 0.3), np.power(self.var.manOverland, 0.6))
+        vov = divideArrays(np.power(runoffm3s, 0.4) * np.power(self.var.tanslope, 0.3), np.power(self.var.manOverland, 0.6))
 
-        tov = divideArrays(self.var.lsFactor * np.power(self.var.manOverland, 0.6),
-                           3600 * np.power(self.var.directRunoff_mm, 0.4) * np.power(self.var.tanslope, 0.3))
-        tov2 = divideArrays(self.var.slopelength, 3600 * vov)
+        #tov = divideArrays(self.var.lsFactor * np.power(self.var.manOverland, 0.6),
+        #                   3600 * np.power(self.var.directRunoff_mm, 0.4) / self.var.DtSec * np.power(self.var.tanslope, 0.3))
+        tov = divideArrays(self.var.slopelength, 3600 * vov)
         
         
         #tov2 = divideArrays(np.power(self.var.slopelength, 0.6))
         
         tch = self.var.travelTime / 3600  # converted from seconds to hours
+        
+        #print('mean tch: ', np.nanmean(tch), ' max tch: ', np.nanmax(tch), ' median tch: ', np.median(tch))
+        #print('mean tov: ', np.nanmean(tov), ' max tov: ', np.nanmax(tov), ' median tov: ', np.median(tov))
         self.var.tconc = tov + tch  # [hours]
         
         # a05 load dummy value: fraction of daily rain falling in the half-hour highest intensity
@@ -249,10 +256,15 @@ class waterquality_erosed(object):
         # qpeak: peak runoffrate m3/s
         self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff_mm[0:4] * self.var.cellArea,
                                       3600. * self.var.tconc)  # [m3s-1]
-
+        
+      
         # MUSLE: sediment yield per day and grid in [1000 kg]
         self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
-
+        
+        # calculate depth of soil loss (mm)
+        self.var.sedimentLossDepth_mm = divideValues(self.var.sedYieldLand * np.tile(self.var.soildepth[0], (4, 1)), np.tile(self.var.cellArea,  (4, 1)))
+        
+        
         # self.var.sedYieldLand_sum = np.nansum(self.var.fracVegCover[0:4]*self.var.sedYieldLand, axis=0)
         erosedVarsSum = ['sedYieldLand', 'channel_sed', 'channel_sedConc']
         for variable in erosedVarsSum:
@@ -264,6 +276,7 @@ class waterquality_erosed(object):
             np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),
             0.)
         
+        
         # as an output variable
         self.var.sum_sedYieldLand_tonha =  divideValues(self.var.sum_sedYieldLand, self.var.cellArea * 0.0001)
 
@@ -272,26 +285,3 @@ class waterquality_erosed(object):
         if checkOption('includeWaterBodies'):
             self.var.lakeResOutflowM3s = self.var.lakeResOutflowM * self.var.cellArea / 86400
             self.var.detentionTime = self.var.lakeResStorage / self.var.lakeResOutflowM3s
-
-
-
-
-        erosed_debug = False
-        if erosed_debug:
-            #print('runoffm3s', np.nansum(runoffm3s), 'runoffmin', np.nanmin(runoffm3s) , 'runoffmax', np.nanmax(runoffm3s))
-            #print('runoffm3s', np.nanmean(directRunoff_m3sec), 'runoffmin', np.nanmin(directRunoff_m3sec) , 'runoffmax', np.nanmax(directRunoff_m3sec))
-            #print('directRunoffm', self.var.directRunoff)
-            #print('directRunoffmm', directRunoff_mm)
-            #print('vov', np.nanmean(vov), 'vovmin', np.nanmin(vov) , 'vovmax', np.nanmax(vov))
-            #print('Tov', np.nanmean(tov), 'tovmin', np.nanmin(tov) , 'tovmax', np.nanmax(tov))
-            #print('Tov2', np.nanmean(tov2), 'tov2min', np.nanmin(tov2) , 'tov2max', np.nanmax(tov))
-            #print('maxtimerunoff', np.nanmean(self.var.maxtime_runoff_conc))
-            #print('tchmean', np.nanmean(tch), 'tchmin', np.nanmin(tch), 'tchmax',np.nanmax(tch))
-            #print('tconcmean', np.nanmean(self.var.tconc), 'tconcmin', np.nanmin(self.var.tconc), 'tconcmax', np.nanmax(self.var.tconc))
-            print(np.nanmean(self.var.detentionTime/86400), np.nanmin(self.var.detentionTime/86400), np.nanmax(self.var.detentionTime/86400))
-            ### Stop run at step 282 - for debugging purposes
-            if (dateVar['curr'] == 150):
-               ii=1
-
-        
-
