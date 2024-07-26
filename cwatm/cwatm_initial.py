@@ -1,13 +1,12 @@
 # -------------------------------------------------------------------------
 # Name:       CWATM Initial
-# Purpose:
-#
+# Purpose: 
 # Author:      PB
 #
 # Created:     16/05/2016
 # Copyright:   (c) PB 2016
 # -------------------------------------------------------------------------
-# water quality test change
+
 from cwatm.hydrological_modules.miscInitial import miscInitial
 from cwatm.hydrological_modules.initcondition import initcondition
 
@@ -31,7 +30,10 @@ from cwatm.hydrological_modules.waterbalance import waterbalance
 from cwatm.hydrological_modules.environflow import environflow
 from cwatm.hydrological_modules.routing_reservoirs.routing_kinematic import routing_kinematic
 from cwatm.hydrological_modules.lakes_reservoirs import lakes_reservoirs
-from cwatm.hydrological_modules.waterquality1 import waterquality1
+#from cwatm.hydrological_modules.waterquality1 import waterquality1
+
+from cwatm.hydrological_modules.water_quality.waterquality_main import water_quality
+
 
 from cwatm.management_modules.output import *
 from cwatm.management_modules.data_handling import *
@@ -123,11 +125,12 @@ class CWATModel_ini(DynamicModel):
         self.lakes_res_small_module = lakes_res_small(self)
         self.routing_kinematic_module = routing_kinematic(self)
         self.lakes_reservoirs_module = lakes_reservoirs(self)
-        self.waterquality1 = waterquality1(self)
+        #self.waterquality1 = waterquality1(self)
+        self.waterquality_module = water_quality(self)
         self.waterbalance = waterbalance(self)
 
         # ----------------------------------------
-
+            
         # reading of the metainformation of variables to put into output netcdfs
         metaNetCDF()
 
@@ -162,12 +165,15 @@ class CWATModel_ini(DynamicModel):
 
         self.runoff_concentration_module.initial()
         self.lakes_res_small_module.initial()
-
+          
         self.routing_kinematic_module.initial()
         if checkOption('includeWaterBodies'):
             self.lakes_reservoirs_module.initWaterbodies()
             self.lakes_reservoirs_module.initial_lakes()
             self.lakes_reservoirs_module.initial_reservoirs()
+        
+        self.waterquality_module.initial()
+        
 
         self.waterdemand_module.initial()
         self.waterbalance_module.initial()
@@ -175,6 +181,5 @@ class CWATModel_ini(DynamicModel):
 
         self.output_module.initial()
         self.environflow_module.initial()
-        self.waterquality1.initial()
-
+        
 

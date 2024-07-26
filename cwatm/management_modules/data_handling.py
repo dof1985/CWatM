@@ -1231,7 +1231,9 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     else:
         name = cbinding(namebinding)
     filename =  os.path.normpath(name)
-
+    
+    if cut:
+        cut0, cut1, cut2, cut3 = mapattrNetCDF(filename, check = False)
 
     try:
        nf1 = Dataset(filename, 'r')
@@ -1260,7 +1262,7 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
         else:
             if useDaily == "yearly":
                 date = datetime.datetime(date.year, int(1), int(1))
-#             if useDaily == "monthly":
+            if useDaily == "monthly":
                 date = datetime.datetime(date.year, date.month, int(1))
 
             # A netCDF time variable object  - time index (in the netCDF file)
@@ -1275,7 +1277,6 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
             else:
                 #idx = date2index(date, nctime, calendar=nctime.calendar, select='exact')
                 idx = date2indexNew(date, nctime, calendar=nctime.calendar, select='nearest', name = name)
-
             if meteo: inputcounter[value] = idx
 
 
@@ -1288,6 +1289,7 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
            mapnp = np.flipud(mapnp)
     except:
        ii = 1
+
     if 'Glacier' in namebinding:
         cutcheckmask = maskinfo['shape'][0] * maskinfo['shape'][1]
         cutcheckmap = nf1.variables[value].shape[1] * nf1.variables[value].shape[2]
@@ -1299,9 +1301,12 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
             if checkOption('maps_cut_individually'):
                 cutmap[0], cutmap[1], cutmap[2], cutmap[3] = mapattrNetCDF(name)
         if turn_latitude:
-            mapnp = mapnp[cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]]
+            #mapnp = mapnp[cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]]
+            mapnp = mapnp[cut2:cut3, cut0:cut1]
+            
         else:
-            mapnp = nf1.variables[value][idx, cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]].astype(np.float64)
+            #mapnp = nf1.variables[value][idx, cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]].astype(np.float64)
+            mapnp = nf1.variables[value][idx, cut2:cut3, cut0:cut1].astype(np.float64)
     else:
         if not(turn_latitude):
             mapnp = nf1.variables[value][idx].astype(np.float64)
@@ -1320,10 +1325,11 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     if maskinfo['shapeflat'][0]!= mapnp.size:
         msg = "Error 110: " + name + " has less or more valid pixels than the mask map \n"
         raise CWATMWarning(msg)
-
+    
     mapC = compressArray(mapnp, name=filename)
     if Flags['check']:
         checkmap(value, filename, mapnp, True, True, mapC)
+    
     return mapC
 
 
@@ -2055,6 +2061,26 @@ def divideValues(x,y, default = 0.):
     y1[y1 == 0.] = 1.0
     z = x / y1
     z[y == 0.] = default
+
+    #with np.errstate(invalid='ignore', divide='ignore'):
+    #    z = np.where(y > 0., x/y, default)
+    # have to solve this without err handler to get the error message back
+
+    return z
+    
+def divideArrays(x,y, default = 0.):
+    """
+    returns the result of a division that possibly involves a zero
+
+    :param x:
+    :param y: divisor
+    :param default: return value if y =0
+    :return: result of :math:`x/y` or default if y = 0
+    """
+    y1 = y.copy()
+    y1[y1 == 0.] = 1.0
+    z = x / y1
+    z * np.where(y == 0., default, 1.)
 
     #with np.errstate(invalid='ignore', divide='ignore'):
     #    z = np.where(y > 0., x/y, default)

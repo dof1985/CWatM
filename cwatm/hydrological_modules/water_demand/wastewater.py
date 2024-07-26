@@ -295,6 +295,7 @@ class waterdemand_wastewater(object):
         
         ### Extensive WWTP ####
         # Identify extensive systems - if timeLag >= 2
+
         self.var.extensive = self.var.wwtTimeC >= 2
         # number of days to fill a treatement pool in extensive systems - default no. of pools: 3
         self.var.noPools_extensive = 3

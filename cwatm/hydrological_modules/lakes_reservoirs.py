@@ -434,6 +434,7 @@ class lakes_reservoirs(object):
 
             if checkOption('calcWaterBalance'):
                 self.var.lakedaycorrect = globals.inZero.copy()
+                
 
             self.var.reservoir_releases_excel_option = False
             if 'reservoir_releases_in_Excel_settings' in option:
@@ -581,7 +582,7 @@ class lakes_reservoirs(object):
                     self.var.waterBodyTypCTemp = np.where((self.var.resYearC > year) & (self.var.waterBodyTypC == 3), 1,
                                                           self.var.waterBodyTypCTemp)
                     # we also need the uncompressed version to compute leakage
-                    if self.var.modflow or self.var.includeType4:
+                    if self.var.modflow or self.var.includeType4 or self.var.includeWaterQuality:
                         self.var.waterBodyTypTemp = np.where((self.var.resYear > year) & (self.var.waterBodyTyp == 2),
                                                              0, self.var.waterBodyTyp)
                         self.var.waterBodyTypTemp = np.where((self.var.resYear > year) & (self.var.waterBodyTyp == 4),
@@ -920,7 +921,8 @@ class lakes_reservoirs(object):
         # calculate total inflow into lakes and compress it to waterbodie outflow point
         # inflow to lake is discharge from upstream network + runoff directly into lake + outflow from upstream lakes
         inflowC = np.compress(self.var.compress_LR, inflow)
-
+        if self.var.includeWaterQuality:
+            self.var.inflowC_LR = inflowC.copy()
         # ------------------------------------------------------------
         self.var.resEvapWaterBodyC = globals.inZero.copy()
         outflowLakesC = dynamic_inloop_lakes(inflowC, NoRoutingExecuted)

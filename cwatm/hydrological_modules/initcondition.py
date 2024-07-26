@@ -163,7 +163,25 @@ class initcondition(object):
 
 		Reads the parameter *save_initial* and *save_initial* to know if to save or load initial values
         """
+        ### Check Options - all modules ###
+        
+        # Water Quality ####
+        self.var.includeWaterQuality =  False
+        if 'includeWaterQuality' in option:
+            self.var.includeWaterQuality =  checkOption('includeWaterQuality')
+            # Sediment, P (TDP, PP, inactive)
+            self.var.n_fluxes = 4
+        if self.var.includeWaterQuality:
+            # Phosphorus, EroSed
+            self.var.includePhosphorus = False
+            self.var.includeErosed = False
+            
+            if 'includePhosphorus' in binding:
+                self.var.includePhosphorus = returnBool('includePhosphorus')
 
+            if 'includeErosed' in binding:
+                self.var.includeErosed = returnBool('includeErosed')
+                
         # list all initiatial variables
         # Snow & Frost
         number = int(loadmap('NumberSnowLayers'))
@@ -279,7 +297,31 @@ class initcondition(object):
                 Var2 = ["smalllakeInflowOld","smalllakeVolumeM3","smalllakeOutflow"]
                 initCondVar.extend(Var1)
                 initCondVarValue.extend(Var2)
-
+        
+        # Water quality
+        if self.var.includeWaterQuality:
+            # Erosed - Sediment delivery
+            if self.var.includeErosed:
+                Var1 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc"]
+                Var2 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc"]
+                initCondVar.extend(Var1)
+                initCondVarValue.extend(Var2)
+            # Phosphorus
+            if self.var.includePhosphorus:
+                Var1 = ["channel_P", "channel_PP", "channel_inactiveP", "channel_PConc", "channel_PPConc", "channel_inactivePConc",\
+                        "resLake_P", "resLake_PP", "resLake_inactiveP", "resLake_PConc", "resLake_PPConc", "resLake_inactivePConc"]
+                Var2 = ["channel_P", "channel_PP", "channel_inactiveP", "channel_PConc", "channel_PPConc", "channel_inactivePConc",\
+                        "resLake_P", "resLake_PP", "resLake_inactiveP", "resLake_PConc", "resLake_PPConc", "resLake_inactivePConc"]
+                soil_vars = ["soil_P_inactive1", "soil_P_inactive2", "soil_P_inactive3", "soil_P_labile1", "soil_P_labile2",\
+                    "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]
+                for lc_idx in range(4):
+                    for var in soil_vars:
+                       Var1.append(var + '_' + str(lc_idx))
+                       Var2.append(var + '[' + str(lc_idx)+ ']')
+                       
+                initCondVar.extend(Var1)
+                initCondVarValue.extend(Var2)
+        
         if 'reservoir_transfers' in option:
             if checkOption('reservoir_transfers'):
                 if 'Excel_settings_file' in binding:

@@ -244,12 +244,13 @@ elif platform1 == "CYGWIN_NT-6.1":
     dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5cyg.so")
 elif platform1 == "Darwin":
     # Apple
-    dll_routing = os.path.join(os.path.split(path_global)[0], "hydrological_modules", "routing_reservoirs",
-                                   "t5_mac.so")
+    
+    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5_mac.so")
 
 else:
     print("Linux\n")
-    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5_linux.so")
+    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5_mac.dylib")
+#dll_routing = "/Users/sorger/Library/CloudStorage/OneDrive-IIASA/GitHub/wq_dev/cwatm/hydrological_modules/routing_reservoirs"
 
 #dll_routing = "C:/work2/test1/t4.dll"
 lib2 = ctypes.cdll.LoadLibrary(dll_routing)

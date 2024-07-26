@@ -502,7 +502,7 @@ class water_demand:
                 if 'reservoir_command_areas' in binding:
                     self.var.load_command_areas = True
 
-                if 'reservoir_command_areas_restricted' in binding:
+                if 'reservoir_command_areas_restricted' in binding and self.var.includeWastewater:
                     self.var.load_command_areas_wwt = True
 
                 if self.var.modflow and 'Water_conveyance_efficiency' in binding:
@@ -685,17 +685,17 @@ class water_demand:
             self.var.Lift_Industry = globals.inZero.copy()
             self.var.Lift_Livestock = globals.inZero.copy()
             self.var.Lift_Irrigation = globals.inZero.copy()
-            
-            self.var.wwt_Domestic = globals.inZero.copy()
-            self.var.wwt_Industry = globals.inZero.copy()
-            self.var.wwt_Livestock = globals.inZero.copy()
-            self.var.wwt_Irrigation = globals.inZero.copy()
 
             self.var.Lake_Domestic = globals.inZero.copy()
             self.var.Lake_Industry = globals.inZero.copy()
             self.var.Lake_Livestock = globals.inZero.copy()
             self.var.Lake_Irrigation = globals.inZero.copy()
 
+            self.var.wwt_Domestic = globals.inZero.copy()
+            self.var.wwt_Industry = globals.inZero.copy()
+            self.var.wwt_Livestock = globals.inZero.copy()
+            self.var.wwt_Irrigation = globals.inZero.copy()
+            
             self.var.Res_Domestic = globals.inZero.copy()
             self.var.Res_Industry = globals.inZero.copy()
             self.var.Res_Livestock = globals.inZero.copy()
@@ -706,8 +706,8 @@ class water_demand:
             self.var.GW_Livestock = globals.inZero.copy()
             self.var.GW_Irrigation = globals.inZero.copy()
             self.var.abstractedLakeReservoirM3 = globals.inZero.copy()
-
             self.var.swAbstractionFraction_domestic = 1 + globals.inZero.copy()
+            
             self.var.ind_efficiency = 1.
             self.var.dom_efficiency = 1.
             self.var.liv_efficiency = 1
@@ -803,6 +803,11 @@ class water_demand:
             self.var.Lake_Industry = globals.inZero.copy()
             self.var.Lake_Livestock = globals.inZero.copy()
             self.var.Lake_Irrigation = globals.inZero.copy()
+            
+            self.var.wwt_Domestic = globals.inZero.copy()
+            self.var.wwt_Industry = globals.inZero.copy()
+            self.var.wwt_Livestock = globals.inZero.copy()
+            self.var.wwt_Irrigation = globals.inZero.copy()
 
             self.var.Res_Domestic = globals.inZero.copy()
             self.var.Res_Industry = globals.inZero.copy()
@@ -1505,6 +1510,8 @@ class water_demand:
 
                 minlake = np.maximum(0., 0.98 * lakeResStorageC)  # reasonable but arbitrary limit
                 act_bigLakeAbstC = np.minimum(minlake, remainNeedBigC)
+                if self.var.includeWaterQuality:
+                    self.var.act_bigLakeAbstC = act_bigLakeAbstC.copy() * self.var.MtoM3C
                 # substract from both, because it is sorted by self.var.waterBodyTypCTemp
                 self.var.lakeStorageC = self.var.lakeStorageC - act_bigLakeAbstC * self.var.MtoM3C
                 self.var.lakeVolumeM3C = self.var.lakeVolumeM3C - act_bigLakeAbstC * self.var.MtoM3C
