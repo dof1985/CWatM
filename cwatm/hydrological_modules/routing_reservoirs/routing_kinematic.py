@@ -526,9 +526,9 @@ class routing_kinematic(object):
                 self.var.channel_sedDeg = globals.inZero.copy()
                 channel_sed_Abstracted_Dt  = self.var.channel_sed_Abstracted / self.var.noRoutingSteps
                 returnflowIrr_sed_Dt = self.var.returnflowIrr_sed /  self.var.noRoutingSteps
-                self.var.resLake_sed_depostion = globals.inZero.copy()
+                self.var.resLake_sed_deposition = globals.inZero.copy()
                 if checkOption('includeWaterBodies'):
-                    resLake_sed_depostion_LR = np.compress(self.var.compress_LR, self.var.resLake_sed_depostion)
+                    resLake_sed_depostion_LR = np.compress(self.var.compress_LR, self.var.resLake_sed_deposition)
                 
             if self.var.includePhosphorus:
                 self.var.resLakeOutflow_P = globals.inZero.copy()
@@ -946,10 +946,16 @@ class routing_kinematic(object):
                     np.put(self.var.resLake_sed, self.var.decompress_LR, self.var.resLake_mass[0, :])
                     # sediment Lake concentration [mg / l]
                     self.var.resLake_sedConc = divideValues(self.var.resLake_sed, self.var.lakeResStorage) * 10**3
+                    # creating a map showing sedConc in channels and lakes
+                    lakeResOutflowsedConc = npareatotal(self.var.resLake_sedConc, self.var.waterBodyID)
+                    # if a lake or reservoir present, put value of resLake, else put channel value
+                    self.var.channel_sedConc = np.where(self.var.waterBodyID > 0, lakeResOutflowsedConc,
+                                                      self.var.channel_sedConc)
                     # uncompress inflow sediment
                     np.put(self.var.resLakeInflow_sed, self.var.decompress_LR, sumresLake_sed_inflow)
                     # uncompress sediment deposition in lakes
-                    np.put(self.var.resLake_sed_depostion, self.var.decompress_LR, resLake_sed_depostion_LR)
+                    np.put(self.var.resLake_sed_deposition, self.var.decompress_LR, resLake_sed_depostion_LR)
+
 
             if self.var.includePhosphorus:
                 
@@ -990,7 +996,7 @@ class routing_kinematic(object):
                     lakeResOutflowPConc = npareatotal(self.var.resLake_PConc, self.var.waterBodyID)
                     lakeResOutflowPPConc = npareatotal(self.var.resLake_PPConc, self.var.waterBodyID)
                     lakeResOutflowPInactiveConc = npareatotal(self.var.resLake_inactivePConc, self.var.waterBodyID)
-                    
+
                     self.var.channel_PConc = np.where(self.var.waterBodyID > 0, lakeResOutflowPConc, self.var.channel_PConc)
                     self.var.channel_PPConc = np.where(self.var.waterBodyID > 0, lakeResOutflowPPConc, self.var.channel_PPConc)
                     self.var.channel_inactivePConc = np.where(self.var.waterBodyID > 0, lakeResOutflowPInactiveConc, self.var.channel_inactivePConc)
