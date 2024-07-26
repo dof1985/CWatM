@@ -1,3 +1,2 @@
-call conda activate cwatm
-python ../../../../run_cwatm.py %run -l
+python ..\..\..\..\run_cwatm.py %run -l
 

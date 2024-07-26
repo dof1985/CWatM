@@ -134,11 +134,8 @@ ParamRanges = pandas.read_csv(ParamRangesPath,sep=",",index_col=0)
 # ar = np.recfromcsv('example.csv'), my_data = genfromtxt('my_file.csv', delimiter=',')
 
 # Load observed streamflow
-streamflow_data = pandas.read_csv(Qtss_csv,sep=",", dayfirst=True, parse_dates=True,
-								  index_col=0, header = None, skiprows = 1,
-								  names=['Date', 'Observation'])
-
-observed_streamflow = streamflow_data['Observation']
+streamflow_data = pandas.read_csv(Qtss_csv,sep=",", parse_dates=True, index_col=0)
+#observed_streamflow = streamflow_data['lobith']
 #observed_streamflow = streamflow_data[Qtss_col]
 observed_streamflow = streamflow_data.values.astype(np.float32)
 observed_streamflow[observed_streamflow<-9000]= np.nan
@@ -220,7 +217,6 @@ def RunModel(Individual):
 			if use_multiprocessing == 0:
 				template_bat_new = template_bat_new.split()[0] + " " + template_bat_new.split()[1] + " " + template_bat_new.split()[2] + " -l"
 		f = open(runfile, "w")
-		os.chmod(runfile, 0o744)
 		f.write(template_bat_new)
 		f.close()
 
@@ -369,10 +365,10 @@ if __name__ == "__main__":
 			population[0][-1] = 0.
 
 
-	effmax = np.zeros(shape=(ngen+1,1))*np.nan
-	effmin = np.zeros(shape=(ngen+1,1))*np.nan
-	effavg = np.zeros(shape=(ngen+1,1))*np.nan
-	effstd = np.zeros(shape=(ngen+1,1))*np.nan
+	effmax = np.zeros(shape=(ngen+1,1))*np.NaN
+	effmin = np.zeros(shape=(ngen+1,1))*np.NaN
+	effavg = np.zeros(shape=(ngen+1,1))*np.NaN
+	effstd = np.zeros(shape=(ngen+1,1))*np.NaN
 	if startlater == False:
 		halloffame = tools.ParetoFront()
 
@@ -493,7 +489,7 @@ if __name__ == "__main__":
 
 	# Convert the scaled parameter values of halloffame ranging from 0 to 1 to unscaled parameter values
 	paramvals = np.zeros(shape=(len(halloffame),len(halloffame[0])))
-	paramvals[:] = np.nan
+	paramvals[:] = np.NaN
 	for kk in range(len(halloffame)):
 		for ii in range(len(ParamRanges)):
 			paramvals[kk][ii] = halloffame[kk][ii]*(float(ParamRanges.iloc[ii,1])-float(ParamRanges.iloc[ii,0]))+float(ParamRanges.iloc[ii,0])
@@ -543,7 +539,6 @@ if __name__ == "__main__":
 		else:
 			runfile = runfile + ".sh"
 		f = open(runfile, "w")
-		os.chmod(runfile, 0o744)
 		f.write(template_bat_new)
 		f.close()
 
