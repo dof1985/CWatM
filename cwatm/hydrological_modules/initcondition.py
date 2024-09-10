@@ -146,8 +146,11 @@ class initcondition(object):
         self.var.includeWaterQuality =  False
         if 'includeWaterQuality' in option:
             self.var.includeWaterQuality =  checkOption('includeWaterQuality')
-            # Sediment, P (TDP, PP, inactive)
-            self.var.n_fluxes = 4
+            # Sediment, P (TDP, PP)
+            self.var.n_fluxes = 3
+            self.var.sed_idx = 0
+            self.var.TDP_idx = 1
+            self.var.PP_idx = 2
         if self.var.includeWaterQuality:
             # Phosphorus, EroSed
             self.var.includePhosphorus = False

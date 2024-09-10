@@ -183,8 +183,14 @@ class waterquality_erosed(object):
         # instream routing
         # channel erodibility factor
         self.var.Kch = globals.inZero.copy() + 0.008
+        if 'channel_erodibility' in binding:
+            self.var.Kch = globals.inZero.copy() + loadmap('channel_erodibility')
+            
         # channel cover factor
         self.var.Cch = globals.inZero.copy() + 0.9
+        if 'channel_cover' in binding:
+            self.var.Cch = globals.inZero.copy() + loadmap('channel_cover')
+        
         # peak runoff factor
         self.var.prf = globals.inZero.copy() + loadmap('prf')
         # csp

@@ -147,8 +147,8 @@ class CWATModel_dyn(DynamicModel):
         
         if self.var.includeWaterQuality:
             if self.var.includePhosphorus:
-                self.var.channel_TP = self.var.channel_P + self.var.channel_PP + self.var.channel_inactiveP
-                self.var.resLake_TP = self.var.resLake_P + self.var.resLake_PP + self.var.resLake_inactiveP
+                self.var.channel_TP = self.var.channel_P + self.var.channel_PP #+ self.var.channel_inactiveP
+                self.var.resLake_TP = self.var.resLake_P + self.var.resLake_PP #+ self.var.resLake_inactiveP
                 self.var.channel_TPConc = np.where(self.var.channelStorage > 10, divideValues(self.var.channel_TP, self.var.channelStorage), 0.) * 10**3
                 self.var.channel_TDPConc = np.where(self.var.channelStorage > 10, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
                 if checkOption('includeWaterBodies'):
