@@ -292,7 +292,8 @@ class initcondition(object):
                         "resLake_P", "resLake_PP", "resLake_PConc", "resLake_PPConc"]
                 Var2 = ["channel_P", "channel_PP", "channel_PConc", "channel_PPConc",\
                         "resLake_P", "resLake_PP", "resLake_PConc", "resLake_PPConc"]
-                soil_vars = ["soil_P_labile1", "soil_P_labile2", "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]
+                soil_vars = ["soil_P_inactive1", "soil_P_inactive2", "soil_P_inactive3",\
+                            "soil_P_labile1", "soil_P_labile2", "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]
                 for lc_idx in range(4):
                     for var in soil_vars:
                        Var1.append(var + '_' + str(lc_idx))
