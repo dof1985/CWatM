@@ -288,12 +288,11 @@ class initcondition(object):
                 initCondVarValue.extend(Var2)
             # Phosphorus
             if self.var.includePhosphorus:
-                Var1 = ["channel_P", "channel_PP", "channel_inactiveP", "channel_PConc", "channel_PPConc", "channel_inactivePConc",\
-                        "resLake_P", "resLake_PP", "resLake_inactiveP", "resLake_PConc", "resLake_PPConc", "resLake_inactivePConc"]
-                Var2 = ["channel_P", "channel_PP", "channel_inactiveP", "channel_PConc", "channel_PPConc", "channel_inactivePConc",\
-                        "resLake_P", "resLake_PP", "resLake_inactiveP", "resLake_PConc", "resLake_PPConc", "resLake_inactivePConc"]
-                soil_vars = ["soil_P_inactive1", "soil_P_inactive2", "soil_P_inactive3", "soil_P_labile1", "soil_P_labile2",\
-                    "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]
+                Var1 = ["channel_P", "channel_PP", "channel_PConc", "channel_PPConc",\
+                        "resLake_P", "resLake_PP", "resLake_PConc", "resLake_PPConc"]
+                Var2 = ["channel_P", "channel_PP", "channel_PConc", "channel_PPConc",\
+                        "resLake_P", "resLake_PP", "resLake_PConc", "resLake_PPConc"]
+                soil_vars = ["soil_P_labile1", "soil_P_labile2", "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]
                 for lc_idx in range(4):
                     for var in soil_vars:
                        Var1.append(var + '_' + str(lc_idx))
