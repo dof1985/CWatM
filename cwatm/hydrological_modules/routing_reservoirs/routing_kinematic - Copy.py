@@ -189,10 +189,15 @@ class routing_kinematic(object):
         #                   list(int64, 1), int32(375), int64(375), boolean
 
         j = 1
+        #maxTravel = np.max(gridCellTraveled)
         #while (gridCellTraveled > 0).any():
         while (np.max(gridCellTraveled) > 0):
             # routing of wq mass fluxes as long as water is routed
             fracDown = np.maximum(np.where(gridCellTraveled < 1, gridCellTraveled, 1.), 0.)
+
+            #self.routeMassDown2(channel, resLakeInflowTmp, outlet, x=tmp_massStock, a=fracDown, outletid=outletID,
+            #                    lakesCond=resLakeInflowCondition, down=downdirID)
+            #def routeMassDown2(self, tmp_x, resLakeInflowTmp, outlet, x, a, outletid, lakesCond, down):
 
             channel.fill(0)
 
@@ -207,7 +212,7 @@ class routing_kinematic(object):
                 channel[i, downdirID] = npareatotal(fracDown * tmp_massStock[i, :], downdirID)
                 # replace of npareatotal
                 #for j, value in enumerate(downdirID):
-                #    channel[i, value] = channel[i, value]  + fracDown[j] * tmp_massStock[i,j]
+                #    channel[i, value] = channel[i, value]  + fracDown[j] * tmp_massStock[i,j]   #+ a[j] * x[1, j]
             channel -= fracDown * tmp_massStock
 
             if flagWaterBodies:
@@ -218,7 +223,37 @@ class routing_kinematic(object):
             gridCellTraveled -= 1
             gridCellTraveled = np.where(gridCellTraveled < 0, 0, gridCellTraveled)
             j += 1
+        # print (j)
         return
+
+
+
+    def routeMassDown2(self, tmp_x, resLakeInflowTmp, outlet, x, a, outletid, lakesCond, down ):
+
+        tmp_x.fill(0.)
+        #resLakeInflowTmp.fill(0.)
+        #outlet.fill(0.)
+
+
+        # outlet to sea/endorheic lake
+        outlet[:, outletid] = x[:, outletid]
+        x[:, outletid] = 0.
+
+        if checkOption('includeWaterBodies'):
+            resLakeInflowTmp = x * lakesCond
+            x -= resLakeInflowTmp
+        for i in range(self.var.n_fluxes):
+            tmp_x[i, down] = npareatotal(a * x[i, :], down)
+        tmp_x -= a * x
+
+        # for putiin g it in c++ : np.take(np.bincount as loop
+        #tmpx1 = globals.inZero.copy()
+        #for j, value in enumerate(down):
+        #    tmpx1[value] = tmpx1[value] + a[j] * x[1, j]
+
+        return
+
+
 
     def routeMassDown(self, x, a, outletid, lakesCond, down):
 
@@ -851,13 +886,22 @@ class routing_kinematic(object):
                                self.var.resLakeInflowTmp, outletID, downdirID, resLakeInflowCondition,
                                flagWaterBodies, len(gridCellTraveled), len(outletID), self.var.n_fluxes)
 
+
+                iii =1
+                #void wqRouting(double * gridCellTraveled, double ** channel, double ** outlet, double ** tmp_massStock,
+                #          double ** tmp_massOutlet, double ** selfresLakeInflow, long long * outletID, long long * downdirID,
+                #          long long * resLakeInflowCondition, bool flagWaterBodies, int size, int idsize, int wqsize)
+
+
                 """
                 j = 1
                 while (gridCellTraveled > 0).any():
                     # routing of wq mass fluxes as long as water is routed
                     fracDown = np.maximum(np.where(gridCellTraveled  < 1, gridCellTraveled, 1.), 0.)
-                    channel, resLakeInflowTmp, outlet = self.routeMassDown(x = tmp_massStock, a = fracDown, outletid = outletID, \
-                            lakesCond = resLakeInflowCondition, down = downdirID)
+                    #channel, resLakeInflowTmp, outlet = self.routeMassDown(x = tmp_massStock, a = fracDown, outletid = outletID, \
+                    #        lakesCond = resLakeInflowCondition, down = downdirID)
+                    self.routeMassDown2(channel, resLakeInflowTmp, outlet, x = tmp_massStock, a = fracDown, outletid = outletID,
+                                    lakesCond = resLakeInflowCondition, down = downdirID)
 
                     if checkOption('includeWaterBodies'):
                         self.var.resLakeInflowTmp += resLakeInflowTmp
@@ -867,8 +911,13 @@ class routing_kinematic(object):
                     gridCellTraveled -= 1
                     gridCellTraveled = np.where(gridCellTraveled < 0, 0, gridCellTraveled)
                     j += 1
+                #print (j)
                 """
 
+
+                    
+                    
+                
                 if self.var.includeErosed: 
                     # flux = 0
                     # updating variables, result of substep routing

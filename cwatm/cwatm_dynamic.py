@@ -20,6 +20,8 @@ class CWATModel_dyn(DynamicModel):
     # =========== DYNAMIC ====================================================
 
     def dynamic(self):
+
+        
         """
         Dynamic part of CWATM
         calls the dynamic part of the hydrological modules
@@ -52,9 +54,10 @@ class CWATModel_dyn(DynamicModel):
             print(header + "done with Environmental Flow\n")
             sys.exit(400)
 
+        
         self.readmeteo_module.dynamic()
         timemeasure("Read meteo")  # 1. timing after read input maps
-
+        
         if Flags['calib']:
             self.output_module.dynamic()
             return
@@ -79,7 +82,7 @@ class CWATModel_dyn(DynamicModel):
         if dateVar['newYear']  and not dateVar['newStart']:
             # save last year landcover fraction to guess transition in the water quality module
             self.var.fracVegCover_former = self.var.fracVegCover.copy()
-            
+
         self.landcoverType_module.dynamic_fracIrrigation(init=dateVar['newYear'], dynamic=self.var.dynamicLandcover)
         self.capillarRise_module.dynamic()
         timemeasure("Soil 1.Part")  # 4. timing
@@ -87,7 +90,7 @@ class CWATModel_dyn(DynamicModel):
         # *********  Soil splitted in different land cover fractions *************
         self.landcoverType_module.dynamic()
         timemeasure("Soil main")  # 5. timing
-         
+
         if self.var.modflow:
             self.groundwater_modflow_module.dynamic()
         else:
@@ -96,7 +99,7 @@ class CWATModel_dyn(DynamicModel):
 
         self.runoff_concentration_module.dynamic()
         timemeasure("Runoff conc.")  # 8. timing
-        
+
         if self.var.includeWaterQuality:
             self.waterquality_module.dynamic()
             timemeasure("Water_Quality")
@@ -106,8 +109,7 @@ class CWATModel_dyn(DynamicModel):
         self.routing_kinematic_module.dynamic()
 
         timemeasure("Routing_Kin")  # 10. timing
-
-
+        
         # calculate Total water storage (tws) [m] as a sum of
         # Groundwater [m] + soil [m] + lake and reservoir storage [m3] + channel storage [m3]
         # [m3] >> [m] --> * InvCellArea
@@ -169,7 +171,7 @@ class CWATModel_dyn(DynamicModel):
 
         self.output_module.dynamic()
         timemeasure("Output")  # 12. timing
-        
+
         self.init_module.dynamic()
         if self.currentStep == self.firstStep:
             self.timeMesTbl = pd.DataFrame(np.array([np.array(timeMes)]), index = [self.currentStep])

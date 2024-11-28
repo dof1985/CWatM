@@ -238,7 +238,7 @@ if python_bit  < 64:
 path_global = os.path.dirname(__file__)
 
 if platform1 == "Windows":
-    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5.dll")
+    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t6.dll")
 elif platform1 == "CYGWIN_NT-6.1":
     # CYGWIN_NT-6.1 - compiled with cygwin
     dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5cyg.so")
@@ -249,7 +249,7 @@ elif platform1 == "Darwin":
 
 else:
     print("Linux\n")
-    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t5_mac.dylib")
+    dll_routing = os.path.join(os.path.split(path_global)[0],"hydrological_modules","routing_reservoirs","t6_linux.so")
 #dll_routing = "/Users/sorger/Library/CloudStorage/OneDrive-IIASA/GitHub/wq_dev/cwatm/hydrological_modules/routing_reservoirs"
 
 #dll_routing = "C:/work2/test1/t4.dll"
@@ -287,8 +287,12 @@ lib2.kinematic.argtypes = [array_1d_double,array_1d_double, array_1d_int, array_
 lib2.runoffConc.restype = None
 lib2.runoffConc.argtypes = [array_2d_double,array_1d_double,array_1d_double,array_1d_double,ctypes.c_int, ctypes.c_int]
 
+#DLLEXPORT void wqRouting(double* gridCellTraveled, double** channel, double** outlet, double** tmp_massStock, double** tmp_massOutlet, double** selfresLakeInflow,
+# long long* outletID, long long* resLakeInflowCondition, long long* downdirID, bool flagWaterBodies,
+# #int size, int idsize, int wqsize);
 
-
+lib2.wqRouting.restype = None
+lib2.wqRouting.argtypes = [array_1d_double,array_2d_double,array_2d_double,array_2d_double, array_2d_double, array_2d_double, array_1d_int,array_1d_int,array_1d_int, ctypes.c_bool, ctypes.c_int,ctypes.c_int,ctypes.c_int]
 
 
 def globalFlags(setting, arg,settingsfile,Flags):

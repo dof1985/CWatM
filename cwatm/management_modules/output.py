@@ -227,7 +227,7 @@ class outputTssMap(object):
             :param map: 1D array of data
             :return: value of the first output point
             """
-
+            
             first = sorted(list(self.var.sampleAdresses))[0]
             value = map[self.var.sampleAdresses[first]]
             return value
