@@ -43,7 +43,22 @@ class waterquality_erosed(object):
         self.var = model.var
         self.model = model
         self.waterquality_vars = waterquality_vars(model)
-
+    
+    def convert_kc_to_c(self, kc, max_kc, beta):
+        fc_est = globals.inZero.copy()
+        
+        # estimate frac_cover based on kc from Allen, 1998 ().
+        fc_est = np.where(kc <= 0.15, 0.01 + 0.09 * (0.15 - (1 - kc)), fc_est)
+        fc_est = np.where(np.logical_and(kc > 0.15, kc <= 0.5), 0.1 + 0.25 * (1 - (0.5 - kc)), fc_est)
+        fc_est = np.where(np.logical_and(kc > 0.5, kc <= 0.7), 0.35 + 0.15 * (1 - (0.7 - kc)), fc_est)
+        fc_est = np.where(kc > 0.7, 0.5 + 0.2 * (1 - (max_kc - kc)), fc_est)
+        
+        # convert fc to c_factor - Gyssels et al., 2005 (doi: 10.1191/0309133305pp443ra)
+        
+        c_fact_out = np.exp(beta * 100 * fc_est)
+        return(c_fact_out)
+        
+    
     def sediments_in_channel(self, channel_sed, channel_sedConc, prf, Q, A, csp, spexp, V, Kch, Cch):
         # this function is used for sediment routing sub-steps in the channel
 
@@ -86,6 +101,7 @@ class waterquality_erosed(object):
        
 
         return channel_sed, channel_sedConc, sedDep, sedDeg
+        
     def sediments_in_lakes_reservoirs(self, conc_i, conc_eq, ks, d_50, V, t):
         """
         conc_eq ... equilibrium conc. of suspended solids in waterbody (kg/m3)
@@ -124,7 +140,19 @@ class waterquality_erosed(object):
 
         # C_usle: USLE cover and management factor
         self.var.cFactor = loadmap('cFactor')
-
+        
+        # C_usle  from Kc-factor - monthly
+        if 'cfactor_from_kc' in binding  and returnBool('cfactor_from_kc') == True:
+            self.var.cfactor_arr = np.tile(globals.inZero,(4,1))
+            self.var.c_factor_beta =  -0.048 # https://doi.org/10.1016/j.rse.2018.04.008
+            if 'c_factor_beta' in binding:
+                self.var.c_factor_beta = loadmap('c_factor_beta')
+            
+            # max kcmaps
+            self.var.max_kcGrassland = readnetcdf2('grassland_cropCoefficientNC', 0, useDaily = "max")
+            self.var.max_kcPaddy = readnetcdf2('irrPaddy_cropCoefficientNC', None, "max")
+            self.var.max_kcNonPaddy = readnetcdf2('irrNonPaddy_cropCoefficientNC', None, "max")
+        
         # ls_usle: USLE topographic factor (slope-length)
         self.var.lsFactor = loadmap('lsFactor')
 
@@ -275,9 +303,30 @@ class waterquality_erosed(object):
         # qpeak: peak runoffrate m3/s
         self.var.qpeak = divideArrays(self.var.atc * self.var.directRunoff_mm[0:4] * (self.var.cellArea/10**6), 3.6 * self.var.tconc)  # [m3s-1]
         
-      
-        # MUSLE: sediment yield per day and grid in [1000 kg]
-        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
+        ### CALCULATE C-FACTOR BASED ON KC-valuesof cropland
+
+        if dateVar['newStart'] or (dateVar['currDate'].day in [1,11,21]):
+            if 'cfactor_from_kc' in binding  and returnBool('cfactor_from_kc') == True:
+                # convert kc of paddy and nonpaddy irr to c factor
+                # if irrigation is included No ranges between 0-3; else 0-1; forest = 0 , grassland = 1, paddyIrr = 2, nonPaddyIrr = 3;
+                self.var.cfactor_arr[0] = 0.00155 # mean of range from Panagos et al., 2015 (dx.doi.org/10.1016/j.landusepol.2015.05.021)
+                
+                # grassland combines natural grasslands 0.01 - 0.08 & pasture land 0.05 - 0.15 (Panagos et al., 2015) -- > 0.1  for the unmanaged share; managed share use kc-to-c fucntion
+                grassland_cFactor =  self.convert_kc_to_c(kc = self.var.cropKC[1], max_kc = self.var.max_kcGrassland ,beta = self.var.c_factor_beta)
+                self.var.cfactor_arr[1] = 0.1 * (1. - self.var.fracManagedGrassland) + self.var.fracManagedGrassland * grassland_cFactor
+                
+                # irrPaddy
+                self.var.cfactor_arr[2] = self.convert_kc_to_c(kc = self.var.cropKC[2], max_kc = self.var.max_kcPaddy ,beta = self.var.c_factor_beta)
+                
+                # irrNonPaddy
+                self.var.cfactor_arr[3] = self.convert_kc_to_c(kc = self.var.cropKC[3], max_kc = self.var.max_kcNonPaddy ,beta = self.var.c_factor_beta)
+        
+
+        # MUSLE: sediment yield per day and grid in [1000 kg]             
+        if 'cfactor_from_kc' in binding  and returnBool('cfactor_from_kc') == True:
+            self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cfactor_arr * self.var.lsFactor * self.var.CFRG
+        else:
+            self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
         
         # calculate depth of soil loss (mm)
         self.var.sedimentLossDepth_mm = divideValues(self.var.sedYieldLand * np.tile(self.var.soildepth[0], (4, 1)), np.tile(self.var.cellArea,  (4, 1)))

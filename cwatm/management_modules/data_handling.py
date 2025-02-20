@@ -1108,19 +1108,18 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     else:
         name = cbinding(namebinding)
     filename =  os.path.normpath(name)
-    
     if cut:
         cut0, cut1, cut2, cut3 = mapattrNetCDF(filename, check = False)
-
+    
     try:
        nf1 = Dataset(filename, 'r')
     except:
         msg = "Error 212: Netcdf map stacks: \n"
         raise CWATMFileError(filename,msg, sname = namebinding)
-
+    
     if value == "None":
         value = list(nf1.variables.items())[-1][0]  # get the last variable name
-
+        
     # date if used daily, monthly or yearly or day of year
     idx = None  # will produce an error and indicates something is wrong with date
     if useDaily == "DOY":  # day of year 1-366
@@ -1129,9 +1128,8 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
         idx = date
     if useDaily == "month":
         idx = int(date.month) - 1
-
+   
     if useDaily in ["monthly","yearly","daily"]:
-
         # DATE2INDEX TAKES A LONG TIME TO GET THE INDEX, THIS SHOULD BE A FASTER VERSION, ONCE THE FIRST INDEX IS COLLECTED
         if (value in inputcounter) and meteo:
             inputcounter[value] += 1
@@ -1162,7 +1160,10 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     try:
         if (nf1.variables['lat'][0] - nf1.variables['lat'][-1]) < 0:
            turn_latitude = True
-           mapnp = nf1.variables[value][idx].astype(np.float64)
+           if useDaily == 'max':
+            mapnp = np.max(nf1.variables[value], axis = 0).astype(np.float64)
+           else:
+            mapnp = nf1.variables[value][idx].astype(np.float64)
            mapnp = np.flipud(mapnp)
     except:
        ii = 1
@@ -1180,7 +1181,11 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
             
         else:
             #mapnp = nf1.variables[value][idx, cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]].astype(np.float64)
-            mapnp = nf1.variables[value][idx, cut2:cut3, cut0:cut1].astype(np.float64)
+            if useDaily == 'max':
+                mapnp = np.max(nf1.variables[value], axis = 0)[cut2:cut3, cut0:cut1].astype(np.float64)
+            else:
+                mapnp = nf1.variables[value][idx, cut2:cut3, cut0:cut1].astype(np.float64)
+            
     else:
         if not(turn_latitude):
             mapnp = nf1.variables[value][idx].astype(np.float64)
