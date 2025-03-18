@@ -42,11 +42,11 @@ class waterquality_phosphorus(object):
         # Labile p stocks, Dissolved P stocks, Labile P inputs, P outputs in runoff, interflow, and percolation/groundwater recharge,
         # soil moisture content
 
+        dry_soil = 1E-10
         # redistribute phosphrous in each soil layer to 3 sub-soil layers- NOT BEING USED - TO CHECK / CANCEL  - DF
         bot_lyr_prop = 2 / (1 + mobility_coeff)
         top_lyr_prop = mobility_coeff * bot_lyr_prop
         # IMPLEMENTATION -> PROPORTION_COEFF * PRE_TDP/3
-        
         # calculate a and b terms
         a =  Kf * soilmass * EPC0 + P_in
         b = divideArrays(Kf * soilmass + Qr + Qi + Qp, Vs)
@@ -54,38 +54,43 @@ class waterquality_phosphorus(object):
         # calculate new TDP value
         preTDP = TDP.copy()
         prePlab = Plab.copy()
-        TDP = (divideArrays(a, b) + (TDP - divideArrays(a, b))* np.exp(-1 * b)) #* self.var.naturalLandFrac# in kg
-        
+        preEPC0 = EPC0.copy()
+        TDP = np.nan_to_num((divideArrays(a, b) + (TDP - divideArrays(a, b))* np.exp(-1 * b)), 0.) #* self.var.naturalLandFrac# in kg
+        TDP = np.where(Vs <= dry_soil, preTDP, TDP)  # no sorption/adsorption if soil is too dry
         # Discretized soil labile P
         b0 = b * Vs 
         
         # calculate sorption/absorption
         sorp = Kf * soilmass * (divideArrays(a, b0) -\
             EPC0 + divideArrays(1, b) * (divideArrays(TDP, Vs) - divideArrays(a, b0)) *  (1 -  np.exp(-1 * b)))
-        sorp =  np.where(Vs == 0, 0, sorp)
+        sorp =  np.nan_to_num(np.where(Vs == 0, 0, sorp), 0.)
         
         # update Plab
         Plab = Plab + sorp# * self.var.naturalLandFrac
         
         
         # calculate fluxes (in kg)
-        P_Qr = (Qr * (divideArrays(preTDP, Vs))) * runoff_adj # calibration parameter runoff_adj > 0 
-        P_Qi = Qi * divideArrays(preTDP, Vs)
-        P_Qp = Qp * divideArrays(preTDP, Vs)
+        P_Qr = np.nan_to_num((Qr * (divideArrays(preTDP, Vs))) * runoff_adj, 0.) # calibration parameter runoff_adj > 0 
+        P_Qi = np.nan_to_num(Qi * divideArrays(preTDP, Vs), 0.)
+        P_Qp = np.nan_to_num(Qp * divideArrays(preTDP, Vs), 0.)
         
         # Add balance term to Plab
         b_in = P_in
         b_out = P_Qr + P_Qi + P_Qp
         b_sto = Plab - prePlab + TDP - preTDP
+       
+
+        bal = np.nan_to_num(b_in - b_out - b_sto, 0.)
         
-        bal = b_in - b_out - b_sto
         Plab = Plab + bal
-        
+        Plab = np.where(Vs <= dry_soil, prePlab, Plab)  # no sorption/adsorption if soil is too dry
+
         
         
         # calculate dynamic EPC
-        EPC0 = divideArrays(Plab, Kf * soilmass)
-        
+        EPC0 = np.nan_to_num(divideArrays(Plab, Kf * soilmass), 0.)
+        EPC0 = np.where(Vs <= dry_soil, preEPC0, EPC0) # no sorption/adsorption if soil is too dry
+
         return Plab, TDP, EPC0, P_Qr, P_Qi, P_Qp
         
     def __init__(self, model):
@@ -170,7 +175,7 @@ class waterquality_phosphorus(object):
             self.var.soil_P_labile1 -= self.var.soil_P_dissolved1
             self.var.soil_P_labile2 -= self.var.soil_P_dissolved2
             self.var.soil_P_labile3 -= self.var.soil_P_dissolved3
-            
+
         else:
             # if self.var.initLoadFile is set to True
             soil_vars = ["soil_P_inactive1", "soil_P_inactive2", "soil_P_inactive3", "soil_P_labile1", "soil_P_labile2",\
@@ -532,7 +537,7 @@ class waterquality_phosphorus(object):
         self.var.soil_P_labile3 =  outputs[0].copy()
         self.var.soil_P_dissolved3 =  outputs[1].copy()
         self.var.EPC3 =  outputs[2].copy()
-        
+
         # update fluxes - no runoff from layer 2
         interflow3_P =  outputs[4].copy()
         toGW = outputs[5].copy()
@@ -674,7 +679,7 @@ class waterquality_phosphorus(object):
                 # update the active P pool
                 vars(self.var)[act_][i] = vars(self.var)[act_][i] + to_active - to_stable
         
-        
+
         # Iterate across natural land covers | 1: grassland is a mixed managed and natural land
         
         coeff_natural = 1 / (1 - self.var.soil_P_fracInactive_natural)
@@ -701,3 +706,4 @@ class waterquality_phosphorus(object):
                 
                 # update the active P pool
                 vars(self.var)[act_][i] = vars(self.var)[act_][i] + to_active - to_stable
+        
