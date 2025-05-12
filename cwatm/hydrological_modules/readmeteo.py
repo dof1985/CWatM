@@ -210,7 +210,8 @@ class readmeteo(object):
         # no evaporation -> less maps
         else:
             meteomaps = [self.var.preMaps, self.var.tempMaps, self.var.evaTMaps, self.var.eva0Maps]
-            if self.var.snowmelt_radiation:
+
+            if self.var.snowmelt_radiation or self.var.includeWaterQuality:
                 meteomaps.append(self.var.RSDSMaps)
                 meteomaps.append(self.var.RSDLMaps)
             if self.var.includeGlaciers:
@@ -576,7 +577,7 @@ class readmeteo(object):
             self.var.ETRef = self.var.meteo[2,no]
             self.var.EWRef = self.var.meteo[3,no]
             j = 3
-            if self.var.snowmelt_radiation:
+            if self.var.snowmelt_radiation or self.var.includeWaterQuality:
                 self.var.Rsds = self.var.meteo[4,no]
                 self.var.Rsdl = self.var.meteo[5,no]
                 j = 5

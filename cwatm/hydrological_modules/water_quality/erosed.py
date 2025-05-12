@@ -178,9 +178,8 @@ class waterquality_erosed(object):
         self.var.tanslope = np.maximum(tanslope, 0.00001)
 
         # channel flow time of concentration: unrealistic values. substituted wth. self.var.travelTime
-        # tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))
-        
-        self.var.sedStor_gridcell = globals.inZero.copy()
+        # tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))        
+        self.var.sedStor_gridcell = self.var.load_initial('sedStor_gridcell', default = globals.inZero.copy())
         self.var.sedToChannel = globals.inZero.copy()
         
         # channel sediment [kg]

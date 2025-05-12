@@ -65,7 +65,47 @@ class waterquality_vars(object):
 
         i =1
 
+    def soilTemperature(self, solar_rad, t_soilAvg, t_avg, t_min, t_max, bulk_density, soil_depth, albedo, soil_water, lambda_, soil_lyr = 1):
+        
+        # soil temperature according to Soil and Water Assessment Tool (SWAT)
+        
+        # m to mm
+        soil_water = soil_water * 1000
+        soil_depth = soil_depth * 1000
+        
+        # CALCULATE soil_depthTot
+        soil_depthTot = np.nansum(soil_depth, axis = 0)
+        ddmax = 1000 + divideValues(2500 * bulk_density, bulk_density + 686 * np.exp(-5.63 * bulk_density))
+        
+        d_scaling = divideValues(soil_water, (0.356 - 0.144 * bulk_density) * soil_depthTot)
+        
+        dd = ddmax * np.exp(np.log(divideValues(500, ddmax)) * divideValues(1 - d_scaling,  1 + d_scaling) ** 2)
+        
+        if soil_lyr == 1:
+            z_ = 25
+        elif soil_lyr == 2:
+            z_ = 25 + soil_depth[soil_lyr - 1, :] / 2
+        else:
+            z_ = 25 + soil_depth[1, :] + soil_depth[soil_lyr - 1, :] / 2
+        depthRatio = divideValues(z_, dd)
+        depth_factor = divideValues(depthRatio, depthRatio + np.exp(-0.867 - 2.078 * depthRatio))
+        
+        # surface temperature
+        radterm = (solar_rad * (1 - albedo) - 14) / 20
+        tmp_bare = t_avg + radterm * 0.5 * (t_max - t_min)
+        
+        # temporary
+        bcv = 0
+        
+        tmp_soil = vars(self.var)['soilTemp' +  str(soil_lyr)].copy()
+        
+        tmp_surf = bcv * tmp_soil + (1 - bcv) *(tmp_bare)
+        # calculate soil temperature
+        
+        tmp_soil = lambda_ * tmp_soil + (1 - lambda_) * (depth_factor * (t_soilAvg - tmp_surf) + tmp_surf)
 
+        return tmp_soil
+        
 
 
 # --------------------------------------------------------------------------

@@ -316,7 +316,7 @@ class evaporationPot(object):
         else:
             RLN = RNup - self.var.Rsdl
             # RDL is stored on disk as W/m2 but converted in MJ/m2/s in readmeteo.py
-
+            
         if returnBool('albedo'):
             if dateVar['newStart'] or dateVar['newMonth']:  # loading every month a new map
                 self.var.albedoLand = readnetcdf2('albedoMaps', dateVar['currDate'], useDaily='month',value='albedoLand')

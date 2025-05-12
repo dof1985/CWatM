@@ -281,9 +281,15 @@ class initcondition(object):
         # Water quality
         if self.var.includeWaterQuality:
             # Erosed - Sediment delivery
+            Var1 = ["soilTemp1", "soilTemp2", "soilTemp3"]
+            Var2 = ["soilTemp1", "soilTemp2", "soilTemp3"]
+            
+            initCondVar.extend(Var1)
+            initCondVarValue.extend(Var2)
+            
             if self.var.includeErosed:
-                Var1 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc"]
-                Var2 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc"]
+                Var1 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc", "sedStor_gridcell"]
+                Var2 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc", "sedStor_gridcell"]
                 initCondVar.extend(Var1)
                 initCondVarValue.extend(Var2)
             # Phosphorus

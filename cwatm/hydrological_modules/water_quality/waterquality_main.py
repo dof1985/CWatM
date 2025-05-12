@@ -16,7 +16,7 @@ from cwatm.management_modules.globals import *
 # import water quality sub-modules
 from cwatm.hydrological_modules.water_quality.phosphorus import waterquality_phosphorus
 from cwatm.hydrological_modules.water_quality.erosed import waterquality_erosed
-
+from cwatm.hydrological_modules.water_quality.waterquality_vars import waterquality_vars
 class water_quality(object):
     '''
     WATER QUALITY - MAIN MODULE
@@ -48,7 +48,8 @@ class water_quality(object):
         # define water quality sub-modules
         self.waterquality_p = waterquality_phosphorus(self)
         self.erosed = waterquality_erosed(model)
-	
+        self.waterquality_vars = waterquality_vars(model)
+
     def initial(self):
         
         if self.var.includeWaterQuality:
@@ -57,8 +58,12 @@ class water_quality(object):
             # create water quality variables
             waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'naturalLandFrac', 'onlyIrr', 'onlyIrrPaddy']
             for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))            
-            
+            self.var.soilTemp1 = self.var.load_initial('soilTemp1', default = globals.inZero.copy())
+            self.var.soilTemp2 = self.var.load_initial('soilTemp2', default = globals.inZero.copy())
+            self.var.soilTemp3 = self.var.load_initial('soilTemp3', default = globals.inZero.copy())
+
             # Create sub-modules variables
+           
             if self.var.includePhosphorus:
                 phosphorusVars = ['soil_P_inactive1', 'soil_P_inactive2', 'soil_P_inactive3',\
                                   'soil_P_labile1', 'soil_P_labile2', 'soil_P_labile3',\
@@ -117,22 +122,23 @@ class water_quality(object):
             '''
             # loaded as bulkDensity g/cm3
             self.var.gCm3TokgM3 = 1000
+            self.var.gCm3TomgM3 = 1000000000
             
             rho1 = globals.inZero.copy() + 1.
             rho2 = globals.inZero.copy() + 1.
             rho3 = globals.inZero.copy() + 1.
 
             if 'rho1' in binding:
-                rho1 = loadmap('rho1')
+                self.var.rho1 = loadmap('rho1')
             if 'rho2' in binding:
-                rho2 = loadmap('rho2')
+                self.var.rho2 = loadmap('rho2')
             if 'rho3' in binding:
-                rho3 = loadmap('rho3')
+                self.var.rho3 = loadmap('rho3')
     
             # Calculate soil mass as [kg]
-            self.var.soilM1 = self.var.soildepth[0] * rho1 * self.var.gCm3TokgM3 * self.var.cellArea
-            self.var.soilM2 = self.var.soildepth[1] * rho2 * self.var.gCm3TokgM3 * self.var.cellArea
-            self.var.soilM3 = self.var.soildepth[2] * rho3 * self.var.gCm3TokgM3 * self.var.cellArea
+            self.var.soilM1 = self.var.soildepth[0] * self.var.rho1 * self.var.gCm3TokgM3 * self.var.cellArea
+            self.var.soilM2 = self.var.soildepth[1] * self.var.rho2 * self.var.gCm3TokgM3 * self.var.cellArea
+            self.var.soilM3 = self.var.soildepth[2] * self.var.rho3 * self.var.gCm3TokgM3 * self.var.cellArea
             
             self.var.soilM1_f = np.tile(self.var.soilM1, (4, 1))
             self.var.soilM2_f = np.tile(self.var.soilM2, (4, 1))
@@ -163,6 +169,16 @@ class water_quality(object):
                 self.var.resLake_conc = np.tile(np.compress(self.var.compress_LR, globals.inZero.copy()), (self.var.n_fluxes, 1))
                 
                 # Initital sub-compartments storage water [m3]                
+            
+            # Initiate soil temperature data
+            # https://zenodo.org/records/7134169
+            self.var.soilTempAnnualAvg = globals.inZero.copy() + 11.9
+            if 'soilTempAvg' in binding:
+                self.var.soilTempAnnualAvg = globals.inZero.copy() + loadmap('soilTempAvg')
+            
+            self.var.soilTemp_lambda = globals.inZero.copy() + 0.8
+            if 'soilTemp_lambda' in binding:
+                self.var.soilTemp_lambda = loadmap('soilTemp_lambda')
                 
             # Run initial sub-modules
             if self.var.includePhosphorus:
@@ -183,6 +199,23 @@ class water_quality(object):
 
     def dynamic(self): 
         
+        
+        # calcualte soil temperature
+        if returnBool('albedo'):
+            albedo_ = self.var.albedoLand
+        else: 
+            albedo_ = self.var.AlbedoCanopy
+            
+        # lyr 1
+        self.var.soilTemp1 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w1, lambda_ = self.var.soilTemp_lambda, soil_lyr = 1)
+        
+        # lyr 2
+        self.var.soilTemp2 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w2, lambda_ = self.var.soilTemp_lambda, soil_lyr = 2)
+        
+        # lyr 3
+        self.var.soilTemp3 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w3, lambda_ = self.var.soilTemp_lambda, soil_lyr = 3)
+        
+        print(np.nanmean(self.var.soilTemp1))
         # landcover transitions
         if self.var.includePhosphorus:
                 #self.var.soil_P_inactive_urbanLoss = globals.inZero.copy()
