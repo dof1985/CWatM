@@ -546,14 +546,14 @@ class waterquality_phosphorus(object):
         
         # Enrichment factors based on finer soil praticles
 
-        E_pp = np.where(self.var.sedYieldLand * 1000 > 0.1, np.exp(2.00 - 0.16 * np.log(self.var.sedYieldLand * 0.1)), 1.) # sedYieldLand * 1000 (to kg) / 10000 (per ha)
+        E_pp = np.where(self.var.sedToChannel > 0.1, np.exp(2.00 - 0.16 * np.log(self.var.sedToChannel * 0.1)), 1.) # sedYieldLand * 1000 (to kg) / 10000 (per ha)
         
         # Calculate soil availabile for degredation - NOT BEING USED - TO CHECK / CANCEL  - DF
         
         top_lyr_prop = (2 * self.var.P_mobility_in_soil) / (1 + self.var.P_mobility_in_soil)
         Avl_P_for_erosion = self.var.soil_P_labile1 / 3 * top_lyr_prop
         
-        sedYieldLand_PP = np.maximum(np.minimum(E_pp * self.var.sedYieldLand * 1000 * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1) , 0.)
+        sedYieldLand_PP = np.maximum(np.minimum(E_pp * self.var.sedToChannel * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1) , 0.)
         
         # update soil layer 1 - erosion is only allowed from the top soil
         self.var.soil_P_labile1 -= sedYieldLand_PP

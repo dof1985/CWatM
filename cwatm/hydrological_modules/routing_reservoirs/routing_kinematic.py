@@ -815,7 +815,7 @@ class routing_kinematic(object):
                 minMassAllowed = 10**-5
                 if self.var.includeErosed:
                     # sediment in channel: input from musle by routing steps minus abstraction
-                    self.var.channel_sed = np.maximum(self.var.channel_sed + (self.var.sum_sedYieldLand * 1000) / self.var.noRoutingSteps  + lakeResOut_sed_Dt - channel_sed_Abstracted_Dt, 0.)
+                    self.var.channel_sed = np.maximum(self.var.channel_sed + (self.var.sedToChannel) / self.var.noRoutingSteps  + lakeResOut_sed_Dt - channel_sed_Abstracted_Dt, 0.)
                     self.var.channel_sed  = np.where(self.var.channel_sed <= minMassAllowed, 0., self.var.channel_sed)
                     massFluxArray[self.var.sed_idx, :] = self.var.channel_sed
                     
@@ -905,7 +905,6 @@ class routing_kinematic(object):
                         channel_sed = self.var.channel_sed, channel_sedConc = self.var.channel_sedConc, prf=self.var.prf, \
                         Q=self.var.discharge, A=self.var.crossArea, csp=self.var.csp, spexp=self.var.spexp,
                         V=self.var.substepChannelStorage, Kch=self.var.Kch, Cch = self.var.Cch)
-                    
                     self.var.channel_sedDep += sed_dep_dt
                     self.var.channel_sedDeg += sed_deg_dt
                     

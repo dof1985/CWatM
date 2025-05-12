@@ -153,6 +153,7 @@ class waterquality_erosed(object):
             self.var.max_kcPaddy = readnetcdf2('irrPaddy_cropCoefficientNC', None, "max")
             self.var.max_kcNonPaddy = readnetcdf2('irrNonPaddy_cropCoefficientNC', None, "max")
         
+
         # ls_usle: USLE topographic factor (slope-length)
         self.var.lsFactor = loadmap('lsFactor')
 
@@ -178,7 +179,10 @@ class waterquality_erosed(object):
 
         # channel flow time of concentration: unrealistic values. substituted wth. self.var.travelTime
         # tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))
-
+        
+        self.var.sedStor_gridcell = globals.inZero.copy()
+        self.var.sedToChannel = globals.inZero.copy()
+        
         # channel sediment [kg]
         self.var.channel_sed = self.var.load_initial('channel_sed', default = globals.inZero.copy())
         self.var.channel_sedConc = self.var.load_initial('channel_sedConc', default = globals.inZero.copy())
@@ -210,12 +214,12 @@ class waterquality_erosed(object):
 
         # instream routing
         # channel erodibility factor
-        self.var.Kch = globals.inZero.copy() + 0.008
+        self.var.Kch = globals.inZero.copy() + 0.003
         if 'channel_erodibility' in binding:
             self.var.Kch = globals.inZero.copy() + loadmap('channel_erodibility')
             
         # channel cover factor
-        self.var.Cch = globals.inZero.copy() + 0.9
+        self.var.Cch = globals.inZero.copy() + 0.0015
         if 'channel_cover' in binding:
             self.var.Cch = globals.inZero.copy() + loadmap('channel_cover')
         
@@ -283,10 +287,11 @@ class waterquality_erosed(object):
 
         self.var.tov = divideArrays(self.var.slopelength, 3600 * self.var.vov)
         
+        self.var.tov = np.where(self.var.runoffm3s > 1, self.var.tov, 24)
         
         #tov2 = divideArrays(np.power(self.var.slopelength, 0.6))
         
-        self.var.tch = self.var.travelTime / 3600  # converted from seconds to hours
+        self.var.tch = np.where(self.var.runoffm3s > 1, self.var.travelTime / 3600, 24)  # converted from seconds to hours
         
         #print('mean tch: ', np.nanmean(tch), ' max tch: ', np.nanmax(tch), ' median tch: ', np.median(tch))
         #print('mean tov: ', np.nanmean(tov), ' max tov: ', np.nanmax(tov), ' median tov: ', np.median(tov))
@@ -320,13 +325,29 @@ class waterquality_erosed(object):
                 
                 # irrNonPaddy
                 self.var.cfactor_arr[3] = self.convert_kc_to_c(kc = self.var.cropKC[3], max_kc = self.var.max_kcNonPaddy ,beta = self.var.c_factor_beta)
+      
+        # MUSLE: sediment yield per day and grid in [1000 kg]
+        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
         
 
         # MUSLE: sediment yield per day and grid in [1000 kg]             
         if 'cfactor_from_kc' in binding  and returnBool('cfactor_from_kc') == True:
             self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cfactor_arr * self.var.lsFactor * self.var.CFRG
+        
+        # correct for snow
+        self.var.sedYieldLand = divideArrays(self.var.sedYieldLand, np.exp(3 * self.var.SnowCover /  25.4))
+        
+        # stop sediment yield if frost index > threshold
+        self.var.sedYieldLand = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0., self.var.sedYieldLand)
+        
+        # Calculate sed to channel and lag
+        if checkOption('includeRunoffConcentration'):
+            share_release = np.where(np.nansum(self.var.runoff_conc) > 0, self.var.runoff_conc[0] / np.nansum(self.var.runoff_conc), 0)
+            self.var.sedStor_gridcell = self.var.sedStor_gridcell - share_release * self.var.sedToChannel + self.var.sedToChannel
+            self.var.sedToChannel = (self.var.sedToChannel * share_release).copy()
         else:
-            self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
+            self.var.sedToChannel = (self.var.sum_sedYieldLand * 1000).copy() 
+        
         
         # calculate depth of soil loss (mm)
         self.var.sedimentLossDepth_mm = divideValues(self.var.sedYieldLand * np.tile(self.var.soildepth[0], (4, 1)), np.tile(self.var.cellArea,  (4, 1)))
