@@ -180,6 +180,12 @@ class waterquality_erosed(object):
         # channel flow time of concentration: unrealistic values. substituted wth. self.var.travelTime
         # tch = divideArrays(0.62 * self.var.chanLength * np.power(self.var.manNChan, 0.75), np.power(self.var.cellArea, 0.125) * np.power(self.var.chanGrad, 0.375))        
         self.var.sedStor_gridcell = self.var.load_initial('sedStor_gridcell', default = globals.inZero.copy())
+        
+        if checkOption('includeRunoffConcentration'):
+            self.var.sedRunoff_conc = np.tile(globals.inZero,(self.var.maxtime_runoff_conc, 1))
+            for i in range(self.var.maxtime_runoff_conc):
+                self.var.sedRunoff_conc[i] = self.var.load_initial("sedRunoff_conc", number = i+1)
+
         self.var.sedToChannel = globals.inZero.copy()
         
         # channel sediment [kg]
@@ -338,16 +344,7 @@ class waterquality_erosed(object):
         
         # stop sediment yield if frost index > threshold
         self.var.sedYieldLand = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0., self.var.sedYieldLand)
-        
-        # Calculate sed to channel and lag
-        if checkOption('includeRunoffConcentration'):
-            share_release = np.where(np.nansum(self.var.runoff_conc) > 0, self.var.runoff_conc[0] / np.nansum(self.var.runoff_conc), 0)
-            self.var.sedStor_gridcell = self.var.sedStor_gridcell - share_release * self.var.sedToChannel + self.var.sedToChannel
-            self.var.sedToChannel = (self.var.sedToChannel * share_release).copy()
-        else:
-            self.var.sedToChannel = (self.var.sum_sedYieldLand * 1000).copy() 
-        
-        
+    
         # calculate depth of soil loss (mm)
         self.var.sedimentLossDepth_mm = divideValues(self.var.sedYieldLand * np.tile(self.var.soildepth[0], (4, 1)), np.tile(self.var.cellArea,  (4, 1)))
         
@@ -358,6 +355,21 @@ class waterquality_erosed(object):
         for variable in erosedVarsSum:
             vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
         
+        self.var.sedToChannel = (self.var.sum_sedYieldLand * 1000).copy() 
+        
+        # Calculate sed to channel and lag
+        if checkOption('includeRunoffConcentration'):
+            runoffConcShare = divideArrays(self.var.runoff_conc, np.nansum(self.var.runoff_conc, axis = 0))
+            
+            sedToStor = self.var.sedToChannel * runoffConcShare
+            
+            self.var.sedRunoff_conc = np.roll(self.var.sedRunoff_conc, -1, axis=0)
+            self.var.sedRunoff_conc[self.var.maxtime_runoff_conc - 1] = globals.inZero
+            self.var.sedRunoff_conc = self.var.sedRunoff_conc + sedToStor
+            
+            self.var.sedStor_gridcell = self.var.sedStor_gridcell - self.var.sedRunoff_conc[0] + self.var.sedToChannel
+            self.var.sedToChannel = self.var.sedRunoff_conc[0, :].copy()
+            
         # CHANNEL
         if checkOption('includeWaterDemand'):
             self.var.channel_sed_Abstracted = np.maximum(

@@ -215,7 +215,6 @@ class water_quality(object):
         # lyr 3
         self.var.soilTemp3 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w3, lambda_ = self.var.soilTemp_lambda, soil_lyr = 3)
         
-        print(np.nanmean(self.var.soilTemp1))
         # landcover transitions
         if self.var.includePhosphorus:
                 #self.var.soil_P_inactive_urbanLoss = globals.inZero.copy()

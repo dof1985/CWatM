@@ -175,6 +175,11 @@ class initcondition(object):
             for i in range(10):
                 initCondVar.append("runoff_conc" + str(i + 1))
                 initCondVarValue.append("runoff_conc[" + str(i) + "]")
+                
+                if self.var.includeWaterQuality:
+                    if self.var.includeErosed:
+                        initCondVar.append("sedRunoff_conc" + str(i + 1))
+                        initCondVarValue.append("sedRunoff_conc[" + str(i) + "]")
 
         # soil / landcover
         i = 0
