@@ -190,9 +190,17 @@ class evaporation(object):
                         vars(self.var)[z + '_Irr'] = globals.inZero
                         vars(self.var)[z + '_nonIrr'] = globals.inZero
 
-                    # The general crops are representative vegetation.
+                    self.var.ET_crop_Irr_paddy = globals.inZero
+                    self.var.ET_crop_Irr_paddy_fraccrop = globals.inZero
 
                     for c in range(len(self.var.Crops)):
+
+                        # For creating annual and month total outputs, since such totals don't work with square bracket variables
+                        vars(self.var)['ET_crop_Irr_'+str(c)] = globals.inZero
+                        vars(self.var)['ET_crop_Irr_fraccrop_'+str(c)] = globals.inZero
+                        vars(self.var)['ET_crop_nonIrr_'+str(c)] = globals.inZero
+                        vars(self.var)['ET_crop_nonIrr_fraccrop_'+str(c)] = globals.inZero
+                        vars(self.var)['irr_crop_'+str(c)] = globals.inZero
 
                         self.var.activatedCrops[c] = self.var.load_initial("activatedCrops_" + str(c))
                         self.var.fracCrops_Irr[c] = self.var.load_initial('fracCrops_Irr_' + str(c))
@@ -214,7 +222,6 @@ class evaporation(object):
                                 1)
 
                         except:
-
                             self.var.fracCrops_IrrLandDemand[i] = readnetcdf2(self.var.Crops_names[i] + '_Irr', dateVar['currDate'],
                                                                   'yearly',
                                                                   value=re.split(r'[^a-zA-Z0-9_[\]]', cbinding(self.var.Crops_names[i] + '_Irr'))[-2])
@@ -549,8 +556,10 @@ class evaporation(object):
                     self.var.totalPotET_month[c] += self.var.PotET_crop[c] #self.var.cropCorrect * self.var.currentKC[c] * self.var.ETRef #np.maximum(0., self.var.cropCorrect * self.var.currentKC[c] * self.var.ETRef - self.var.potBareSoilEvap - self.var.snowEvap)
 
                     #For creating named crop maps
-                    #vars(self.var)[self.var.Crops_names[c]+'_Irr'] = self.var.fracCrops_Irr[c].copy()
-                    #vars(self.var)[self.var.Crops_names[c] + '_nonIrr'] = self.var.fracCrops_nonIrr[c].copy()
+                    vars(self.var)[self.var.Crops_names[c]+'_Irr'] = self.var.fracCrops_Irr[c].copy()
+                    vars(self.var)[self.var.Crops_names[c] + '_nonIrr'] = self.var.fracCrops_nonIrr[c].copy()
+
+                    
 
                     if 'adminSegments' in binding:
                         self.var.totalPotET_month_segment[c] = npareaaverage(self.var.totalPotET_month[c], self.var.adminSegments)

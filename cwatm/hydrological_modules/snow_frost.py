@@ -9,6 +9,7 @@
 # -------------------------------------------------------------------------
 
 from cwatm.management_modules.data_handling import *
+import pandas as pd
 
 class snow_frost(object):
 
@@ -271,6 +272,9 @@ class snow_frost(object):
 
         self.var.Snow = globals.inZero.copy()
         self.var.Rain = globals.inZero.copy()
+        # for glacier: snow and rain is reduced by glacier size, but to calc the total amount all snow and rain is needed
+        self.var.Snow1 = globals.inZero.copy()
+        self.var.Rain1 = globals.inZero.copy()
         self.var.SnowMelt = globals.inZero.copy()
         self.var.IceMelt = globals.inZero.copy()
         self.var.SnowCover = globals.inZero.copy()
@@ -317,6 +321,7 @@ class snow_frost(object):
 
         month = dateVar['currDate'].month - 1
         # run through all snow layers
+
         for i in range(self.var.numberSnowLayers):
 
             if self.var.lapseratevar:
@@ -430,7 +435,9 @@ class snow_frost(object):
                 current_fracGlacierCover = np.where(weight > 0, 0, abs(weight))
                 #weight below zero is set to zero
                 weight[weight < 0] = 0
-                assert (weight >= 0).all()
+                self.var.Snow1 += SnowS / self.var.numberSnowLayersFloat
+                self.var.Rain1 += RainS / self.var.numberSnowLayersFloat
+                # depends on the area of non glacier area in a gridcell
                 self.var.Snow += SnowS * weight
                 self.var.Rain += RainS * weight
                 self.var.SnowMelt += SnowMeltS * weight
@@ -445,12 +452,17 @@ class snow_frost(object):
                 self.var.SnowCover += self.var.SnowCoverS[i]
 
 
+        
         if not self.var.excludeGlacierArea:
             self.var.Snow /= self.var.numberSnowLayersFloat
             self.var.Rain /= self.var.numberSnowLayersFloat
             self.var.SnowMelt /= self.var.numberSnowLayersFloat
             self.var.IceMelt /= self.var.numberSnowLayersFloat
             self.var.SnowCover /= self.var.numberSnowLayersFloat
+            self.var.precipitation_sn = self.var.Snow + self.var.Rain
+        else:
+            # if glaicer than calculate also rain+snow on glacier
+            self.var.precipitation_sn = self.var.Snow1 + self.var.Rain1
 
 
 

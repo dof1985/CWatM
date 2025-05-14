@@ -145,7 +145,9 @@ class waterdemand_irrigation:
         soilWaterStorage = self.var.w1[No] + self.var.w2[No]
         soilWaterStorageCap = self.var.ws1[No] + self.var.ws2[No]
         relSat = soilWaterStorage / soilWaterStorageCap
-        satAreaFrac = np.maximum(1 - (1 - relSat),0) ** self.var.arnoBeta[No]
+        # PB cause some trouble!
+        #satAreaFrac = np.maximum(1 - (1 - relSat),0) ** self.var.arnoBeta[No]
+        satAreaFrac = 1 - np.maximum((1 - relSat),0) ** self.var.arnoBeta[No]
         satAreaFrac = np.maximum(np.minimum(satAreaFrac, 1.0), 0.0)
 
         store = soilWaterStorageCap / (self.var.arnoBeta[No] + 1)
@@ -170,11 +172,13 @@ class waterdemand_irrigation:
         # to avoid a strange behaviour of the p-formula's, ETRef is set to a maximum of 10 mm/day.
 
         # for group number 1 -> those are plants which needs irrigation
-        # p = 1 / (0.76 + 1.5 * np.minimum(0.1 * (self.var.totalPotET[No] * 1000.), 1.0)) - 0.10 * ( 5 - cropGroupNumber)
+        #p = 1 / (0.76 + 1.5 * etpotMax) - 0.10 * ( 5 - self.var.cropGroupNumber)
         p = 1 / (0.76 + 1.5 * etpotMax) - 0.4
         # soil water depletion fraction (easily available soil water) # Van Diepen et al., 1988: WOFOST 6.0, p.87.
         p = p + (etpotMax - 0.6) / 4
         # correction for crop group 1  (Van Diepen et al, 1988) -> p between 0.14 - 0.77
+        #p = np.where(self.var.cropGroupNumber <= 2.5, p + (etpotMax - 0.6) / (self.var.cropGroupNumber * (self.var.cropGroupNumber + 3)), p)
+
         p = np.maximum(np.minimum(p, 1.0), 0.)
         # p is between 0 and 1 => if p =1 wcrit = wwp, if p= 0 wcrit = wfc
         # p is closer to 0 if evapo is bigger and cropgroup is smaller
@@ -182,9 +186,9 @@ class waterdemand_irrigation:
         wCrit1 = ((1 - p) * (self.var.wfc1[No] - self.var.wwp1[No])) + self.var.wwp1[No]
         wCrit2 = ((1 - p) * (self.var.wfc2[No] - self.var.wwp2[No])) + self.var.wwp2[No]
         # wCrit3 = ((1 - p) * (self.var.wfc3[No] - self.var.wwp3[No])) + self.var.wwp3[No]
-
-        critWaterPlant1 = np.maximum(0., wCrit1 - self.var.wwp1[No])  # * self.var.rootDepth[0][No]
-        critWaterPlant2 = np.maximum(0., wCrit2 - self.var.wwp2[No])  # * self.var.rootDepth[1][No]
+       
+        critWaterPlant1 = np.maximum(0., wCrit1 - self.var.wwp1[No])
+        critWaterPlant2 = np.maximum(0., wCrit2 - self.var.wwp2[No])# * self.var.rootDepth[1][No]
         # critWaterPlant3 = np.maximum(0., wCrit3 - self.var.wwp3[No]) # * self.var.rootDepth[2][No]
         critAvlWater = critWaterPlant1 + critWaterPlant2  # + critWaterPlant3
 
@@ -192,6 +196,7 @@ class waterdemand_irrigation:
 
         self.var.pot_irrConsumption[No] = np.where(self.var.cropKC[No] > 0.20, np.where(readAvlWater < (self.var.alphaDepletion * critAvlWater),
                                                         np.maximum(0.0, self.var.alphaDepletion * self.var.totAvlWater - readAvlWater),  0.), 0.)
+
 
         if "fraction_IncreaseIrrigation_Nonpaddy" in binding:
             self.var.fraction_IncreaseIrrigation_Nonpaddy = loadmap(

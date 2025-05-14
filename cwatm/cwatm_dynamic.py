@@ -109,6 +109,7 @@ class CWATModel_dyn(DynamicModel):
             groundwater_storage = self.var.groundwater_storage_available
         elif checkOption('limitAbstraction'):
             groundwater_storage = self.var.storGroundwater
+            self.var.unmetDemand_runningSum = self.var.storGroundwater * 0
         else:
             self.var.unmetDemand_runningSum += self.var.unmetDemand
             groundwater_storage = self.var.storGroundwater - self.var.unmetDemand_runningSum

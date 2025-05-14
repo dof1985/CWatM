@@ -525,7 +525,8 @@ def compressArray(map, name="None", zeros = 0.):
     if name != "None":
         if np.max(np.isnan(mapC)):
             msg = "Error 106:" + name + " has less valid pixels than area or ldd \n"
-            raise CWATMError(msg)
+            #raise CWATMError(msg)
+            mapC[np.isnan(mapC)] = 0.000001
             # test if map has less valid pixel than area.map (or ldd)
     # if a value is bigger or smaller than 1e20, -1e20 than the standard value is taken
     mapC[mapC > 1.E20] = zeros
@@ -1081,7 +1082,6 @@ def multinetdf(meteomaps, usebuffer,startcheck = 'dateBegin'):
 
             nf1.close()
             # --- End Netcdf -------------
-
         meteofiles[maps] =  meteolist
         flagmeteo[maps] = 0
 
@@ -1110,7 +1110,7 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
         meteoInfo = meteofiles[name][flagmeteo[name]]
         idx = inputcounter[name]
         filename =  os.path.normpath(meteoInfo[0])
-
+      
     except:
         date1 = "%02d/%02d/%02d" % (date.day, date.month, date.year)
         msg = "Error 210: Netcdf map error for: " + name + " -> " + cbinding(name) + " on: " + date1 + ": \n"
@@ -1278,7 +1278,6 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
 
             if meteo: inputcounter[value] = idx
 
-
     #checkif latitude is reversed
     turn_latitude = False
     try:
@@ -1402,6 +1401,8 @@ def readnetcdfInitial(name, value,default = 0.0):
     :raises if varibale name is not included in the netcdf file: :meth:`management_modules.messages.CWATMWarning`
     """
 
+    if value == "storGroundwater":
+        ii = 1
     filename =  os.path.normpath(name)
     try:
        nf1 = Dataset(filename, 'r')
@@ -1973,14 +1974,19 @@ def returnBool(inBinding):
         msg = "Error 115: Value in: \"" + inBinding + "\" is not True or False! \nbut: " + b
         raise CWATMError(msg)
 
-def checkOption(inBinding):
+def checkOption(inBinding,checkfirst = False):
     """
     Check if option in settings file has a counterpart in the source code
 
     :param inBinding: parameter in settings file
+    :checkfirst: check if in settingsfile
 
     Not tested because you need to change the name eg gridSizeUserDefined = True -> gridSizeUser = True
     """
+    if checkfirst:
+        if not(inBinding in option):
+            return False
+
     lineclosest = ""
     test = inBinding in option
     if test:

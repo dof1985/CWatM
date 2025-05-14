@@ -72,7 +72,8 @@ class outputTssMap(object):
 
             sampleAdresses = {}
             outp = []
-            allpoints = np.where(maskinfo["mask"].data == False)
+            #allpoints = np.where(maskinfo["mask"].data == False)
+            allpoints = np.where(maskinfo["mask"] == False)
 
             for i in range(maskinfo['mapC'][0]):
                 if out[i]>0:
@@ -602,7 +603,8 @@ class outputTssMap(object):
                         if map[-9:] == "annualtot":
                             vars(self.var)[varname + "_annualtot"] = vars(self.var)[varname + "_annualtot"] + vars(self.var)[varname]
                         if map[-9:] == "annualavg":
-                            vars(self.var)[varname + "_annualavg"] = vars(self.var)[varname + "_annualavg"] + vars(self.var)[varname]
+                            #vars(self.var)[varname2 + "_annualavg"] = vars(self.var)[varname2 + "_annualavg"] + vars(self.var)[varname]
+                            vars(self.var)[varname + "_annualavg"] = vars(self.var)[varname + "_annualavg"] + eval(inputmap)
 
                         if dateVar['checked'][dateVar['currwrite'] - 1]==2:
                             if map[-9:] == "annualtot":

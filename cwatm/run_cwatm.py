@@ -65,6 +65,7 @@ if "modflow_coupling" in option:
 
 #import xlrd
 #import openpyxl
+gdal.UseExceptions()
 
 # ---------------------------
 
@@ -113,7 +114,6 @@ def CWATMexe(settings):
 
 
     """
-
     parse_configuration(settings)
     # print option
     # print binding
@@ -264,6 +264,7 @@ def headerinfo():
 
     versioning['exe'] = __file__
     realPath = os.path.dirname(os.path.realpath(versioning['exe']))
+    """
     if Flags['calib'] or Flags['warm']:
         versioning['lastdate'] = "01.06.2021"
         __date__ = versioning['lastdate']
@@ -285,6 +286,11 @@ def headerinfo():
         versioning['lastdate'] = datetime.datetime.fromtimestamp(lasttime).strftime("%Y/%m/%d %H:%M")
         __date__ = versioning['lastdate']
         versioning['lastfile'] = lastfile
+    """
+    versioning['lastdate'] = "21.12.2024"
+    __date__ = versioning['lastdate']
+    versioning['lastfile'] = "___"  
+    
     versioning['version'] = __version__
     versioning['platform'] = platform1
 

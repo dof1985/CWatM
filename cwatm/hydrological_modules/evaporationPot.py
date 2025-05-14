@@ -105,6 +105,12 @@ class evaporationPot(object):
         3: Yang et al. Penman Montheith correction method
         Yang, Y., Roderick, M. L., Zhang, S., McVicar, T. R., and Donohue, R. J.: Hydrologic implications of vegetation response to elevated CO2 in climate projections, Nat. Clim. Change, 9, 44-48, 10.1038/s41558-018-0361-0, 2019.
         Equation 14: where the term 2.14 accounts for changing [CO2] on rs
+        4: Priestley-Taylor: 1.26 * delat
+        https://wetlandscapes.github.io/blog/blog/penman-monteith-and-priestley-taylor/
+        uses only tmin, tmax, tavg, rsds, rlds (or rsd)
+        5: Modified Thornthwaite
+          Pereira, A. R., & Pruitt, W. O. (2004). Adaptation of the Thornthwaite Scheme for Estimating Daily Reference Evapotranspiration. Agricultural Water Management, 66, 251-257.
+            https://doi.org/10.1016/j.agwat.2003.11.003
 
         
 
@@ -136,6 +142,7 @@ class evaporationPot(object):
             if self.var.pet_modus == 2: self.dynamic_2()
             if self.var.pet_modus == 3: self.dynamic_1()
             if self.var.pet_modus == 4: self.dynamic_4()
+            if self.var.pet_modus == 5: self.dynamic_5()
 
     # --------------------------------------------------------------------------
 
@@ -360,13 +367,9 @@ class evaporationPot(object):
         # if only daily calculate radiation is given instead of longwave down and shortwave down radiation
         if self.var.only_radiation:
             # FAO 56 - https://www.fao.org/3/x0490E/x0490e07.htm#solar%20radiation  equation 39
-            a = dateVar['doy']
-            #radian = np.pi / 180 * self.var.lat
-            radian = np.pi / 180 * -20
-            #distanceSun = 1 + 0.033 *  np.cos(2 * np.pi * dateVar['doy'] / 365)
-            distanceSun = 1 + 0.033 * np.cos(2 * np.pi * 246 / 365)
-            #declin = 0.409 * np.sin(2 * np.pi * dateVar['doy'] / 365 - 1.39)
-            declin = 0.409 * np.sin(2 * np.pi * 246 / 365 - 1.39)
+            radian = np.pi / 180 * self.var.lat
+            distanceSun = 1 + 0.033 *  np.cos(2 * np.pi * dateVar['doy'] / 365)
+            declin = 0.409 * np.sin(2 * np.pi * dateVar['doy'] / 365 - 1.39)
 
             ws = np.arccos(-np.tan(radian * np.tan(declin)))
             Ra = 24 *60 / np.pi * 0.082 * distanceSun * (ws * np.sin(radian) * np.sin(declin) + np.cos(radian) * np.cos(declin) * np.sin(ws))
@@ -411,3 +414,58 @@ class evaporationPot(object):
         # potential evaporation rate from a bare soil surface [m/day]
         self.var.EWRef = RNANWater * 0.001
 
+
+    def dynamic_5(self):
+        """
+        Dynamic part of the potential evaporation module
+        5. MODIFIED THORNTHWAITE METHOD
+        uses only tmin, tmax, tavg
+        Pereira, A. R., & Pruitt, W. O. (2004). Adaptation of the Thornthwaite Scheme for Estimating Daily Reference Evapotranspiration. Agricultural Water Management, 66, 251-257. https://doi.org/10.1016/j.agwat.2003.11.003
+        Put together by  Tamás Ács
+        """
+        
+        # FAO 56 - https://www.fao.org/3/x0490E/x0490e07.htm#solar%20radiation  equation 39
+        # 	radian: local latitude [rad]
+        radian = np.pi / 180 * self.var.lat
+        # solar declination [rad] with day of year
+        declin = 0.409 * np.sin(2 * np.pi * dateVar['doy'] / 365 - 1.39)
+        # 	ws: the hourly angle between sunrise and sunset [rad]
+        ws = np.arccos(-np.tan(radian * np.tan(declin)))
+        # Photoperiod (daylength)
+        N = ws * 24 / np.pi
+        
+        # 	k: parameter, found the be 0.69-0.72 (0.72 proposed by Camargo et al.
+        #   and 0.69 proposed by Pereira et al.)
+        k = 0.69
+ 
+        # Thermal index of the year:
+        if globals.dateVar['newStart'] or globals.dateVar['newYear']:
+            self.var.thermalI = readnetcdf2('thermalIndexFile', globals.dateVar['currDate'], "yearly", value="thermalindex")
+
+        # I will be calculated in a prerun, year starts on 1st Jan.
+        # I=∑(0.2*T_(eff,mean) )^1.514  from n=1 to 12
+        # n: index of month
+        # T_(eff,mean): the monthly mean of daily T_eff values in the given month [C]
+        
+        # exponent alpha
+        alpha = 6.75e-7 * self.var.thermalI**3 - 7.71e-5 * self.var.thermalI**2 + 1.7912e-2 * self.var.thermalI + 0.49239
+
+        # Effective temperature (Camargo et al. 1999 and Pereira et al. 2004)
+        Teff = N / (24-N) * 0.5 * k * (3 * self.var.TMax - self.var.TMin)
+        Teff = np.where(Teff < self.var.Tavg,self.var.Tavg,Teff)
+        Teff = np.where(Teff > self.var.TMax,self.var.TMax,Teff)
+        
+        # PET (Thornthwaite 1948 and Willmott et al. 1985):
+        pet1 = N/360 * 16 * (10 * Teff / self.var.thermalI) ** alpha
+        pet2 = -415.85 + 32.24 * Teff - 0.43 * Teff**2
+        # correction factor by PB to get to daily and to include photoperiod variation
+        pet2 = pet2 * N/364.386
+        PET = np.where(Teff< 26.5,pet1,pet2)
+        PET = np.where(Teff< 0,0,PET)
+
+        # potential reference evapotranspiration rate [m/day]  # from mm to m 
+        self.var.ETRef = PET * 0.001   
+        # only one potential evapotranspiration: water = reference crop * 1.2
+        # 1.2 as empirical factor
+        self.var.EWRef = self.var.ETRef * 1.2
+        
