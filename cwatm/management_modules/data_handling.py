@@ -437,7 +437,8 @@ def compressArray(map, name="None", zeros = 0.):
     if name != "None":
         if np.max(np.isnan(mapC)):
             msg = "Error 106:" + name + " has less valid pixels than area or ldd \n"
-            raise CWATMError(msg)
+            #raise CWATMError(msg)
+            mapC[np.isnan(mapC)] = 0.000001
             # test if map has less valid pixel than area.map (or ldd)
     # if a value is bigger or smaller than 1e20, -1e20 than the standard value is taken
     mapC[mapC > 1.E20] = zeros
@@ -916,6 +917,9 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
                     start = num2date(startint * datediv, units=nctime.units, calendar=nctime.calendar)
 
             nf1.close()
+
+            # --- End Netcdf -------------
+
         meteofiles[maps] =  meteolist
         flagmeteo[maps] = 0
 
@@ -943,6 +947,7 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
         meteoInfo = meteofiles[name][flagmeteo[name]]
         idx = inputcounter[name]
         filename =  os.path.normpath(meteoInfo[0])
+
     except:
         date1 = "%02d/%02d/%02d" % (date.day, date.month, date.year)
         msg = "Error 210: Netcdf map error for: " + name + " -> " + cbinding(name) + " on: " + date1 + ": \n"
@@ -1108,9 +1113,11 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     else:
         name = cbinding(namebinding)
     filename =  os.path.normpath(name)
+
     if cut:
         cut0, cut1, cut2, cut3 = mapattrNetCDF(filename, check = False)
     
+
     try:
        nf1 = Dataset(filename, 'r')
     except:
@@ -1137,7 +1144,7 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
         else:
             if useDaily == "yearly":
                 date = datetime.datetime(date.year, int(1), int(1))
-            if useDaily == "monthly":
+#             if useDaily == "monthly":
                 date = datetime.datetime(date.year, date.month, int(1))
 
             # A netCDF time variable object  - time index (in the netCDF file)
@@ -1152,8 +1159,8 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
             else:
                 #idx = date2index(date, nctime, calendar=nctime.calendar, select='exact')
                 idx = date2indexNew(date, nctime, calendar=nctime.calendar, select='nearest', name = name)
-            if meteo: inputcounter[value] = idx
 
+            if meteo: inputcounter[value] = idx
 
     #checkif latitude is reversed
     turn_latitude = False
@@ -1167,7 +1174,6 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
            mapnp = np.flipud(mapnp)
     except:
        ii = 1
-
     if 'Glacier' in namebinding:
         cutcheckmask = maskinfo['shape'][0] * maskinfo['shape'][1]
         cutcheckmap = nf1.variables[value].shape[1] * nf1.variables[value].shape[2]
@@ -1176,9 +1182,7 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
 
     if cut:
         if turn_latitude:
-            #mapnp = mapnp[cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]]
-            mapnp = mapnp[cut2:cut3, cut0:cut1]
-            
+            mapnp = mapnp[cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]]
         else:
             #mapnp = nf1.variables[value][idx, cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]].astype(np.float64)
             if useDaily == 'max':
@@ -1186,6 +1190,7 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
             else:
                 mapnp = nf1.variables[value][idx, cut2:cut3, cut0:cut1].astype(np.float64)
             
+
     else:
         if not(turn_latitude):
             mapnp = nf1.variables[value][idx].astype(np.float64)
@@ -1204,11 +1209,10 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     if maskinfo['shapeflat'][0]!= mapnp.size:
         msg = "Error 110: " + name + " has less or more valid pixels than the mask map \n"
         raise CWATMWarning(msg)
-    
+
     mapC = compressArray(mapnp, name=filename)
     if Flags['check']:
         checkmap(value, filename, mapnp, True, True, mapC)
-    
     return mapC
 
 
@@ -1260,6 +1264,8 @@ def readnetcdfInitial(name, value,default = 0.0):
     :raises if varibale name is not included in the netcdf file: :meth:`management_modules.messages.CWATMWarning`
     """
 
+    if value == "storGroundwater":
+        ii = 1
     filename =  os.path.normpath(name)
     try:
        nf1 = Dataset(filename, 'r')
@@ -1781,14 +1787,19 @@ def returnBool(inBinding):
         msg = "Error 115: Value in: \"" + inBinding + "\" is not True or False! \nbut: " + b
         raise CWATMError(msg)
 
-def checkOption(inBinding):
+def checkOption(inBinding,checkfirst = False):
     """
     Check if option in settings file has a counterpart in the source code
 
     :param inBinding: parameter in settings file
+    :checkfirst: check if in settingsfile
 
     Not tested because you need to change the name eg gridSizeUserDefined = True -> gridSizeUser = True
     """
+    if checkfirst:
+        if not(inBinding in option):
+            return False
+
     lineclosest = ""
     test = inBinding in option
     if test:
@@ -1863,26 +1874,6 @@ def divideValues(x,y, default = 0.):
     y1[y1 == 0.] = 1.0
     z = x / y1
     z[y == 0.] = default
-
-    #with np.errstate(invalid='ignore', divide='ignore'):
-    #    z = np.where(y > 0., x/y, default)
-    # have to solve this without err handler to get the error message back
-
-    return z
-    
-def divideArrays(x,y, default = 0.):
-    """
-    returns the result of a division that possibly involves a zero
-
-    :param x:
-    :param y: divisor
-    :param default: return value if y =0
-    :return: result of :math:`x/y` or default if y = 0
-    """
-    y1 = y.copy()
-    y1[y1 == 0.] = 1.0
-    z = x / y1
-    z * np.where(y == 0., default, 1.)
 
     #with np.errstate(invalid='ignore', divide='ignore'):
     #    z = np.where(y > 0., x/y, default)

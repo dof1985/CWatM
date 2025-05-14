@@ -73,6 +73,26 @@ class initcondition(object):
 
         return Crops, Crops_names
 
+    def reservoir_addinfo(self, xl_settings_file_path):
+        pd = importlib.import_module("pandas", package=None)
+        df = pd.read_excel(xl_settings_file_path, header=None, sheet_name='Reservoirs')
+
+        # reservoir_transfers = [ [Giving reservoir, Receiving reservoir, [366-day array of releases]] ]
+        reservoir_info = []
+        #         0      1      2
+        dtypes =['int','bool','float','float','int','str','float','float','float','float','float','float','float','float','float','float','float','float']
+        for col in list(df)[5:]:
+            info =[]
+            # more complicated by sometimes excel mismatch dtypes
+            for var in range(19):
+                v = np.array(df[col][var]).tolist()
+                info.append(v)
+            #info = np.array([df[col][values] for values in range(19)])
+            reservoir_info.append(info)
+
+        return reservoir_info
+
+
     def reservoir_transfers(self, xl_settings_file_path):
         pd = importlib.import_module("pandas", package=None)
         df = pd.read_excel(xl_settings_file_path, sheet_name='Reservoir_transfers')
@@ -80,10 +100,26 @@ class initcondition(object):
         # reservoir_transfers = [ [Giving reservoir, Receiving reservoir, fraction of live storage] ]
         reservoir_transfers = []
 
+        '''
+        # MS - OLD
         for i in df.index:
             transfer = [df['Giving reservoir'][i], df['Receiving reservoir'][i], df['Fraction of live storage'][i]]
             if transfer[2] > 0:
-                reservoir_transfers.append(transfer)
+        '''
+        
+        # PB - OLD
+        for col in list(df)[5:]:
+            releases = [df[col][4+day] for day in range(366)]
+            # info for transfer: Ruleset, giving res, receiving res, Limits, release days
+            # defaul;t rule = 1
+            try:
+                rule = int(df[col][0])
+            except:
+                rule = 1
+            transfer = [rule,int(df[col][1]), int(df[col][2]),df[col][3], releases]
+            reservoir_transfers.append(transfer)
+
+
         return reservoir_transfers
     
  
@@ -140,6 +176,7 @@ class initcondition(object):
 
 		Reads the parameter *save_initial* and *save_initial* to know if to save or load initial values
         """
+
         ### Check Options - all modules ###
         
         # Water Quality ####
@@ -159,9 +196,7 @@ class initcondition(object):
             if 'includePhosphorus' in binding:
                 self.var.includePhosphorus = returnBool('includePhosphorus')
 
-            if 'includeErosed' in binding:
-                self.var.includeErosed = returnBool('includeErosed')
-                
+
         # list all initiatial variables
         # Snow & Frost
         number = int(loadmap('NumberSnowLayers'))
@@ -281,7 +316,22 @@ class initcondition(object):
                 Var1 = ["smalllakeInflow","smalllakeStorage","smalllakeOutflow"]
                 Var2 = ["smalllakeInflowOld","smalllakeVolumeM3","smalllakeOutflow"]
                 initCondVar.extend(Var1)
-                initCondVarValue.extend(Var2)
+                initCondVarValue.extend(Var2)                
+                
+        if 'reservoir_add_info_in_Excel' in option:
+            if checkOption('reservoir_add_info_in_Excel'):
+                if 'Excel_settings_file' in binding:
+                    xl_settings_file_path = cbinding('Excel_settings_file')
+                    self.var.reservoir_info = self.reservoir_addinfo(xl_settings_file_path)
+
+
+
+        if 'reservoir_transfers' in option:
+            if checkOption('reservoir_transfers'):
+                if 'Excel_settings_file' in binding:
+                    xl_settings_file_path = cbinding('Excel_settings_file')
+                    self.var.reservoir_transfers = self.reservoir_transfers(xl_settings_file_path)
+
         
         # Water quality
         if self.var.includeWaterQuality:
@@ -313,11 +363,6 @@ class initcondition(object):
                 initCondVar.extend(Var1)
                 initCondVarValue.extend(Var2)
         
-        if 'reservoir_transfers' in option:
-            if checkOption('reservoir_transfers'):
-                if 'Excel_settings_file' in binding:
-                    xl_settings_file_path = cbinding('Excel_settings_file')
-                    self.var.reservoir_transfers = self.reservoir_transfers(xl_settings_file_path)
         
         if 'includeWastewater' in option:
             if checkOption('includeWastewater'):

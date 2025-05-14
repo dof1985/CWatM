@@ -191,6 +191,8 @@ class readmeteo(object):
             self.var.snowmelt_radiation = False
 
         if checkOption('calc_evaporation'):
+            self.var.pet_modus = checkOption('PET_modus')
+
             if self.var.only_radiation:
                 # for maps from EMO-5 with total radiation and vapor pressure instead of huss, air pressure, rsds and rlds
                 meteomaps = [self.var.preMaps, self.var.tempMaps,'TminMaps','TmaxMaps','WindMaps','RGDMaps','EActMaps']
@@ -200,6 +202,14 @@ class readmeteo(object):
                     meteomaps.append('QAirMaps')
                 else:
                     meteomaps.append('RhsMaps')
+            if self.var.pet_modus == 4:
+                # Priestley-Taylor: tmin, tmax, tavg, rsds, rlds (or rsd)
+                if not(self.var.only_radiation):
+                    meteomaps = [self.var.preMaps, self.var.tempMaps, 'TminMaps', 'TmaxMaps','RSDSMaps', 'RSDLMaps']
+            if self.var.pet_modus == 5:
+                # for modified Thornthwaite: uses only tmin, tmax, tavg
+                meteomaps = [self.var.preMaps, self.var.tempMaps, 'TminMaps', 'TmaxMaps']
+
 
 
             if self.var.includeGlaciers:
@@ -653,7 +663,10 @@ class readmeteo(object):
             checkmap(self.var.tempMaps, "", self.var.Tavg, True, True, self.var.Tavg)
 
         if checkOption('calc_evaporation') or self.var.snowmelt_radiation:
-            # for new snow calculation radiation is needed
+           # for new snow calculation radiation is needed
+           if self.var.pet_modus < 5:
+                # If evaporation is not modified Thornwaite
+                # because with priestly or Thornewaite there are no radiation maps
             if self.var.only_radiation:
                 # read daily calculated radiation [in KJ/m2/day]
                 # named here Rsds instead of rds, because use in evaproationPot in the same way as rsds
@@ -735,37 +748,40 @@ class readmeteo(object):
                 self.var.TMin -= ZeroKelvin
                 self.var.TMax -= ZeroKelvin
 
-            #self.var.Wind = readnetcdf2('WindMaps', dateVar['currDate'], addZeros = True, meteo = True)
-            self.var.Wind, MaskMapBoundary = readmeteodata('WindMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
-            self.var.Wind = self.downscaling2(self.var.Wind)
+            if self.var.pet_modus < 4:
+                # with priestley ET or Thornewaite ET no wind, psurf,qair available
+                self.var.Wind = readmeteodata('WindMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
+                self.var.Wind = self.downscaling2(self.var.Wind)
+
                 # wind speed maps at 10m [m/s]
 
-            # Adjust wind speed for measurement height: wind speed measured at
-            # 10 m, but needed at 2 m height
-            # Shuttleworth, W.J. (1993) in Maidment, D.R. (1993), p. 4.36
-            self.var.Wind = self.var.Wind * 0.749
+                # Adjust wind speed for measurement height: wind speed measured at
+                # 10 m, but needed at 2 m height
+                # Shuttleworth, W.J. (1993) in Maidment, D.R. (1993), p. 4.36
+                self.var.Wind = self.var.Wind * 0.749
 
-            if not self.var.only_radiation:
+                if not self.var.only_radiation:
 
-                #self.var.Psurf = readnetcdf2('PSurfMaps', dateVar['currDate'], addZeros = True, meteo = True)
-                self.var.Psurf, MaskMapBoundary = readmeteodata('PSurfMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
-                self.var.Psurf = self.downscaling2(self.var.Psurf)
-                    # Instantaneous surface pressure[Pa]
+                    #self.var.Psurf = readnetcdf2('PSurfMaps', dateVar['currDate'], addZeros = True, meteo = True)
+                    self.var.Psurf = readmeteodata('PSurfMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
+                    self.var.Psurf = self.downscaling2(self.var.Psurf)
+                        # Instantaneous surface pressure[Pa]
 
-                if returnBool('useHuss'):
-                    #self.var.Qair = readnetcdf2('QAirMaps', dateVar['currDate'], addZeros = True, meteo = True)
-                    self.var.Qair, MaskMapBoundary = readmeteodata('QAirMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
-                    # 2 m istantaneous specific humidity[kg / kg]
-                else:
-                    #self.var.Qair = readnetcdf2('RhsMaps', dateVar['currDate'], addZeros = True, meteo = True)
-                    self.var.Qair, MaskMapBoundary = readmeteodata('RhsMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
-                self.var.Qair = self.downscaling2(self.var.Qair)
+                    if returnBool('useHuss'):
+                        #self.var.Qair = readnetcdf2('QAirMaps', dateVar['currDate'], addZeros = True, meteo = True)
+                        self.var.Qair = readmeteodata('QAirMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
+                        # 2 m istantaneous specific humidity[kg / kg]
+                    else:
+                        #self.var.Qair = readnetcdf2('RhsMaps', dateVar['currDate'], addZeros = True, meteo = True)
+                        self.var.Qair = readmeteodata('RhsMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
+                    self.var.Qair = self.downscaling2(self.var.Qair)
 
-                #--------------------------------------------------------
-                # conversions
 
-                # [Pa] to [KPa]
-                self.var.Psurf = self.var.Psurf * 0.001
+                    #--------------------------------------------------------
+                    # conversions
+
+                    # [Pa] to [KPa]
+                    self.var.Psurf = self.var.Psurf * 0.001
 
 
         # if pot evaporation is already precalulated

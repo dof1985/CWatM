@@ -261,7 +261,7 @@ class landcoverType(object):
         landcoverVars = ['irrTypeFracOverIrr','fractionArea','totAvlWater','cropKC', 'cropKC_landCover',
                          'effSatAt50',  'effPoreSizeBetaAt50', 'rootZoneWaterStorageMin','rootZoneWaterStorageRange',
                          'totalPotET','potTranspiration','soilWaterStorage',
-                         'infiltration', 'infiltration2', 'actBareSoilEvap','landSurfaceRunoff','actTransTotal',
+                         'infiltration','actBareSoilEvap','landSurfaceRunoff','actTransTotal',
                          'gwRecharge','interflow','actualET','pot_irrConsumption','act_irrConsumption','irrDemand',
                          'topWaterLayer',
                          'perc3toGW','capRiseFromGW','netPercUpper','netPerc','prefFlow']
