@@ -58,7 +58,12 @@ class water_demand:
     resId_restricted                                                                                               --   
     waterBodyBuffer                                                                                                --   
     waterBodyBuffer_wwt                                                                                            --   
-    MtoM3C                                 conversion factor from m to m3 (compressed map)                         --
+    reservoir_transfers_net_M3             net reservoir transfers, after exports, transfers, and imports          m3   
+    reservoir_transfers_in_M3              water received into reservoirs                                          m3   
+    reservoir_transfers_out_M3             water given from reservoirs                                             m3   
+    reservoir_transfers_from_outside_M3    water received into reservoirs from Outside                             m3   
+    reservoir_transfers_to_outside_M3      water given from reservoirs to the Outside                              m3   
+    MtoM3C                                 conversion factor from m to m3 (compressed map)                         --   
     waterBodyTypCTemp                                                                                              --   
     pot_livestockConsumption                                                                                       --   
     cellArea                               Area of cell                                                            m2   
@@ -77,7 +82,12 @@ class water_demand:
     adminSegments                          Domestic agents                                                         Int  
     nonFossilGroundwaterAbs                Non-fossil groundwater abstraction. Used primarily without MODFLOW.     m    
     includeWastewater                                                                                              --   
-    lakeVolumeM3C                          compressed map of lake volume                                           m3
+    reservoir_transfers_net_M3C                                                                                    --   
+    reservoir_transfers_in_M3C                                                                                     --   
+    reservoir_transfers_out_M3C                                                                                    --   
+    reservoir_transfers_from_outside_M3C                                                                           --   
+    reservoir_transfers_to_outside_M3C                                                                             --   
+    lakeVolumeM3C                          compressed map of lake volume                                           m3   
     lakeStorageC                                                                                                   --   
     reservoirStorageM3C                                                                                            --   
     lakeResStorageC                                                                                                --   
@@ -487,7 +497,7 @@ class water_demand:
                 if 'reservoir_command_areas' in binding:
                     self.var.load_command_areas = True
 
-                if 'reservoir_command_areas_restricted' in binding:
+                if 'reservoir_command_areas_restricted' in binding and self.var.includeWastewater:
                     self.var.load_command_areas_wwt = True
 
                 if self.var.modflow and 'Water_conveyance_efficiency' in binding:
@@ -671,17 +681,17 @@ class water_demand:
             self.var.Lift_Industry = globals.inZero.copy()
             self.var.Lift_Livestock = globals.inZero.copy()
             self.var.Lift_Irrigation = globals.inZero.copy()
-            
-            self.var.wwt_Domestic = globals.inZero.copy()
-            self.var.wwt_Industry = globals.inZero.copy()
-            self.var.wwt_Livestock = globals.inZero.copy()
-            self.var.wwt_Irrigation = globals.inZero.copy()
 
             self.var.Lake_Domestic = globals.inZero.copy()
             self.var.Lake_Industry = globals.inZero.copy()
             self.var.Lake_Livestock = globals.inZero.copy()
             self.var.Lake_Irrigation = globals.inZero.copy()
 
+            self.var.wwt_Domestic = globals.inZero.copy()
+            self.var.wwt_Industry = globals.inZero.copy()
+            self.var.wwt_Livestock = globals.inZero.copy()
+            self.var.wwt_Irrigation = globals.inZero.copy()
+            
             self.var.Res_Domestic = globals.inZero.copy()
             self.var.Res_Industry = globals.inZero.copy()
             self.var.Res_Livestock = globals.inZero.copy()
@@ -692,8 +702,8 @@ class water_demand:
             self.var.GW_Livestock = globals.inZero.copy()
             self.var.GW_Irrigation = globals.inZero.copy()
             self.var.abstractedLakeReservoirM3 = globals.inZero.copy()
-
             self.var.swAbstractionFraction_domestic = 1 + globals.inZero.copy()
+            
             self.var.ind_efficiency = 1.
             self.var.dom_efficiency = 1.
             self.var.liv_efficiency = 1
@@ -789,6 +799,11 @@ class water_demand:
             self.var.Lake_Industry = globals.inZero.copy()
             self.var.Lake_Livestock = globals.inZero.copy()
             self.var.Lake_Irrigation = globals.inZero.copy()
+            
+            self.var.wwt_Domestic = globals.inZero.copy()
+            self.var.wwt_Industry = globals.inZero.copy()
+            self.var.wwt_Livestock = globals.inZero.copy()
+            self.var.wwt_Irrigation = globals.inZero.copy()
 
             self.var.Res_Domestic = globals.inZero.copy()
             self.var.Res_Industry = globals.inZero.copy()
@@ -879,7 +894,8 @@ class water_demand:
                 self.environmental_need.dynamic()
 
             if self.var.includeIndusDomesDemand:  # all demands are taken into account
-                if globals.dateVar['newStart'] or globals.dateVar['newMonth']:
+                if globals.dateVar['newStart'] or globals.dateVar['newMonth'] \
+                        or 'reservoir_transfers' in option:
                     # total (potential) non irrigation water demand
                     self.var.nonIrrDemand = self.var.domesticDemand + self.var.industryDemand + self.var.livestockDemand
                     self.var.pot_nonIrrConsumption = np.minimum(self.var.nonIrrDemand,
@@ -1486,6 +1502,8 @@ class water_demand:
 
                 minlake = np.maximum(0., 0.98 * lakeResStorageC)  # reasonable but arbitrary limit
                 act_bigLakeAbstC = np.minimum(minlake, remainNeedBigC)
+                if self.var.includeWaterQuality:
+                    self.var.act_bigLakeAbstC = act_bigLakeAbstC.copy() * self.var.MtoM3C
                 # substract from both, because it is sorted by self.var.waterBodyTypCTemp
                 self.var.lakeStorageC = self.var.lakeStorageC - act_bigLakeAbstC * self.var.MtoM3C
                 self.var.lakeVolumeM3C = self.var.lakeVolumeM3C - act_bigLakeAbstC * self.var.MtoM3C
@@ -1527,8 +1545,6 @@ class water_demand:
                                                     + self.var.act_smallLakeResAbst
                 self.var.act_lakeAbst = self.var.act_bigLakeResAbst + self.var.act_smallLakeResAbst
 
-
-                """
                 # Transfer water between reservoirs
                 # Send storage between reservoirs using the Excel sheet reservoir_transfers within cwatm_settings.xlsx
                 # Using the waterBodyIDs defined in the settings, designate
@@ -1540,7 +1556,8 @@ class water_demand:
                     if checkOption('reservoir_transfers'):
 
                         for transfer in self.var.reservoir_transfers:
-                            #self.var.inZero_C = np.compress(self.var.compress_LR, globals.inZero.copy())
+
+                            self.var.inZero_C = np.compress(self.var.compress_LR, globals.inZero.copy())
 
                             if returnBool('dynamicLakesRes'):
                                 year = dateVar['currDate'].year
@@ -1548,69 +1565,106 @@ class water_demand:
                                 year = loadmap('fixLakesResYear')
 
                             if transfer[0] > 0:
-                                # using Giving reservoir ID from Excel - if this is 0 it is from outside
-                                giver = np.where(self.var.waterBodyID_C == transfer[0])[0][0]
-                                giver_already_constructed = self.var.resYearC[giver] <= year
+                                index_giver = np.where(self.var.waterBodyID_C == transfer[0])[0][0]
+                                giver_already_constructed = self.var.resYearC[index_giver] <= year
                             else:
                                 giver_already_constructed = True
 
                             if transfer[1] > 0:
-                                # using the Receiving reservoir from Excel
-                                receiver = np.where(self.var.waterBodyID_C == transfer[1])[0][0]
-                                receiver_already_constructed = self.var.resYearC[receiver] <= year
+                                index_receiver = np.where(self.var.waterBodyID_C == transfer[1])[0][0]
+                                receiver_already_constructed = self.var.resYearC[index_receiver] <= year
                             else:
                                 receiver_already_constructed = True
 
-
-
-
                             if receiver_already_constructed and giver_already_constructed:
-                                # if giving and receiving station already exist (is build before the year which is modelled)
+
                                 reservoir_unused = self.var.resVolumeC - self.var.reservoirStorageM3C
                                 if transfer[1] > 0:
-                                    reservoir_unused_receiver = reservoir_unused[receiver]
+                                    reservoir_unused_receiver = reservoir_unused[index_receiver]
                                 else:
                                     reservoir_unused_receiver = 10e12
 
                                 if transfer[0] == 0:
                                     # In this case, the fraction refers to the fraction of the receiver,
                                     # as the giver is infinite
-                                    reservoir_storage_giver = self.var.resVolumeC[receiver]
+                                    reservoir_storage_giver = self.var.resVolumeC[index_receiver]
                                 else:
-                                    reservoir_storage_giver = self.var.reservoirStorageM3C[giver]
+                                    reservoir_storage_giver = self.var.reservoirStorageM3C[index_giver]
 
+                                reservoir_transfer_actual = np.minimum(reservoir_unused_receiver * 0.95,
+                                                                       np.where(transfer[2] <= 1,
+                                                                                reservoir_storage_giver * transfer[2],
+                                                                                transfer[2]))
 
-                                if transfer[2][dateVar['doy']-1] <= 1:
-                                    reservoir_transfer_actual = reservoir_storage_giver * transfer[2][dateVar['doy'] - 1]
-                                else:
-                                    reservoir_transfer_actual = transfer[2][dateVar['doy']-1]
-                                reservoir_transfer_actual = np.minimum(reservoir_unused_receiver * 0.95,reservoir_transfer_actual)
-
-                                #reservoir_transfer_actual = \
-                                #    np.minimum(reservoir_unused_receiver * 0.95,
-                                #               np.where(transfer[2][dateVar['doy']-1] <= 1,
-                                #                        reservoir_storage_giver * transfer[2][dateVar['doy']-1],
-                                #                        transfer[2][dateVar['doy']-1]))
                                 # print(transfer[0], 'donated', reservoir_transfer_actual, 'm3 to', transfer[1])
 
                                 if transfer[0] > 0:  # There is a giver, not the ocean
-                                    #self.var.inZero_C[index_giver] = -reservoir_transfer_actual  # giver
-                                    self.var.lakeStorageC[giver] = self.var.lakeStorageC[giver] - reservoir_transfer_actual
-                                    self.var.lakeVolumeM3C[giver] = self.var.lakeVolumeM3C[giver] - reservoir_transfer_actual
-                                    self.var.lakeResStorageC[giver] = self.var.lakeResStorageC[giver] - reservoir_transfer_actual
-                                    self.var.reservoirStorageM3C[giver] = self.var.reservoirStorageM3C[giver] - reservoir_transfer_actual
+                                    self.var.inZero_C[index_giver] = -reservoir_transfer_actual  # giver
+                                    self.var.reservoir_transfers_out_M3C[index_giver] += reservoir_transfer_actual
+                                else:
+                                    self.var.reservoir_transfers_from_outside_M3C[index_receiver] \
+                                        += reservoir_transfer_actual
 
                                 if transfer[1] > 0:  # There is a receiver, not the ocean
-                                    #self.var.inZero_C[index_receiver] = reservoir_transfer_actual  # receiver
-                                    self.var.lakeStorageC[receiver] = self.var.lakeStorageC[receiver] + reservoir_transfer_actual
-                                    self.var.lakeVolumeM3C[receiver] = self.var.lakeVolumeM3C[receiver] + reservoir_transfer_actual
-                                    self.var.lakeResStorageC[receiver] = self.var.lakeResStorageC[receiver] + reservoir_transfer_actual
-                                    self.var.reservoirStorageM3C[receiver] = self.var.reservoirStorageM3C[receiver] + reservoir_transfer_actual
+                                    self.var.inZero_C[index_receiver] = reservoir_transfer_actual  # receiver
+                                    self.var.reservoir_transfers_in_M3C[index_receiver] += reservoir_transfer_actual
+                                else:
+                                    self.var.reservoir_transfers_to_outside_M3C[index_giver] \
+                                        += reservoir_transfer_actual
 
 
 
+                                self.var.lakeStorageC += self.var.inZero_C
+                                self.var.lakeVolumeM3C += self.var.inZero_C
+                                self.var.lakeResStorageC += self.var.inZero_C
+                                self.var.reservoirStorageM3C += self.var.inZero_C
+
+                                self.var.reservoir_transfers_net_M3C += self.var.inZero_C
+                                # Cancels out positive and negative if both receiving and giving
+
+                                if transfer[1] == 0:
+                                    to_outside_basin = globals.inZero.copy()
+                                    np.put(to_outside_basin, self.var.decompress_LR, self.var.inZero_C)
+                                    pot_Lake_Industry -= to_outside_basin * self.var.M3toM
+                                    # self.var.Lake_Industry is updated below
+                                    self.var.act_lakeAbst -= to_outside_basin * self.var.M3toM
+
+                                    self.var.act_SurfaceWaterAbstract -= to_outside_basin * self.var.M3toM
+                                    self.var.act_bigLakeResAbst -= to_outside_basin * self.var.M3toM
+                                    self.var.act_bigLakeResAbst_wwt -= to_outside_basin * self.var.M3toM
+                                    
+                                    self.var.industryDemand -= to_outside_basin * self.var.M3toM
+                                    self.var.pot_industryConsumption -= to_outside_basin * self.var.M3toM
+                                    self.var.ind_efficiency = divideValues(self.var.pot_industryConsumption,
+                                                                           self.var.industryDemand)
 
 
+                        np.put(self.var.reservoir_transfers_net_M3, self.var.decompress_LR,
+                               self.var.reservoir_transfers_net_M3C)
+                        self.var.reservoir_transfers_net_M3C = np.compress(self.var.compress_LR,
+                                                                           globals.inZero.copy())
+
+                        np.put(self.var.reservoir_transfers_in_M3, self.var.decompress_LR,
+                               self.var.reservoir_transfers_in_M3C)
+                        self.var.reservoir_transfers_in_M3C = np.compress(self.var.compress_LR,
+                                                                          globals.inZero.copy())
+
+                        np.put(self.var.reservoir_transfers_out_M3, self.var.decompress_LR,
+                               self.var.reservoir_transfers_out_M3C)
+                        self.var.reservoir_transfers_out_M3C = np.compress(self.var.compress_LR,
+                                                                           globals.inZero.copy())
+
+                        np.put(self.var.reservoir_transfers_from_outside_M3, self.var.decompress_LR,
+                               self.var.reservoir_transfers_from_outside_M3C)
+                        self.var.reservoir_transfers_from_outside_M3C = np.compress(self.var.compress_LR,
+                                                                                    globals.inZero.copy())
+
+                        np.put(self.var.reservoir_transfers_to_outside_M3, self.var.decompress_LR,
+                               self.var.reservoir_transfers_to_outside_M3C)
+                        self.var.reservoir_transfers_to_outside_M3C = np.compress(self.var.compress_LR,
+                                                                                  globals.inZero.copy())
+
+                        ###
 
                         if self.var.sectorSourceAbstractionFractions:
 
@@ -1626,7 +1680,7 @@ class water_demand:
                             self.var.swAbstractionFraction = \
                                 np.where(self.var.reservoir_transfers_to_outside_M3 != 0, 1,
                                          self.var.swAbstractionFraction_nonIrr)
-                """
+
                 # -------------------------------------
 
                 if self.var.sectorSourceAbstractionFractions:
@@ -2258,15 +2312,12 @@ class water_demand:
 
                     act_gw = np.copy(self.var.pot_GroundwaterAbstract)
 
-                self.var.waterAbstract = self.var.unmetDemand + self.var.nonFossilGroundwaterAbs + self.var.act_SurfaceWaterAbstract
-
                 self.var.act_irrNonpaddyWithdrawal = self.var.fracVegCover[3] * self.var.irrDemand[3]
                 self.var.act_irrPaddyWithdrawal = self.var.fracVegCover[2] * self.var.irrDemand[2]
 
                 self.var.act_irrNonpaddyDemand = self.var.act_irrNonpaddyWithdrawal.copy()
                 self.var.act_irrPaddyDemand = self.var.act_irrPaddyWithdrawal.copy()
 
-                # end of limit_abstraction = False
             ## End of limit extraction if, then
 
             self.var.act_irrConsumption[2] = divideValues(self.var.act_irrPaddyWithdrawal,

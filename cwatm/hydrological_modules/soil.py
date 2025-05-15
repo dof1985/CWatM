@@ -9,8 +9,7 @@
 # -------------------------------------------------------------------------
 
 from cwatm.management_modules.data_handling import *
-import warnings
-warnings.filterwarnings("ignore")
+
 
 class soil(object):
 
@@ -239,7 +238,7 @@ class soil(object):
             preStor3 = self.var.w3[No].copy()
             pretopwater = self.var.topwater
 
-
+        
         # -----------------------------------------------------------
         # from evaporation
         # calculate potential bare soil evaporation and transpiration
@@ -254,6 +253,13 @@ class soil(object):
 
         #if (dateVar['curr'] == 130) and (No==2):
         #    ii=1
+        
+        # for the water quality modules
+        self.var.pre_w1 = self.var.w1.copy() # divideArrays(self.var.w1, self.var.cellArea) # 
+        self.var.pre_w2 = self.var.w2.copy() # divideArrays(self.var.w2, self.var.cellArea) # 
+        self.var.pre_w3 = self.var.w3.copy() # divideArrays(self.var.w3, self.var.cellArea) #
+
+
 
         availWaterInfiltration = self.var.availWaterInfiltration[No].copy()
         availWaterInfiltration = availWaterInfiltration + self.var.act_irrConsumption[No]
@@ -298,13 +304,14 @@ class soil(object):
             # CAPRISE from GW to soilayer 3 , if this is full it is send to soil layer 2
             self.var.w2[No] = self.var.w2[No] + np.where(self.var.w3[No] > self.var.ws3[No], self.var.w3[No] - self.var.ws3[No], 0)
             self.var.w3[No] = np.minimum(self.var.ws3[No], self.var.w3[No])
+            
             # CAPRISE from GW to soilayer 2 , if this is full it is send to soil layer 1
             self.var.w1[No] = self.var.w1[No] + np.where(self.var.w2[No] > self.var.ws2[No], self.var.w2[No] - self.var.ws2[No], 0)
             self.var.w2[No] = np.minimum(self.var.ws2[No], self.var.w2[No])
             # CAPRISE from GW to soilayer 1 , if this is full it is send to RUNOFF
             saverunofffromGW = + np.where(self.var.w1[No] > self.var.ws1[No], self.var.w1[No] - self.var.ws1[No], 0)
             self.var.w1[No]= np.minimum(self.var.ws1[No], self.var.w1[No])
-
+            
             # Now, we need to add transfer between soil layers # MODIF LUCA TO IMPROVE MODFLOW COUPLING
 
             # Percolation -----------------------------------------------
@@ -339,7 +346,7 @@ class soil(object):
             satTermFC3 = np.maximum(0., self.var.w3[No] - self.var.wres3[No]) / (self.var.wfc3[No] - self.var.wres3[No])
             capRise1 = np.minimum(np.maximum(0., (1 - satTermFC1) * kUnSat2), self.var.kunSatFC12[No])
             capRise2 = np.minimum(np.maximum(0., (1 - satTermFC2) * kUnSat3), self.var.kunSatFC23[No])
-
+            
             self.var.w1[No] = self.var.w1[No] + capRise1
             self.var.w2[No] = self.var.w2[No] - capRise1 + capRise2
             self.var.w3[No] = self.var.w3[No] - capRise2  # GW capillary rise has already been added to the soil
@@ -395,6 +402,7 @@ class soil(object):
         rws3 = np.maximum(np.minimum(1., rws3), 0.) * self.var.adjRoot[2][No]
         self.var.rws = rws1 + rws2 + rws3
 
+
         TaMax = self.var.potTranspiration[No] * self.var.rws
         # transpiration is 0 when soil is frozen
         TaMax = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0., TaMax)
@@ -410,7 +418,6 @@ class soil(object):
         self.var.w1[No] = self.var.w1[No] - ta1
         self.var.w2[No] = self.var.w2[No] - ta2
         self.var.w3[No] = self.var.w3[No] - ta3
-
 
         # -------------------------------------------------------------
         # Actual potential bare soil evaporation - upper layer
@@ -490,6 +497,7 @@ class soil(object):
 
         # infiltration to soilayer 1 , if this is full it is send to soil layer 2
         self.var.w1[No] = self.var.w1[No] + self.var.infiltration[No]
+        self.var.infiltration2[No] = self.var.infiltration[No] - np.where(self.var.w1[No] > self.var.ws1[No], self.var.w1[No] - self.var.ws1[No], 0)
         self.var.w2[No] = self.var.w2[No] + np.where(self.var.w1[No] > self.var.ws1[No], self.var.w1[No] - self.var.ws1[No], 0)
         self.var.w1[No] = np.minimum(self.var.ws1[No], self.var.w1[No])
 
@@ -545,15 +553,16 @@ class soil(object):
             self.var.capRiseFromGW[No] = np.maximum(0., (1 - satTermFC3) * np.sqrt(self.var.KSat3[NoSoil] * kUnSat3))
             self.var.capRiseFromGW[No] = 0.5 * self.var.capRiseFrac * self.var.capRiseFromGW[No]
             self.var.capRiseFromGW[No] = np.minimum(np.maximum(0., self.var.storGroundwater), self.var.capRiseFromGW[No])
-
+            
         self.var.w1[No] = self.var.w1[No] + capRise1
         self.var.w2[No] = self.var.w2[No] - capRise1 + capRise2
+        
         if self.var.modflow:
             self.var.w3[No] = self.var.w3[No] - capRise2
             # GW capillary rise has already been added to the soil
         else:
             self.var.w3[No] = self.var.w3[No] - capRise2 + self.var.capRiseFromGW[No]
-
+        
         # Percolation -----------------------------------------------
         # Available water in both soil layers [m]
         availWater1 = np.maximum(0.,self.var.w1[No] - self.var.wres1[No])
@@ -667,7 +676,7 @@ class soil(object):
         # When the soil is frozen (frostindex larger than threshold), no perc1 and 2
         self.var.perc1to2[No] = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0,self.var.perc1to2[No])
         self.var.perc2to3[No] = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0,self.var.perc2to3[No])
-
+        
         # Update soil moisture
         self.var.w1[No] = self.var.w1[No] - self.var.perc1to2[No]
         self.var.w2[No] = self.var.w2[No] + self.var.perc1to2[No] - self.var.perc2to3[No]
@@ -687,38 +696,30 @@ class soil(object):
         self.var.actTransTotal_paddy = self.var.actTransTotal[2]*self.var.fracVegCover[2]
         self.var.actTransTotal_nonpaddy = self.var.actTransTotal[3]*self.var.fracVegCover[3]
 
-        self.var.ET_crop_Irr_paddy = (self.var.actTransTotal_paddy+(self.var.actBareSoilEvap[3]+self.var.openWaterEvap[2])*self.var.fracVegCover[2])
-        self.var.ET_crop_Irr_paddy_fraccrop = np.where(self.var.fracVegCover[2]>0, self.var.ET_crop_Irr_paddy*self.var.fracVegCover[2], 0)
-
         if self.var.includeCrops: #checkOption('includeCrops') and checkOption('includeCropSpecificWaterUse'):
             if No == 3:
 
-                #Method 1: Area proportional
-
-                #for c in range(len(self.var.Crops)):
-                #    self.var.actTransTotal_crops_Irr[c] = np.where(self.var.fracVegCover[3]>0, self.var.fracCrops_Irr[c]/(self.var.fracVegCover[3]), 0) * self.var.actTransTotal_nonpaddy
-                #    self.var.actTransTotal_crops_nonIrr[c] = np.where(self.var.fracVegCover[1]>0, self.var.fracCrops_nonIrr[c]/(self.var.fracVegCover[1]), 0) * self.var.actTransTotal_paddy
-
+                #Method 1: Simple
+                """
+                for c in range(len(self.var.Crops)):
+                    self.var.actTransTotal_crops_Irr[c] = np.where(self.var.fracVegCover[3]>0, self.var.fracCrops_Irr[c]/self.var.fracVegCover[3], 0) * self.var.actTransTotal_nonpaddy
+                    self.var.actTransTotal_crops_nonIrr[c] = np.where(self.var.fracVegCover[1]>0, self.var.fracCrops_nonIrr[c]/self.var.fracVegCover[1], 0) * self.var.actTransTotal_paddy
+                """
                 # Crop-specific transpiration (m) scales the land-class specific transpiration according to its
                 # specific potential evapotranspiration and the land-class specific potential evapotranspiration
 
                 for c in range(len(self.var.Crops)):
 
-                    # Area and transpiration-Kc proportional
-                    self.var.actTransTotal_crops_Irr[c] = np.where(self.var.fracVegCover[3] * (self.var.cropKC[3]-self.var.minCropKC) > 0, (
-                        self.var.fracCrops_Irr[c] * (self.var.currentKC[c] - self.var.minCropKC)) / (self.var.fracVegCover[3] *
-                                                                                                     (self.var.cropKC[3]-self.var.minCropKC)),
-                                                                                                     0) * self.var.actTransTotal_nonpaddy
-                    
-                    self.var.actTransTotal_crops_nonIrr[c] = np.where(self.var.fracVegCover[1] * (self.var.cropKC[1]-self.var.minCropKC) > 0, (
-                        self.var.fracCrops_nonIrr[c] * (self.var.currentKC[c] - self.var.minCropKC)) / (self.var.fracVegCover[1] *
-                                                                                                     (self.var.cropKC[1]-self.var.minCropKC)),
-                                                                                                     0) * self.var.actTransTotal_grasslands
+                    #self.var.actTransTotal_crops_Irr[c] = np.where(self.var.fracVegCover[3] * (self.var.cropKC[3]-self.var.minCropKC) > 0, (
+                    #            self.var.fracCrops_Irr[c] * (self.var.currentKC[c] - self.var.minCropKC)) / (self.var.fracVegCover[3] *
+                    #                                                                  (self.var.cropKC[3]-self.var.minCropKC)),
+                    #                                                                                         0) * self.var.actTransTotal_nonpaddy
 
+                    self.var.actTransTotal_crops_Irr[c] = np.where(
+                        self.var.fracCrops_Irr[c] * self.var.weighted_KC_Irr_woFallow > 0, (
+                                self.var.fracCrops_Irr[c] * (self.var.currentKC[c]-self.var.minCropKC)) / self.var.weighted_KC_Irr_woFallow,
+                        0) * self.var.actTransTotal_nonpaddy
 
-
-'''
-# OLD
                     self.var.actTransTotal_month_Irr[c] += self.var.actTransTotal_crops_Irr[c] + \
                                                            self.var.actBareSoilEvap[3] * self.var.fracCrops_Irr[c]
 
@@ -729,46 +730,12 @@ class soil(object):
 
                     self.var.actTransTotal_month_nonIrr[c] += self.var.actTransTotal_crops_nonIrr[c] + \
                                                               self.var.actBareSoilEvap[1] * self.var.fracCrops_nonIrr[c]
-'''
-# update MS?
-                    self.var.ET_crop_Irr[c] = (self.var.actTransTotal_crops_Irr[c] +
-                                               self.var.actBareSoilEvap[3] * self.var.fracCrops_Irr[c])
-                    vars(self.var)['ET_crop_Irr_'+str(c)] = self.var.ET_crop_Irr[c].copy()
-                    vars(self.var)['ET_crop_Irr_fraccrop_'+str(c)] = np.where(self.var.fracCrops_Irr[c]>0, 
-                                                                                self.var.ET_crop_Irr[c]/self.var.fracCrops_Irr[c], 0)
-
-                    self.var.actTransTotal_month_Irr[c] += self.var.ET_crop_nonIrr[c]
-
-                    
-                    self.var.ET_crop_nonIrr[c] = (self.var.actTransTotal_crops_nonIrr[c] +
-                                                  self.var.actBareSoilEvap[1] * self.var.fracCrops_nonIrr[c])
-                    vars(self.var)['ET_crop_nonIrr_'+str(c)] = self.var.ET_crop_nonIrr[c].copy()
-                    vars(self.var)['ET_crop_nonIrr_fraccrop_'+str(c)] = np.where(self.var.fracCrops_nonIrr[c]>0, 
-                                                                                self.var.ET_crop_nonIrr[c]/self.var.fracCrops_nonIrr[c], 0)
-
-                    self.var.actTransTotal_month_nonIrr[c] += self.var.ET_crop_nonIrr[c]
-
-
 
                     self.var.irr_crop[c] = np.where(
                         self.var.frac_totalIrr * self.var.weighted_KC_Irr_woFallow > 0, (
                                 self.var.fracCrops_Irr[c] * self.var.currentKC[c]) / self.var.weighted_KC_Irr_woFallow_fullKc,
                         0) * self.var.act_irrNonpaddyWithdrawal
-                    vars(self.var)['irr_crop_'+str(c)] = self.var.irr_crop[c].copy()
 
-
-                    # daily ratio of actual transpiration to potential ET
-                    self.var.ratio_a_p_nonIrr_daily[c] = np.where(
-                        self.var.PotET_crop[c] * self.var.activatedCrops[c] > 0,
-                        (self.var.actTransTotal_crops_nonIrr[c] +  self.var.actBareSoilEvap[1] * self.var.fracCrops_nonIrr[c]) / (
-                            (self.var.PotET_crop[c]) * self.var.fracCrops_nonIrr[c]),
-                        0)  # This should always be <= 1.
-
-                    self.var.ratio_a_p_Irr_daily[c] = np.where(
-                        self.var.PotET_crop[c] * self.var.activatedCrops[c] > 0,
-                        (self.var.actTransTotal_crops_Irr[c] + self.var.actBareSoilEvap[3] * self.var.fracCrops_Irr[c]) / (
-                            (self.var.PotET_crop[c]) * self.var.fracCrops_Irr[c]),
-                        0)  # This should always be <= 1.
 
 
                     self.var.irr_crop_month[c] += self.var.irr_crop[c]
@@ -791,13 +758,13 @@ class soil(object):
         # groundwater recharge
         toGWorInterflow = self.var.perc3toGW[No] + self.var.prefFlow[No]
         self.var.interflow[No] = self.var.percolationImp * toGWorInterflow
-
+        
+        # calculate interflow for water quality        
         if self.var.modflow:
             self.var.gwRecharge[No] = (1 - self.var.percolationImp) * toGWorInterflow
         else:
             self.var.gwRecharge[No] = (1 - self.var.percolationImp) * toGWorInterflow - self.var.capRiseFromGW[No]
-
-
+            
         if checkOption('calcWaterBalance'):
             self.model.waterbalance_module.waterBalanceCheck(
                 [self.var.availWaterInfiltration[No], self.var.capRiseFromGW[No], self.var.act_irrConsumption[No]],  # In  water demand included in availwater

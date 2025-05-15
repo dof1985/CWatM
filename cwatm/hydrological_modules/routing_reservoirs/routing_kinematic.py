@@ -11,11 +11,12 @@
 from cwatm.management_modules.data_handling import *
 from cwatm.hydrological_modules.routing_reservoirs.routing_sub import *
 from cwatm.hydrological_modules.lakes_reservoirs import *
+from cwatm.hydrological_modules.water_quality.waterquality_vars import waterquality_vars
 
 
 class routing_kinematic(object):
 
-    """
+    '''
     ROUTING
 
     routing using the kinematic wave
@@ -123,24 +124,27 @@ class routing_kinematic(object):
     =====================================  ======================================================================  =====
 
     **Functions**
-    """
+    '''
 
     def __init__(self, model):
         self.var = model.var
         self.model = model
         self.lakes_reservoirs_module = lakes_reservoirs(model)
 
+        self.waterquality_vars = waterquality_vars(model)
+        
     def catchment(self, point):
         """
-        Get the catchment from "global"  LDD and a point
+        Get the catchment from "global"  LDD and a pointchannel_PPConc
 
         * load and create a river network
         * calculate catchment upstream of point
         """
-
+        import numpy as np
         ldd = loadmap('Ldd')
         #self.var.lddCompress, dirshort, self.var.dirUp, self.var.dirupLen, self.var.dirupID, self.var.downstruct, self.var.catchment, self.var.dirDown, self.var.lendirDown = defLdd2(ldd)
 
+        self.var.lddCompress, dirshort, self.var.dirUp, self.var.dirupLen, self.var.dirupID, self.var.downstruct, self.var.catchment, self.var.dirDown, self.var.lendirDown = defLdd2(ldd)
         # decompressing ldd from 1D -> 2D
         dmap = maskinfo['maskall'].copy()
         dmap[~maskinfo['maskflat']] = ldd[:]
@@ -177,6 +181,7 @@ class routing_kinematic(object):
         c4 = c2[d1: d2, d3: d4]
 
         return c4,d3,d1
+
 
     def waterQualityRouting(self,gridCellTraveled, channel, outlet, tmp_massStock, tmp_massOutlet,
                             outletID,resLakeInflowCondition,downdirID, flagWaterBodies):
@@ -245,7 +250,6 @@ class routing_kinematic(object):
                         lake_mass = lake_mass + lake_inflow - lake_outflow
                         
                         return lake_mass, lake_outflow
-
 # --------------------------------------------------------------------------
 # --------------------------------------------------------------------------
 
@@ -259,16 +263,22 @@ class routing_kinematic(object):
         * calculate manning's roughness coefficient
         """
 
+        
         ldd = loadmap('Ldd')
         # l1 = decompress(ldd)
 
         self.var.lddCompress, dirshort, self.var.dirUp, self.var.dirupLen, self.var.dirupID, self.var.downstruct, self.var.catchment, self.var.dirDown, self.var.lendirDown = defLdd2(ldd)
-
+        
+        
         #self.var.ups = upstreamArea(dirDown, dirshort, self.var.cellArea)
         self.var.UpArea1 = upstreamArea(self.var.dirDown, dirshort, globals.inZero + 1.0)
         self.var.UpArea = upstreamArea(self.var.dirDown, dirshort, self.var.cellArea)
 
 
+        if self.var.includeWaterQuality:
+            self.waterquality_vars.initial()
+            self.var.flowVelocity = globals.inZero.copy()
+            
         basin = False
         if 'savebasinmap' in option:
             basin = checkOption('savebasinmap')
@@ -382,6 +392,11 @@ class routing_kinematic(object):
             #self.var.sumbalance = 0
 
         self.var.Xcel = []
+        
+        if self.var.includeWaterQuality:
+            if checkOption('includeWaterBodies'):
+                self.var.resLakeInflowTmp = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+            
 
 
     # --------------------------------------------------------------------------
@@ -514,6 +529,7 @@ class routing_kinematic(object):
         self.var.sumsideflow = 0
         self.var.prechannelStorage = self.var.channelAlpha * self.var.chanLength * self.var.discharge ** self.var.beta
         avgDis = 0
+
         
         if self.var.includeWaterQuality:
             # downstream and outlet IDs are required for mass flux routing
@@ -619,9 +635,8 @@ class routing_kinematic(object):
                 resLakeInflowTmp = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
 
 
-
         for subrouting in range(self.var.noRoutingSteps):
-
+            
             sideflowChanM3 = runoffM3.copy()
             # minus evaporation from channels
             sideflowChanM3 -= EvapoChannelM3Dt
@@ -632,12 +647,12 @@ class routing_kinematic(object):
             if checkOption('includeWaterDemand'):
                 sideflowChanM3 -= WDAddM3Dt
                 # minus waterdemand + returnflow
-
+                
             if checkOption('inflow'):
                 self.var.inflowDt = (self.var.QInM3Old + (subrouting + 1) * self.var.QDelta) / self.var.noRoutingSteps
                 # flow from inlets per sub step
                 sideflowChanM3 += self.var.inflowDt
-
+            
             # in case water bodies are not activated
             lakeResOut_P_Dt = globals.inZero.copy()
             lakeResOut_PP_Dt = globals.inZero.copy()
@@ -776,20 +791,23 @@ class routing_kinematic(object):
                         lakeResOut_P_Dt = lakeResOut_Dt[self.var.TDP_idx, :].copy()
                         lakeResOut_PP_Dt = lakeResOut_Dt[self.var.PP_idx, :].copy()
                         #lakeResOut_inactiveP_Dt = lakeResOut_Dt[3, :].copy()
-
             else:
                 lakesResOut = 0
-
+            
+ 
             #sideflowChan = sideflowChanM3 * self.var.invchanLength * self.var.InvDtSec
-            sideflowChan = sideflowChanM3 * self.var.invchanLength * 1/ self.var.dtRouting
-
+            sideflowChan = sideflowChanM3 * self.var.invchanLength * 1 / self.var.dtRouting
+            
+            substepStorage_pre = self.var.channelAlpha * self.var.chanLength * self.var.discharge ** self.var.beta
+            
             if checkOption('includeWaterBodies'):
                lib2.kinematic(self.var.discharge, sideflowChan, self.var.dirDown_LR, self.var.dirupLen_LR, self.var.dirupID_LR, Qnew, self.var.channelAlpha, self.var.beta, self.var.dtRouting, self.var.chanLength, self.var.lendirDown_LR)
 
             else:
                lib2.kinematic(self.var.discharge, sideflowChan, self.var.dirDown, self.var.dirupLen, self.var.dirupID, Qnew, self.var.channelAlpha, self.var.beta, self.var.dtRouting, self.var.chanLength, self.var.lendirDown)
             self.var.discharge = Qnew.copy()
-
+            
+            
             self.var.sumsideflow = self.var.sumsideflow + sideflowChanM3
             avgDis = avgDis  + self.var.discharge / self.var.noRoutingSteps
             
@@ -1077,7 +1095,8 @@ class routing_kinematic(object):
                     self.var.channel_PPConc = np.where(self.var.waterBodyID > 0, lakeResOutflowPPConc, self.var.channel_PPConc)
                     #self.var.channel_inactivePConc = np.where(self.var.waterBodyID > 0, lakeResOutflowPInactiveConc, self.var.channel_inactivePConc)
                     ###
-    
+
+        
         if checkOption('includeWaterBodies'):
             # if there is a lake no discharge is calculated in the routing routine.
             # therefore this is filled up with the discharge which goes outof the lake
@@ -1087,7 +1106,7 @@ class routing_kinematic(object):
 
         preStor = self.var.channelStorage.copy()
         self.var.channelStorage = self.var.channelAlpha * self.var.chanLength * Qnew ** self.var.beta
-
+      
         # discharge only at the outlets to sea or endorheic lakes, otherwise value is 0.
         # as avarge discharge over timestep e.g. 1 day
         self.var.dis_outlet = np.where(self.var.lddCompress == 5, avgDis, 0.)
@@ -1139,7 +1158,7 @@ class routing_kinematic(object):
                     "lake_res", False)
 
 #### IMPORTANT set Routingstep to 1 to test!
-        """
+        '''
         if checkOption('calcWaterBalance'):
             self.model.waterbalance_module.waterBalanceCheck(
                 [runoffM3, lakesResOut ],  # In
@@ -1194,10 +1213,10 @@ class routing_kinematic(object):
                 [self.var.prechannelStorage, self.var.prelakeResStorage],   # prev storage
                 [self.var.channelStorage, self.var.lakeResStorage],
                 "rout8", False)  # without waterbody
-        """
+        '''
 
 
-        """
+        '''
         a = readmap("C:/work/output/q_pcr")
         b = nominal(a*100)
         c = ifthenelse(b == 105779, scalar(9999), scalar(0))
@@ -1206,7 +1225,7 @@ class routing_kinematic(object):
         np.where(d == 9999)   #23765
         e = pcr2numpy(c, 0).astype(np.float64)
         np.where(e > 9000)   # 75, 371  -> 76, 372
-        """
+        '''
 
 
 
