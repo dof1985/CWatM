@@ -65,7 +65,7 @@ class waterquality_vars(object):
 
         i =1
 
-    def soilTemperature(self, solar_rad, t_soilAvg, t_avg, t_min, t_max, bulk_density, soil_depth, albedo, soil_water, lambda_, soil_lyr = 1):
+    def soilTemperature(self, tmp_soil, solar_rad, t_soilAvg, t_avg, t_min, t_max, bulk_density, soil_depth, albedo, soil_water, lambda_, soil_lyr = 1):
         
         # soil temperature according to Soil and Water Assessment Tool (SWAT)
         
@@ -97,7 +97,7 @@ class waterquality_vars(object):
         # temporary
         bcv = 0
         
-        tmp_soil = vars(self.var)['soilTemp' +  str(soil_lyr)].copy()
+        #tmp_soil = vars(self.var)['soilTemp' +  str(soil_lyr)].copy()
         
         tmp_surf = bcv * tmp_soil + (1 - bcv) *(tmp_bare)
         # calculate soil temperature

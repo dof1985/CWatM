@@ -207,13 +207,13 @@ class water_quality(object):
             albedo_ = self.var.AlbedoCanopy
             
         # lyr 1
-        self.var.soilTemp1 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w1, lambda_ = self.var.soilTemp_lambda, soil_lyr = 1)
+        self.var.soilTemp1 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp1, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w1, lambda_ = self.var.soilTemp_lambda, soil_lyr = 1)
         
         # lyr 2
-        self.var.soilTemp2 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w2, lambda_ = self.var.soilTemp_lambda, soil_lyr = 2)
+        self.var.soilTemp2 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp2, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w2, lambda_ = self.var.soilTemp_lambda, soil_lyr = 2)
         
         # lyr 3
-        self.var.soilTemp3 = self.waterquality_vars.soilTemperature(solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w3, lambda_ = self.var.soilTemp_lambda, soil_lyr = 3)
+        self.var.soilTemp3 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp3, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w3, lambda_ = self.var.soilTemp_lambda, soil_lyr = 3)
         
         # landcover transitions
         if self.var.includePhosphorus:
