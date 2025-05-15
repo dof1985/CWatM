@@ -9,6 +9,7 @@
 # -------------------------------------------------------------------------
 
 from cwatm.management_modules.data_handling import *
+import pandas as pd
 
 class snow_frost(object):
 
@@ -235,6 +236,9 @@ class snow_frost(object):
 
         self.var.Snow = globals.inZero.copy()
         self.var.Rain = globals.inZero.copy()
+        # for glacier: snow and rain is reduced by glacier size, but to calc the total amount all snow and rain is needed
+        self.var.Snow1 = globals.inZero.copy()
+        self.var.Rain1 = globals.inZero.copy()
         self.var.SnowMelt = globals.inZero.copy()
         self.var.IceMelt = globals.inZero.copy()
         self.var.SnowCover = globals.inZero.copy()
@@ -258,6 +262,30 @@ class snow_frost(object):
         #loops through snow layers from highest to lowest
         #the capacity depends on the fraction of forest or grassland
         #self.var.SnowCoverSCapacity[i]
+
+
+        # if only radiation is given like in the EMO meteo dataset:
+        # then rsdl has to be calculted in this way
+        if self.var.snowmelt_radiation:
+            if self.var.only_radiation:
+                radian = np.pi / 180 * self.var.lat
+                distanceSun = 1 + 0.033 * np.cos(2 * np.pi * dateVar['doy'] / 365)
+                # Chapter 3: equation 24
+                declin = 0.409 * np.sin(2 * np.pi * dateVar['doy'] / 365 - 1.39)
+                ws = np.arccos(-np.tan(radian * np.tan(declin)))
+                Ra = 24 * 60 / np.pi * 0.082 * distanceSun * (
+                        ws * np.sin(radian) * np.sin(declin) + np.cos(radian) * np.cos(declin) * np.sin(ws))
+                # Equation 21 Chapter 3
+                Rso = Ra * (0.75 + (2 * 10 ** -5 * self.var.dem))  # in MJ/m2/day
+                # Equation 37 Chapter 3
+                RsRso = 1.35 * self.var.Rsds / Rso - 0.35
+                RsRso = np.minimum(np.maximum(RsRso, 0.05), 1)
+                RSNet = (0.34 - 0.14 * np.sqrt(self.var.EAct)) * RsRso
+                # Eact in hPa but needed in kPa : kpa = 0.1 * hPa - conversion done in readmeteo
+
+        month = dateVar['currDate'].month - 1
+        # run through all snow layers
+
 
         for i in range(self.var.numberSnowLayers):
             TavgS = self.var.Tavg + self.var.DeltaTSnow * self.var.deltaInvNorm[i]
@@ -362,7 +390,9 @@ class snow_frost(object):
                 current_fracGlacierCover = np.where(weight > 0, 0, abs(weight))
                 #weight below zero is set to zero
                 weight[weight < 0] = 0
-                assert (weight >= 0).all()
+                self.var.Snow1 += SnowS / self.var.numberSnowLayersFloat
+                self.var.Rain1 += RainS / self.var.numberSnowLayersFloat
+                # depends on the area of non glacier area in a gridcell
                 self.var.Snow += SnowS * weight
                 self.var.Rain += RainS * weight
                 self.var.SnowMelt += SnowMeltS * weight
@@ -376,12 +406,17 @@ class snow_frost(object):
                 self.var.IceMelt += IceMeltS
                 self.var.SnowCover += self.var.SnowCoverS[i]
 
+
         if not self.var.excludeGlacierArea:
             self.var.Snow /= self.var.numberSnowLayersFloat
             self.var.Rain /= self.var.numberSnowLayersFloat
             self.var.SnowMelt /= self.var.numberSnowLayersFloat
             self.var.IceMelt /= self.var.numberSnowLayersFloat
             self.var.SnowCover /= self.var.numberSnowLayersFloat
+            self.var.precipitation_sn = self.var.Snow + self.var.Rain
+        else:
+            # if glaicer than calculate also rain+snow on glacier
+            self.var.precipitation_sn = self.var.Snow1 + self.var.Rain1
 
         # all in pixel
 

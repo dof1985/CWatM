@@ -1216,16 +1216,5 @@ class routing_kinematic(object):
         '''
 
 
-        '''
-        a = readmap("C:/work/output/q_pcr")
-        b = nominal(a*100)
-        c = ifthenelse(b == 105779, scalar(9999), scalar(0))
-        report(c,"C:/work/output/t3.map")
-        d = compressArray(c)
-        np.where(d == 9999)   #23765
-        e = pcr2numpy(c, 0).astype(np.float64)
-        np.where(e > 9000)   # 75, 371  -> 76, 372
-        '''
-
 
 
