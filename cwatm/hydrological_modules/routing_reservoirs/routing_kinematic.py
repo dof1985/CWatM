@@ -636,6 +636,8 @@ class routing_kinematic(object):
 
 
         for subrouting in range(self.var.noRoutingSteps):
+            # sub time step traveltime
+            self.waterquality_vars.dynamic()
             
             sideflowChanM3 = runoffM3.copy()
             # minus evaporation from channels
@@ -893,7 +895,7 @@ class routing_kinematic(object):
                     
                 #if self.var.includeWaterQuality:
                 # waterquality_vars + retention
-                self.waterquality_vars.dynamic()
+
                 self.var.substepChannelStorage = self.var.channelAlpha * self.var.chanLength * Qnew ** self.var.beta
 
                 if self.var.includeErosed:
