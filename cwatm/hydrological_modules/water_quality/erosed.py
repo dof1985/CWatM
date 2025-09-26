@@ -153,6 +153,10 @@ class waterquality_erosed(object):
             self.var.max_kcPaddy = readnetcdf2('irrPaddy_cropCoefficientNC', None, "max")
             self.var.max_kcNonPaddy = readnetcdf2('irrNonPaddy_cropCoefficientNC', None, "max")
         
+        # p_usle: USLE land conservation factor
+        self.var.pFactor = globals.inZero.copy() + 1.
+        if 'pFactor' in binding:
+            self.var.pFactor = globals.inZero.copy() + loadap('pFactor')
 
         # ls_usle: USLE topographic factor (slope-length)
         self.var.lsFactor = loadmap('lsFactor')
