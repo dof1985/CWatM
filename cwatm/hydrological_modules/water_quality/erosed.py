@@ -336,12 +336,12 @@ class waterquality_erosed(object):
                 self.var.cfactor_arr[3] = self.convert_kc_to_c(kc = self.var.cropKC[3], max_kc = self.var.max_kcNonPaddy ,beta = self.var.c_factor_beta)
       
         # MUSLE: sediment yield per day and grid in [1000 kg]
-        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.CFRG
+        self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cFactor * self.var.lsFactor * self.var.pFactor * self.var.CFRG
         
 
         # MUSLE: sediment yield per day and grid in [1000 kg]             
         if 'cfactor_from_kc' in binding  and returnBool('cfactor_from_kc') == True:
-            self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cfactor_arr * self.var.lsFactor * self.var.CFRG
+            self.var.sedYieldLand = loadmap('a') * np.power(self.var.directRunoff_mm[0:4] * self.var.qpeak * self.var.cellArea, loadmap('b')) * self.var.kFactor * self.var.cfactor_arr * self.var.lsFactor * self.var.pFactor * self.var.CFRG
         
         # correct for snow
         self.var.sedYieldLand = divideArrays(self.var.sedYieldLand, np.exp(3 * self.var.SnowCover /  25.4))
