@@ -1236,61 +1236,40 @@ class lakes_reservoirs(object):
         self.var.sumlakeResOutflow += outflowC
         # self.var.sumlakeResOutflow = self.var.sumlakeResOutflow  + self.var.lakeOutflowC * self.var.dtRouting
 
+        # --------------- correction PB May 2024
+        # calculate evaporation for each cell of the lake
+        # each lake cell fraction of the total lake area
+        # a lake cell has at minimum 5% water
         # decompress to normal maskarea size waterbalance
         if self.var.noRoutingSteps == (NoRoutingExecuted + 1):
-            np.put(self.var.EvapWaterBodyM, self.var.decompress_LR, self.var.sumEvapWaterBodyC)
-            self.var.EvapWaterBodyM = self.var.EvapWaterBodyM / self.var.cellArea
+            np.put(self.var.EvapWaterBodyMOutlet, self.var.decompress_LR, self.var.sumEvapWaterBodyC)
+            self.var.EvapWaterBodyMOutlet = self.var.EvapWaterBodyMOutlet / self.var.cellArea
             np.put(self.var.lakeResInflowM, self.var.decompress_LR, self.var.sumlakeResInflow)
             self.var.lakeResInflowM = self.var.lakeResInflowM / self.var.cellArea
             np.put(self.var.lakeResOutflowM, self.var.decompress_LR, self.var.sumlakeResOutflow)
             self.var.lakeResOutflowM = self.var.lakeResOutflowM / self.var.cellArea
-
+            fracwatermin = np.where(self.var.waterBodyID > 0, np.maximum(self.var.fracVegCover[5],0.05),0)
+            wlakefracsum = npareatotal(fracwatermin, self.var.waterBodyID)
+            # -> part of each cell of the total lake -> sum for each lake = 1
+            wlakefrac = divideValues(self.var.fracVegCover[5], wlakefracsum)
+            # all lake id cells get the evaporation of the outlet cell
+            ebody = npareatotal(self.var.EvapWaterBodyMOutlet, self.var.waterBodyID)
+            # 3) step evoporation is distributed by the water frac of each lake
+            self.var.EvapWaterBodyM = ebody * wlakefrac
+            self.var.EvapWaterBodyM[np.isnan(self.var.EvapWaterBodyM)] = 0.
 
             # Output maps for lakeResInflow and lakeResOutflow when using type-4 res.
             # The standard map inflate the overall res. water volumes
             
             self.var.lakeResInflowM_2 = np.where(self.var.waterBodyTyp == 4,
-                                                self.var.lakeResInflowM - self.var.lakeResOutflowM,
-                                                self.var.lakeResInflowM)
+                                            self.var.lakeResInflowM - self.var.lakeResOutflowM,
+                                            self.var.lakeResInflowM)
             self.var.lakeResOutflowM_2 = np.where(self.var.waterBodyTyp == 4, 0., self.var.lakeResOutflowM)
 
-            # --------------- correction PB May 2024
-            # calculate evaporation for each cell of the lake
-            # each lake cell fraction of the total lake area
-            # a lake cell has at minimum 5% water
-            # decompress to normal maskarea size waterbalance
-            if self.var.noRoutingSteps == (NoRoutingExecuted + 1):
-                np.put(self.var.EvapWaterBodyMOutlet, self.var.decompress_LR, self.var.sumEvapWaterBodyC)
-                self.var.EvapWaterBodyMOutlet = self.var.EvapWaterBodyMOutlet / self.var.cellArea
-                np.put(self.var.lakeResInflowM, self.var.decompress_LR, self.var.sumlakeResInflow)
-                self.var.lakeResInflowM = self.var.lakeResInflowM / self.var.cellArea
-                np.put(self.var.lakeResOutflowM, self.var.decompress_LR, self.var.sumlakeResOutflow)
-                self.var.lakeResOutflowM = self.var.lakeResOutflowM / self.var.cellArea
-                fracwatermin = np.where(self.var.waterBodyID > 0, np.maximum(self.var.fracVegCover[5],0.05),0)
-                wlakefracsum = npareatotal(fracwatermin, self.var.waterBodyID)
-                # -> part of each cell of the total lake -> sum for each lake = 1
-                wlakefrac = divideValues(self.var.fracVegCover[5], wlakefracsum)
-                # all lake id cells get the evaporation of the outlet cell
-                ebody = npareatotal(self.var.EvapWaterBodyMOutlet, self.var.waterBodyID)
-                # 3) step evoporation is distributed by the water frac of each lake
-                self.var.EvapWaterBodyM = ebody * wlakefrac
-                self.var.EvapWaterBodyM[np.isnan(self.var.EvapWaterBodyM)] = 0.
 
-
-                np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
-                np.put(self.var.lakeStorage, self.var.decompress_LR, lakeStorageC)
-                np.put(self.var.resStorage, self.var.decompress_LR, resStorageC)
-
-                #water transfer
-                if checkOption('reservoir_transfers', True):
-                    np.put(self.var.reservoir_transfers_net_M3, self.var.decompress_LR, self.var.reservoir_transfers_net_M3C)
-                    np.put(self.var.reservoir_transfers_out_M3, self.var.decompress_LR, self.var.reservoir_transfers_out_M3C)
-                    np.put(self.var.reservoir_transfers_in_M3, self.var.decompress_LR, self.var.reservoir_transfers_in_M3C)
-                    self.var.reservoir_transfers_net_M3C = np.compress(self.var.compress_LR,globals.inZero.copy())
-                    self.var.reservoir_transfers_out_M3C = np.compress(self.var.compress_LR, globals.inZero.copy())
-                    self.var.reservoir_transfers_in_M3C = np.compress(self.var.compress_LR, globals.inZero.copy())
-
-
+            np.put(self.var.lakeResStorage, self.var.decompress_LR, self.var.lakeResStorageC)
+            np.put(self.var.lakeStorage, self.var.decompress_LR, lakeStorageC)
+            np.put(self.var.resStorage, self.var.decompress_LR, resStorageC)
         # ------------------------------------------------------------
 
         np.put(self.var.reslakeoutflow, self.var.decompress_LR, outflowC)

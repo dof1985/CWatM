@@ -473,6 +473,7 @@ class routing_kinematic(object):
             # evaporation for the whole lake for each routing step
             eWaterBody = np.maximum(0.0, EWRefavg * self.var.lakeArea) / self.var.noRoutingSteps
             # compressed to the number lakes
+            self.var.eWaterBody = eWaterBody.copy()
             self.var.evapWaterBodyC = self.var.lakeEvaFactorC  * np.compress(self.var.compress_LR, eWaterBody)
             # exclude evaporation where lakes are, because they are filled in again with evapWaterBodyC
             self.var.EvapoChannel = np.where(self.var.waterBodyID > 0, (1-self.var.fracVegCover[5]) * self.var.EvapoChannel, self.var.EvapoChannel)
