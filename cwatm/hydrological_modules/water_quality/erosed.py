@@ -156,7 +156,7 @@ class waterquality_erosed(object):
         # p_usle: USLE land conservation factor
         self.var.pFactor = globals.inZero.copy() + 1.
         if 'pFactor' in binding:
-            self.var.pFactor = globals.inZero.copy() + loadap('pFactor')
+            self.var.pFactor = globals.inZero.copy() + loadmap('pFactor')
 
         # ls_usle: USLE topographic factor (slope-length)
         self.var.lsFactor = loadmap('lsFactor')
