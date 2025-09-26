@@ -179,7 +179,7 @@ class outputTssMap(object):
             Validates output directory existence and creates error messages for
             missing paths.
             """
-
+            
             key = sec.lower() + name + type
             if key in out:
                 if out[key][0] != "None":
@@ -191,6 +191,9 @@ class outputTssMap(object):
                                 info.append(os.path.join(outDir[sec], str(var) + "_" + type + ".nc"))
                                 #vars(self.var)[var+"_"+type] = 0
                                 # creates a var to sum/ average the results e.g. self.var.Precipitation_monthtot
+                                info.append(var)
+                                info.append(False)
+
                             else:
                                 # TimeoutputTimeseries(binding[tss], self.var, outpoints, noHeader=Flags['noheader'])
                                 # info.append(os.path.join(outDimpontr[sec], str(var) + "_daily.tss"))
@@ -204,12 +207,12 @@ class outputTssMap(object):
                                 name = os.path.join(outDir[sec], str(var) + "_" + type + suffix)
                                 # info.append(TimeoutputTimeseries2(name, self.var, outpoints, noHeader=False))
                                 info.append(name)
+                                info.append(var)
+                                # flag set True for writing times series in csv format
+                                info.append(newcsvformat)
                         else:
                             msg = "Error 220: Checking output file path \n"
                             raise CWATMFileError(outDir[sec], msg)
-                        info.append(var)
-                        if ismap: info.append(False)  # flag set False for initial writing if it is a map
-                        else: info.append(not(Flags['noheader']))  # flag set True for writing time series header
 
                         placeholder = []
                         info.append(placeholder)
@@ -311,6 +314,11 @@ class outputTssMap(object):
                 msg = "Error 131: Output is not possible!\n"
                 msg += "\""+out +"\" is not one of these: TSS for point value, AreaSum for sum of area, AreaAvg for average of area"
                 raise CWATMError(msg)
+        
+        # save netcdf as index maps (not lar/lon) but only the valid cells
+        self.var.netcdfasindex = False
+        if "netcdfasindex" in option:
+            self.var.netcdfasindex = checkOption('netcdfasindex')
 
 
 

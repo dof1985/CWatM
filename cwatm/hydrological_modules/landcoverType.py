@@ -583,7 +583,7 @@ class landcoverType(object):
             # arnoBeta defines the shape of soil water capacity distribution curve as a function of 
             # topographic variability. b = max( (oh - o0)/(oh + omax), 0.01)
             # oh: the standard deviation of orography, o0: minimum std dev, omax: max std dev
-
+            self.var.ElevationStD = loadmap('ElevationStD')
             self.var.arnoBetaOro = (self.var.ElevationStD - 10.0) / (self.var.ElevationStD + 1500.0)
 
             # for CALIBRATION

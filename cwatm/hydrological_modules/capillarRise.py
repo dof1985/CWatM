@@ -78,6 +78,9 @@ class capillarRise(object):
 
             # approximate height of groundwater table and corresponding reach of cell under influence of capillary rise
             dzGroundwater = self.var.storGroundwater / self.var.specificYield + self.var.maxGWCapRise
+            CRFRAC = np.minimum(1.0, 1.0 - (self.var.dzRel[11] - dzGroundwater) * 0.1 / 
+                                np.maximum(1e-3, self.var.dzRel[11] - self.var.dzRel[10]))
+                                
             #       10  9   8   7   6   5    4   3   2  1    0
             vvv = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01]
             i = 10

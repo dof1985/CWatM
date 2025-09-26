@@ -394,7 +394,7 @@ class readmeteo(object):
 
      # --- end downscaling ----------------------------
 
-    def downscaling2(self,input, downscaleName = "", wc2 = 0 , wc4 = 0, x=None, y=None, xfine=None, yfine=None, meshlist=None, MaskMapBoundaries= None, downscale = 0):
+    def downscaling2(self, input, downscaleName = "", wc2 = 0 , wc4 = 0, x=None, y=None, xfine=None, yfine=None, meshlist=None, MaskMapBoundaries= None, downscale = 0):
         """
         Spatially downscale meteorological data using delta method with WorldClim.
         
@@ -727,21 +727,20 @@ class readmeteo(object):
                 if self.var.only_radiation:
                     # read daily calculated radiation [in KJ/m2/day]
                     # named here Rsds instead of rds, because use in evaproationPot in the same way as rsds
-                    self.var.Rsds = readmeteodata('RGDMaps', dateVar['currDate'], addZeros=True, mapsscale=self.var.meteomapsscale)
+                    self.var.Rsds, MaskMapBoundary = readmeteodata('RGDMaps', dateVar['currDate'], addZeros=True, mapsscale=self.var.meteomapsscale)
                     self.var.Rsds = self.downscaling2(self.var.Rsds) * 0.000001  # convert from KJ to MJ/m2/day
                     # but for EMO it is 1e6 instead 1000 it seems it is J instead of KJ
                     # read daily vapor pressure [in hPa]
-                    self.var.EAct = readmeteodata('EActMaps', dateVar['currDate'], addZeros=True, mapsscale=self.var.meteomapsscale)
+                    self.var.EAct, MaskMapBoundary = readmeteodata('EActMaps', dateVar['currDate'], addZeros=True, mapsscale=self.var.meteomapsscale)
                     self.var.EAct = self.downscaling2(self.var.EAct) * 0.1  # convert from hP to kP
                 else:
-                    self.var.Rsds = readmeteodata('RSDSMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
+                    self.var.Rsds, MaskMapBoundary = readmeteodata('RSDSMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
                     self.var.Rsds = self.downscaling2(self.var.Rsds)
                         # radiation surface downwelling shortwave maps [W/m2]
 
-                    self.var.Rsdl = readmeteodata('RSDLMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
+                    self.var.Rsdl, MaskMapBoundary = readmeteodata('RSDLMaps', dateVar['currDate'], addZeros=True, mapsscale = self.var.meteomapsscale)
                     self.var.Rsdl = self.downscaling2(self.var.Rsdl)
                         # radiation surface downwelling longwave maps [W/m2]
-
 
                     # conversion from W/m2 to MJ/m2/day
                     self.var.Rsds = self.var.Rsds * self.var.WtoMJ
@@ -831,11 +830,11 @@ class readmeteo(object):
                     self.var.Psurf = self.var.Psurf * 0.001
                     if returnBool('useHuss'):
 
-                        self.var.huss = readmeteodata('QAirMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
+                        self.var.huss, MaskMapBoundary = readmeteodata('QAirMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
                         self.var.huss = self.downscaling2(self.var.huss)
                         # 2 m istantaneous specific humidity[kg / kg]
                     else:
-                        self.var.rhs = readmeteodata('RhsMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
+                        self.var.rhs, MaskMapBoundary = readmeteodata('RhsMaps', dateVar['currDate'], addZeros=True, mapsscale =self.var.meteomapsscale)
                         self.var.rhs = self.downscaling2(self.var.rhs)
 
         # if pot evaporation is already precalulated

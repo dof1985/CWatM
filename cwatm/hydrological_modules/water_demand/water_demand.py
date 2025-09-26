@@ -615,8 +615,8 @@ class water_demand:
             if checkOption('includeWaterBodies'):
                     
                 # initiate reservoir_command_areas & reservoir_command_areas_wwt
-                self.var.reservoir_command_areas = globals.inZero.copy()
-                self.var.reservoir_command_areas_wwt = globals.inZero.copy()
+                self.var.reservoir_command_areas = globals.inZero.copy().astype(int)
+                self.var.reservoir_command_areas_wwt = globals.inZero.copy().astype(int)
 
                 if self.var.using_reservoir_command_areas and 'reservoir_command_areas' in binding:
                     self.var.load_command_areas = True
@@ -641,6 +641,7 @@ class water_demand:
                 self.var.reservoir_command_areas = np.where(
                     self.var.waterBodyTyp_unchanged == 1, 0,
                     np.where(self.var.resId_restricted > 0, 0, self.var.reservoir_command_areas))
+
                 self.var.segmentArea = np.where(
                     self.var.reservoir_command_areas > 0,
                     npareatotal(self.var.cellArea, self.var.reservoir_command_areas),

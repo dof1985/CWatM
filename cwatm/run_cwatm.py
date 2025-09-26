@@ -372,9 +372,6 @@ def mainwarm(settings, args, meteo):
     else:
         Flags['warm'] = False
         success, last_dis = CWATMexe(settingsfile[0])
-    else:
-        success, last_dis = CWATMexe2(settingsfile[0],meteo)
-
     return success, last_dis
 
 

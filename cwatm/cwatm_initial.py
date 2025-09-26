@@ -281,7 +281,6 @@ class CWATModel_ini(DynamicModel):
         self.lakes_reservoirs_module = lakes_reservoirs(self)
         #self.waterquality1 = waterquality1(self)
         self.waterquality_module = water_quality(self)
-        self.waterbalance = waterbalance(self)
 
 
 
@@ -327,7 +326,8 @@ class CWATModel_ini(DynamicModel):
         self.snowfrost_module.initial()
 
         self.landcoverType_module.initial()
-
+        self.evaporation_module.initial()
+        
         self.runoff_concentration_module.initial()
         self.lakes_res_small_module.initial()
 

@@ -85,7 +85,7 @@ class interception(object):
         - Irrigated areas: Uses minimum interception capacity with 2/3 power law
         - Sealed surfaces: Uses reference evapotranspiration for interception evaporation
         """
-
+        """
         if coverType in ['forest','grassland']:
             ## interceptCap Maximum interception read from file for forest and grassland land cover
             # for specific days of the year - repeated every year
@@ -93,8 +93,9 @@ class interception(object):
                 self.var.interceptCap[No]  = readnetcdf2(coverType + '_interceptCapNC', dateVar['10day'], "10day")
                 self.var.interceptCap[No] = np.maximum(self.var.interceptCap[No], self.var.minInterceptCap[No])
         else:
-            self.var.interceptCap[No] = self.var.minInterceptCap[No]
 
+            self.var.interceptCap[No] = self.var.minInterceptCap[No]
+        """
         # Rain instead Pr, because snow is substracted later
         # assuming that all interception storage is used the other time step
 

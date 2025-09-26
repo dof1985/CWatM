@@ -196,24 +196,23 @@ class snow_frost(object):
         #divNo = 1./float(self.var.numberSnowLayers)
         #deltaNorm = np.linspace(divNo/2, 1-divNo/2, self.var.numberSnowLayers)
         #self.var.deltaInvNorm = norm.ppf(deltaNorm)
-        self.var.deltaInvNorm = dn[self.var.numberSnowLayers]
+        #self.var.deltaInvNorm = dn[self.var.numberSnowLayers]
 
 
-        self.var.ElevationStD = loadmap('ElevationStD')
+        #self.var.ElevationStD = loadmap('ElevationStD')
 
         #self.var.ElevationMin = loadmap('Elevation')
         #self.var.ElevationMean = loadmap('Elevation_avg')
 
         # max_frac_snow_redistriution = 0.5
         # max_ELevationStD = 1500
-        min_ElevationStD_snow_redistr = 100
+        #min_ElevationStD_snow_redistr = 100
         # 0.46 is the maximum fraction that can be redistributed if snow density is assumed to be 350kg/m3 according to eq. 13 in Frey & Holzmann (2015)
         # this fraction has to be multiplied with the slope, highest slope is 90 degrees
         # the mean slope of each grid cell is the mean of all slopes of the 3'' SRTM DEM
         # the maximum fraction that can be redistributed if snow density is assumed to be 200kg/m3 according to eq. 13 in Frey & Holzmann (2015) is 0.35
         slope_degrees = np.degrees(np.arctan(loadmap('tanslope')))
         self.var.frac_snow_redistribution = np.maximum(0.35 * slope_degrees / 90, globals.inZero)
-        self.var.DeltaTSnow = self.var.ElevationStD * loadmap('TemperatureLapseRate')
 
         self.var.SnowDayDegrees = 0.9856
         #to get the seasonal cycle in snow melt coefficient, value is 81 (263) for northern (southern) hemisphere
