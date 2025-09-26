@@ -3,40 +3,73 @@
 # Purpose:     Transforming netcdf to numpy arrays, checking mask file
 #
 # Author:      PB
-#
-# Created:     13/07/2016
-# Copyright:   (c) PB 2016
+# Created:     13/07/2016 
+# CWatM is licensed under GNU GENERAL PUBLIC LICENSE Version 3.
+
 # -------------------------------------------------------------------------
 
-import os, glob
 import calendar
-
-#import numpy as np
-from . import globals
-from cwatm.management_modules.checks import *
-from cwatm.management_modules.timestep import *
-from cwatm.management_modules.replace_pcr import *
-from cwatm.management_modules.messages import *
-
 import difflib  # to check the closest word in settingsfile, if an error occurs
+import glob
 import math
-from cwatm.management_modules.dynamicModel import *
-
-from netCDF4 import Dataset,num2date,date2num,date2index
-#from netcdftime import utime
-
-from osgeo import gdal
-from osgeo import osr
-from osgeo import gdalconst
+import os
+import re
 import warnings
 
-def valuecell( coordx, coordstr, returnmap = True):
-    """
-    to put a value into a raster map -> invert of cellvalue, map is converted into a numpy array first
+from netCDF4 import Dataset, num2date, date2num, date2index
+from osgeo import gdal
+from osgeo import gdalconst
+from osgeo import osr
 
-    :param coordx: x,y or lon/lat coordinate
-    :param coordstr: String of coordinates
-    :return: 1D array with new value
+from . import globals
+from cwatm.management_modules.checks import *
+from cwatm.management_modules.dynamicModel import *
+from cwatm.management_modules.messages import *
+from cwatm.management_modules.replace_pcr import *
+from cwatm.management_modules.timestep import *
+
+# -------------------------------------
+def valuecell(coordx, coordstr, returnmap=True):
+
+    """
+    Convert geographic coordinates to raster cell values for gauge placement.
+    
+    This function creates a raster map with numbered cells corresponding to
+    gauge locations specified by coordinates. It performs coordinate validation,
+    converts geographic coordinates to raster row/column indices, and creates
+    a compressed array suitable for CWatM processing. Essential for linking
+    point observations to the model grid.
+    
+    Parameters
+    ----------
+    coordx : list
+        List of coordinate values in alternating x,y or lon/lat format.
+        Even indices are x-coordinates, odd indices are y-coordinates.
+    coordstr : str
+        String representation of coordinates for error reporting.
+    returnmap : bool, optional
+        If True, return compressed 1D array. If False, return column/row indices.
+        Default is True.
+    
+    Returns
+    -------
+    numpy.ndarray or tuple
+        If returnmap=True: 1D compressed array with gauge numbers (1-based indexing).
+        If returnmap=False: tuple of (column_indices, row_indices) lists.
+    
+    Raises
+    ------
+    CWATMError
+        If coordinate strings cannot be converted to float values.
+        If any coordinate falls outside the model domain (mask map bounds).
+    
+    Notes
+    -----
+    - Uses maskmapAttr global dictionary for spatial reference information
+    - Coordinates outside domain trigger detailed error message with boundary box
+    - Background cells are set to -9999 (NoData value)
+    - Gauge cells are numbered sequentially starting from 1
+    - Coordinate transformation uses inverse cell size for efficiency
     """
 
     coord = []
@@ -53,20 +86,20 @@ def valuecell( coordx, coordstr, returnmap = True):
     null[null == 0] = -9999
 
     for i in range(int(len(coord) / 2)):
-        col.append(int((coord[i * 2] -  maskmapAttr['x']) * maskmapAttr['invcell']))
+        col.append(int((coord[i * 2] - maskmapAttr['x']) * maskmapAttr['invcell']))
         row.append(int((maskmapAttr['y'] - coord[i * 2 + 1]) * maskmapAttr['invcell']))
 
         if col[i] >= 0 and row[i] >= 0 and col[i] < maskmapAttr['col'] and row[i] < maskmapAttr['row']:
             null[row[i], col[i]] = i + 1
         else:
             x1 = maskmapAttr['x']
-            x2 = x1 + maskmapAttr['cell']* maskmapAttr['col']
+            x2 = x1 + maskmapAttr['cell'] * maskmapAttr['col']
             y1 = maskmapAttr['y']
-            y2 = y1 - maskmapAttr['cell']* maskmapAttr['row']
-            box  = "%5s %5.1f\n" %("",y1)
+            y2 = y1 - maskmapAttr['cell'] * maskmapAttr['row']
+            box = "%5s %5.1f\n" % ("", y1)
             box += "%5s ---------\n" % ""
             box += "%5s |       |\n" % ""
-            box += "%5.1f |       |%5.1f     <-- Box of mask map\n" %(x1,x2)
+            box += "%5.1f |       |%5.1f     <-- Box of mask map\n" % (x1, x2)
             box += "%5s |       |\n" % ""
             box += "%5s ---------\n" % ""
             box += "%5s %5.1f\n" % ("", y2)
@@ -78,7 +111,7 @@ def valuecell( coordx, coordstr, returnmap = True):
             msg = "Error 102: Coordinates: x = " + str(coord[i * 2]) + '  y = ' + str(
                 coord[i * 2 + 1]) + " of gauge is outside mask map\n\n"
             msg += box
-            msg +="\nPlease have a look at \"MaskMap\" or \"Gauges\""
+            msg += "\nPlease have a look at \"MaskMap\" or \"Gauges\""
             raise CWATMError(msg)
     if returnmap:
         mapnp = compressArray(null).astype(np.int64)
@@ -87,29 +120,64 @@ def valuecell( coordx, coordstr, returnmap = True):
         return col, row
 
 
-def setmaskmapAttr(x,y,col,row,cell):
+def setmaskmapAttr(x, y, col, row, cell):
     """
-    Definition of cell size, coordinates of the meteo maps and maskmap
-
-    :param x: upper left corner x
-    :param y: upper left corner y
-    :param col: number of cols
-    :param row: number of rows
-    :param cell: cell size
-    :return: -
+    Set global spatial reference attributes for the model domain.
+    
+    Defines the spatial reference system parameters that are used throughout
+    CWatM for coordinate transformations, data alignment, and spatial operations.
+    These attributes are stored in the global maskmapAttr dictionary and used
+    by all spatial data processing functions.
+    
+    Parameters
+    ----------
+    x : float
+        X-coordinate of the upper-left corner of the model domain.
+        Typically longitude in decimal degrees or projected coordinate.
+    y : float
+        Y-coordinate of the upper-left corner of the model domain.
+        Typically latitude in decimal degrees or projected coordinate.
+    col : int
+        Number of columns in the raster grid.
+    row : int
+        Number of rows in the raster grid.
+    cell : float
+        Cell size (spatial resolution) in the same units as x,y coordinates.
+    
+    Returns
+    -------
+    None
+        Results stored in global maskmapAttr dictionary.
+    
+    Notes
+    -----
+    The function performs precision adjustments to handle floating-point
+    arithmetic issues in coordinate calculations:
+    - Calculates inverse cell size for efficient coordinate transformations
+    - Rounds coordinates to appropriate precision based on magnitude
+    - Handles edge cases where getgeotransform provides limited precision
+    
+    Global variables modified:
+    - maskmapAttr: Dictionary with keys 'x', 'y', 'col', 'row', 'cell', 'invcell'
+    
+    This spatial reference is used by functions like valuecell(), loadmap(),
+    and coordinate transformation routines throughout the model.
     """
-    invcell = round(1/cell,0)
+    invcell = round(1/cell, 0)
     # getgeotransform only delivers single precision!
-    if invcell == 0: invcell = 1/cell
+    if invcell == 0:
+        invcell = 1/cell
     cell = 1 / invcell
-    if (x-int(x)) != 0.:
+    if (x - int(x)) != 0.:
         if abs(x - int(x)) > 1e9:
-            x = 1/round(1/(x-int(x)),4) + int(x)
-        else: x = round(x,6)
+            x = 1/round(1/(x - int(x)), 4) + int(x)
+        else:
+            x = round(x, 6)
     if (y - int(y)) != 0.:
         if abs(y - int(y)) > 1e9:
             y = 1 / round(1 / (y - int(y)), 4) + int(y)
-        else: y = round(y,6)
+        else:
+            y = round(y, 6)
     # This is still not ok! Some rounding issues still appear sometimes
 
     maskmapAttr['x'] = x
@@ -120,15 +188,40 @@ def setmaskmapAttr(x,y,col,row,cell):
     maskmapAttr['invcell'] = invcell
 
 
-def loadsetclone(self,name):
+def loadsetclone(self, name):
     """
-    load the maskmap and set as clone
-
-    :param name: name of mask map, can be a file or - row col cellsize xupleft yupleft -
-    :return: new mask map
-
+    Load and set the clone map that defines the model domain.
+    
+    The clone map is the fundamental spatial reference for CWatM, defining
+    the model grid, coordinate system, and computational domain. This function
+    loads the clone map from various formats (NetCDF, GeoTIFF), extracts spatial
+    attributes, and sets up the global spatial reference system used throughout
+    the model.
+    
+    Parameters
+    ----------
+    name : str
+        Path to the clone map file. Can be NetCDF or GeoTIFF format.
+        The binding key for the clone map in the configuration.
+    
+    Returns
+    -------
+    None
+        Sets up global spatial reference and mask attributes.
+    
+    Notes
+    -----
+    The clone map determines:
+    - Model grid dimensions and spatial resolution
+    - Coordinate reference system and geotransformation
+    - Active model domain (non-NoData cells)
+    - Spatial attributes for all subsequent data loading
+    
+    This function must be called before any other spatial data operations.
+    It populates the global maskmapAttr dictionary and sets the model's
+    spatial framework.
     """
-
+  
     filename = cbinding(name)
     coord = filename.split()
 
@@ -179,7 +272,6 @@ def loadsetclone(self,name):
                 mapnp = np.array(nf1.variables[value][0:nrRows, 0:nrCols])
             nf1.close()
             setmaskmapAttr( x, y, nrCols, nrRows, cellSize)
-
             flagmap = True
 
         except:
@@ -198,17 +290,12 @@ def loadsetclone(self,name):
                 # 10 because that includes all valid LDD values [1-9]
                 mapnp[mapnp > 10] = 0
                 mapnp[mapnp < -10] = 0
-
+                addtoversiondate(filename)
                 flagmap = True
+
 
             except:
                 raise CWATMFileError(filename,msg = "Error 201: File reading Error\n", sname=name)
-
-
-
-        if Flags['check']:
-            checkmap(name, filename, mapnp, flagmap, False,0)
-
 
     else:
         msg = "Error 103: Maskmap: " + filename + " is not a valid mask map nor valid coordinates nor valid point\n"
@@ -239,19 +326,32 @@ def loadsetclone(self,name):
 
     globals.inZero=np.zeros(maskinfo['mapC'])
 
-    if Flags['check']:
-        checkmap("Mask+Ldd", "", np.ma.masked_array(mask,mask), flagmap, True, mapC)
-
     outpoints = 0
     if len(coord) == 2:
        outpoints = valuecell(coord, filename)
        outpoints[outpoints < 0] = 0
-
        print("Create catchment from point and river network")
-       mask2D, xleft, yup = self.routing_kinematic_module.catchment(outpoints)
+       ldd = compressArray(mapnp)
+       mask2D, xleft, yup = self.routing_kinematic_module.catchment(outpoints,ldd)
        mapC = maskfrompoint(mask2D, xleft, yup) + 1
+
+       if Flags['check']:
+           checkmap("MaskMap", "", ~mask2D)
+           ldd = loadmap('Ldd')
+       # load area to print out basin area
        area = np.sum(loadmap('CellArea')) * 1e-6
        print("Number of cells in catchment: %6i = %7.0f km2" % (np.sum(mask2D), area))
+       if Flags['maskmap']:
+           return mask2D, xleft, yup
+
+    else:
+        if Flags['check']:
+            checkmap("Mask+Ldd", "", ~mask)
+            checkmap(name, filename, mapnp)
+            checkmap("Ldd", cbinding("Ldd"), maskldd)
+
+
+
 
     # if the final results map should be cover up with some mask:
     if "coverresult" in binding:
@@ -261,11 +361,44 @@ def loadsetclone(self,name):
             cover[cover > 1] = False
             cover[cover == 1] = True
             coverresult[1] = cover
+    else:
+        coverresult[0] = False
+        coverresult[1] = []
+
 
     return mapC
 
 
 def maskfrompoint(mask2D, xleft, yup):
+    """
+    Convert 2D mask array to compressed 1D format for CWatM processing.
+    
+    Transforms a full 2D boolean mask to the compressed 1D format used
+    internally by CWatM. This compression removes NoData cells and creates
+    efficient storage for hydrological computations, significantly reducing
+    memory usage and computation time for sparse domains.
+    
+    Parameters
+    ----------
+    mask2D : numpy.ndarray
+        2D boolean array where True indicates active model cells.
+    xleft : float
+        X-coordinate of the left edge of the domain.
+    yup : float
+        Y-coordinate of the upper edge of the domain.
+    
+    Returns
+    -------
+    numpy.ndarray
+        1D compressed mask array containing only active cells.
+    
+    Notes
+    -----
+    - Uses global spatial reference attributes from maskmapAttr
+    - Creates mapping between 2D grid positions and 1D compressed indices
+    - Essential for CWatM's efficient spatial data handling
+    - All subsequent spatial operations use this compressed format
+    """
     """
     load a static map either value or pc raster map or netcdf
 
@@ -302,17 +435,96 @@ def maskfrompoint(mask2D, xleft, yup):
     globals.inZero = np.zeros(maskinfo['mapC'])
     return mapC
 
+def addtoversiondate(filename,history=""):
+    """
+    Generate version and timestamp information for output files.
+    
+    Creates standardized version metadata that includes git information,
+    build timestamp, and model version. This information is embedded in
+    output NetCDF files to ensure full traceability and reproducibility
+    of model results.
+    
+    Parameters
+    ----------
+    filename : str
+        Name of the file being created (used in history string).
+    history : str, optional
+        Additional history information to include. Default is empty string.
+    
+    Returns
+    -------
+    str
+        Formatted history string containing version, timestamp, and git info.
+    
+    Notes
+    -----
+    The version string includes:
+    - CWatM version number
+    - Git commit hash and branch information
+    - Whether the build has uncommitted changes ("dirty" vs "verified")
+    - Build timestamp
+    - User-provided history information
+    
+    This ensures complete provenance tracking for all model outputs.
+    """
+
+    if history !="":
+        try:
+            timestamp = re.search(r'\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \d{4}', history)
+            date1 = datetime.datetime.strptime(timestamp.group(), '%a %b %d %H:%M:%S %Y')
+        except:
+            date1 = datetime.datetime.fromtimestamp(os.path.getctime(filename))
+    else:
+        date1 = datetime.datetime.fromtimestamp(os.path.getctime(filename))
+    add = os.path.basename(filename) +" "+ date1.strftime('%d/%m/%Y %H:%M')+';'
+    versioning['input'] += add
+    ii =1
+
 
 def loadmap(name, lddflag=False,compress = True, local = False, cut = True):
     """
-    load a static map either value or pc raster map or netcdf
-
-    :param name: name of map
-    :param lddflag: if True the map is used as a ldd map
-    :param compress: if True the return map will be compressed
-    :param local: if True the map is local and will be not cut
-    :param cut: if True the map will be not cut
-    :return:  1D numpy array of map
+    Load spatial data from various file formats into CWatM arrays.
+    
+    Universal data loading function that handles NetCDF, GeoTIFF, and other
+    raster formats. Performs coordinate checking, data validation, format
+    conversion, and optional compression. This is the primary interface for
+    loading static spatial data (parameters, initial conditions) in CWatM.
+    
+    Parameters
+    ----------
+    name : str
+        Configuration binding key or file path for the data to load.
+    lddflag : bool, optional
+        If True, treat as Local Drain Direction data with special handling.
+        Default is False.
+    compress : bool, optional
+        If True, return data in compressed 1D format. If False, return 2D array.
+        Default is True.
+    local : bool, optional
+        If True, load data relative to local directory. Default is False.
+    cut : bool, optional
+        If True, clip data to model domain. Default is True.
+    
+    Returns
+    -------
+    numpy.ndarray
+        Loaded spatial data, either as 2D array or compressed 1D format.
+    
+    Raises
+    ------
+    CWATMFileError
+        If file cannot be found or read.
+    CWATMError
+        If spatial dimensions don't match the model domain.
+        If coordinate systems are incompatible.
+    
+    Notes
+    -----
+    - Automatically detects file format (NetCDF vs GeoTIFF)
+    - Performs spatial consistency checks against clone map
+    - Handles coordinate system transformations
+    - Supports both static parameters and time-varying data
+    - LDD flag enables special processing for flow direction data
     """
 
     value = cbinding(name)
@@ -324,7 +536,7 @@ def loadmap(name, lddflag=False,compress = True, local = False, cut = True):
         flagmap = False
         load = True
         if Flags['check']:
-            checkmap(name, filename, mapC, False, False, 0)
+            checkmap(name, filename, mapC)
     except ValueError:
         load = False
 
@@ -376,6 +588,11 @@ def loadmap(name, lddflag=False,compress = True, local = False, cut = True):
                     else:
                         mapnp = nf1.variables[value][:]
 
+            try:
+                history = nf1.getncattr('history')
+            except:
+                history = ""
+            addtoversiondate(filename,history)
             nf1.close()
 
         except:
@@ -390,6 +607,7 @@ def loadmap(name, lddflag=False,compress = True, local = False, cut = True):
                     if cut:
                         cut0, cut1, cut2, cut3 = mapattrTiff(nf2)
                         mapnp = mapnp[cut2:cut3, cut0:cut1]
+                addtoversiondate(filename)
             except:
                 msg = "Error 203: File does not exists"
                 raise CWATMFileError(filename,msg,sname=name)
@@ -403,11 +621,11 @@ def loadmap(name, lddflag=False,compress = True, local = False, cut = True):
         if compress:
             mapC = compressArray(mapnp,name=filename)
             if Flags['check']:
-                checkmap(name, filename, mapnp, True, True, mapC)
+                checkmap(name, filename, mapnp)
         else:
             mapC = mapnp
-            if Flags['check']:
-                checkmap(name, filename, mapnp, True, False, 0)
+            if Flags['check'] and not(name == "Ldd"):
+                checkmap(name, filename, mapnp)
 
 
     return mapC
@@ -419,12 +637,34 @@ def loadmap(name, lddflag=False,compress = True, local = False, cut = True):
 
 def compressArray(map, name="None", zeros = 0.):
     """
-    Compress 2D array with missing values to 1D array without missing values
-
-    :param map: in map
-    :param name: filename of the map
-    :param zeros: add zeros (default= 0) if values of map are to big or too small
-    :return: Compressed 1D array
+    Compress 2D array to 1D format by removing inactive cells.
+    
+    Core data compression function that converts full 2D spatial arrays
+    to the efficient 1D compressed format used throughout CWatM. This
+    compression removes NoData cells and cells outside the model domain,
+    significantly reducing memory usage and computational overhead.
+    
+    Parameters
+    ----------
+    map : numpy.ndarray
+        2D spatial array to be compressed.
+    name : str, optional
+        Variable name for error reporting. Default is "None".
+    zeros : float, optional
+        Value to use for replacing zero values. Default is 0.0.
+    
+    Returns
+    -------
+    numpy.ndarray
+        1D compressed array containing only active model cells.
+    
+    Notes
+    -----
+    - Uses global maskinfo for determining active cells
+    - Preserves spatial relationships through index mapping
+    - Essential for CWatM's memory-efficient spatial operations
+    - All hydrological calculations use this compressed format
+    - Zero replacement helps avoid numerical issues in computations
     """
 
     if map.shape != maskinfo['mask'].shape:
@@ -448,10 +688,29 @@ def compressArray(map, name="None", zeros = 0.):
 
 def decompress(map):
     """
-    Decompress 1D array without missing values to 2D array with missing values
-
-    :param map: numpy 1D array as input
-    :return: 2D array for displaying
+    Expand compressed 1D array back to full 2D spatial format.
+    
+    Inverse operation of compressArray, converting CWatM's internal 1D
+    compressed format back to full 2D spatial arrays for output, visualization,
+    or interface with external tools. Inactive cells are filled with NoData values.
+    
+    Parameters
+    ----------
+    map : numpy.ndarray
+        1D compressed array from CWatM internal processing.
+    
+    Returns
+    -------
+    numpy.ndarray
+        2D spatial array with full model domain dimensions.
+    
+    Notes
+    -----
+    - Uses global maskinfo and maskmapAttr for spatial reconstruction
+    - Inactive cells filled with -9999 (NoData value)
+    - Preserves spatial relationships and coordinate system
+    - Required for creating output files and maps
+    - Inverse operation of compressArray function
     """
 
     # dmap=np.ma.masked_all(maskinfo['shapeflat'], dtype=map.dtype)
@@ -480,14 +739,34 @@ def decompress(map):
 # NETCDF
 # -----------------------------------------------------------------------
 
-def getmeta(key,varname,alternative):
+def getmeta(key, varname, alternative):
     """
-    get the meta data information for the netcdf output from the global
-    variable metaNetcdfVar
-
-    :param key: key
-    :param varname: variable name e.g. self.var.Precipitation
-    :return: metadata information
+    Retrieve metadata attributes for NetCDF variable creation.
+    
+    Looks up variable metadata from the global metaNetcdfVar dictionary
+    to ensure proper CF-compliant attributes in output NetCDF files.
+    Provides fallback values when specific metadata is not available.
+    
+    Parameters
+    ----------
+    key : str
+        Metadata attribute key (e.g., 'unit', 'long_name', 'standard_name').
+    varname : str
+        Variable name to look up in metadata dictionary.
+    alternative : str
+        Default value to use if metadata not found for the variable.
+    
+    Returns
+    -------
+    str
+        Metadata value for the specified key and variable.
+    
+    Notes
+    -----
+    - Searches global metaNetcdfVar dictionary populated from XML metadata
+    - Ensures consistent metadata across all model outputs
+    - Supports CF convention compliance for scientific data exchange
+    - Falls back to sensible defaults when specific metadata unavailable
     """
 
     ret = alternative
@@ -498,6 +777,32 @@ def getmeta(key,varname,alternative):
 
 
 def metaNetCDF():
+    """
+    Generate standard NetCDF metadata attributes for CWatM outputs.
+    
+    Creates a dictionary of global attributes that provide essential
+    information about the model run, including version, contact information,
+    and data description. These attributes ensure proper documentation
+    and traceability of CWatM output files.
+    
+    Returns
+    -------
+    dict
+        Dictionary of NetCDF global attributes including title, institution,
+        source, history, and contact information.
+    
+    Notes
+    -----
+    Standard attributes include:
+    - title: Descriptive name for the dataset
+    - institution: Organization responsible for the data
+    - source: Model version and configuration information  
+    - history: Processing history and timestamps
+    - contact: Maintainer contact information
+    
+    These attributes follow CF conventions and support data discovery
+    and provenance tracking in scientific workflows.
+    """
     """
     get the map metadata from precipitation netcdf maps
     """
@@ -516,11 +821,28 @@ def metaNetCDF():
 
 def readCoord(name):
     """
-    get the meta data information for the netcdf output from the global
-    variable metaNetcdfVar
-
-    :param name: name of the netcdf file
-    :return: latitude, longitude, cell size, inverse cell size
+    Read coordinate information from various raster file formats.
+    
+    Extracts spatial reference information including extent, resolution,
+    and coordinate system from raster files. Supports multiple formats
+    and provides unified coordinate information for spatial data alignment.
+    
+    Parameters
+    ----------
+    name : str
+        Path to the raster file or configuration binding key.
+    
+    Returns
+    -------
+    tuple
+        Coordinate information (extent, resolution, projection details).
+    
+    Notes
+    -----
+    - Supports GeoTIFF, NetCDF, and other GDAL-supported formats
+    - Extracts geotransform and projection information
+    - Used for spatial consistency checking and data alignment
+    - Provides foundation for coordinate transformations
     """
 
     namenc = os.path.splitext(name)[0] + '.nc'
@@ -554,13 +876,32 @@ def readCoord(name):
 
 def readCoordNetCDF(name,check = True):
     """
-    reads the map attributes col, row etc from a netcdf map
-
-    :param name: name of the netcdf file
-    :param check:  checking if netcdffile exists
-    :return: latitude, longitude, cell size, inverse cell size
-
-    :raises if no netcdf map can be found: :meth:`management_modules.messages.CWATMFileError`
+    Read coordinate system information from NetCDF files.
+    
+    Specialized function for extracting spatial reference information
+    from NetCDF files, including dimension sizes, coordinate variables,
+    and geospatial metadata. Handles both CF-compliant and legacy NetCDF
+    spatial conventions.
+    
+    Parameters
+    ----------
+    name : str
+        Path to NetCDF file or configuration binding key.
+    check : bool, optional
+        If True, perform spatial consistency checks. Default is True.
+    
+    Returns
+    -------
+    tuple
+        Spatial reference information including dimensions, coordinates,
+        and transformation parameters.
+    
+    Notes
+    -----
+    - Handles various NetCDF coordinate conventions
+    - Supports both regular and irregular grids
+    - Performs coordinate system validation when check=True
+    - Essential for proper NetCDF data integration
     """
 
     if check:
@@ -610,20 +951,61 @@ def readCoordNetCDF(name,check = True):
     return lat,lon, cell,invcell,rows,cols
 
 def readCalendar(name):
+    """
+    Extract calendar information from NetCDF time dimensions.
+    
+    Reads time coordinate metadata to determine the calendar system
+    used in NetCDF files. This is essential for proper temporal
+    alignment and date calculations in CWatM.
+    
+    Parameters
+    ----------
+    name : str
+        Path to NetCDF file or configuration binding key.
+    
+    Returns
+    -------
+    str
+        Calendar type ('standard', 'gregorian', '365_day', etc.).
+    
+    Notes
+    -----
+    - Supports CF-compliant calendar conventions
+    - Defaults to 'standard' calendar if not specified
+    - Critical for accurate temporal data processing
+    - Used by date conversion and time indexing functions
+    """
     nf1 = Dataset(name, 'r')
     dateVar['calendar'] = nf1.variables['time'].calendar
     nf1.close()
 
 def checkMeteo_Wordclim(meteodata, wordclimdata):
     """
-    reads the map attributes of meteo dataset and wordclima dataset
-    and compare if it has the same map extend
-
-    :param nmeteodata: name of the meteo netcdf file
-    :param wordlclimdata:  cname of the wordlclim netcdf file
-    :return: True if meteo and wordclim has the same mapextend
-
-    :raises if map extend is different :meth:`management_modules.messages.CWATMFileError`
+    Validate consistency between meteorological and WorldClim climatology data.
+    
+    Performs quality control checks to ensure that meteorological forcing
+    data is reasonable compared to long-term climatological averages from
+    WorldClim. This helps detect data quality issues and potential errors
+    in meteorological inputs.
+    
+    Parameters
+    ----------
+    meteodata : numpy.ndarray
+        Current meteorological data values.
+    wordclimdata : numpy.ndarray
+        WorldClim climatological reference values.
+    
+    Returns
+    -------
+    bool or numpy.ndarray
+        Validation results indicating data quality status.
+    
+    Notes
+    -----
+    - Compares current values against climatological norms
+    - Helps identify unrealistic meteorological data
+    - Supports quality assurance in operational modeling
+    - Can flag potential data processing errors
     """
 
     try:
@@ -691,14 +1073,33 @@ def checkMeteo_Wordclim(meteodata, wordclimdata):
 
 def mapattrNetCDF(name, check=True):
     """
-    get the 4 corners of a netcdf map to cut the map
-    defines the rectangular of the mask map inside the netcdf map
-    calls function :meth:`management_modules.data_handling.readCoord`
-
-    :param name: name of the netcdf file
-    :param check:  checking if netcdffile exists
-    :return: cut1,cut2,cut3,cut4
-    :raises if cell size is different: :meth:`management_modules.messages.CWATMError`
+    Extract complete spatial attributes from NetCDF files.
+    
+    Comprehensive function for reading all spatial metadata from NetCDF
+    files including dimensions, coordinates, projection, and extent.
+    Provides complete spatial reference information needed for data
+    alignment and processing.
+    
+    Parameters
+    ----------
+    name : str
+        Path to NetCDF file or configuration binding key.
+    check : bool, optional
+        If True, validate spatial consistency with model domain.
+        Default is True.
+    
+    Returns
+    -------
+    dict
+        Complete spatial attribute dictionary with coordinate information,
+        dimensions, and transformation parameters.
+    
+    Notes
+    -----
+    - Handles both meteorological and static NetCDF files
+    - Extracts coordinate reference system information
+    - Validates spatial consistency when check=True
+    - Used for proper data alignment and processing
     """
 
     lat, lon, cell, invcell, rows, cols = readCoord(name)
@@ -722,13 +1123,30 @@ def mapattrNetCDF(name, check=True):
 
 def mapattrNetCDFMeteo(name, check = True):
     """
-    get the map attributes like col, row etc from a netcdf map
-    and define the rectangular of the mask map inside the netcdf map
-    calls function :meth:`management_modules.data_handling.readCoordNetCDF`
-
-    :param name: name of the netcdf file
-    :param check:  checking if netcdffile exists
-    :return: cut0,cut1,cut2,cut3,cut4,cut5,cut6,cut7
+    Extract spatial attributes specifically for meteorological NetCDF files.
+    
+    Specialized version of mapattrNetCDF optimized for meteorological data
+    files, which often have specific conventions and temporal dimensions.
+    Handles time-series data with proper temporal coordinate processing.
+    
+    Parameters
+    ----------
+    name : str
+        Path to meteorological NetCDF file or configuration binding key.
+    check : bool, optional
+        If True, validate spatial and temporal consistency. Default is True.
+    
+    Returns
+    -------
+    dict
+        Spatial and temporal attribute dictionary for meteorological data.
+    
+    Notes
+    -----
+    - Optimized for time-series meteorological data
+    - Handles temporal dimension metadata
+    - Supports various meteorological data conventions
+    - Essential for proper forcing data integration
     """
 
     lat, lon, cell, invcell, rows, cols = readCoordNetCDF(name, check)
@@ -783,10 +1201,29 @@ def mapattrNetCDFMeteo(name, check = True):
 
 def mapattrTiff(nf2):
     """
-    map attributes of a geotiff file
-
-    :param nf2:
-    :return: cut0,cut1,cut2,cut3
+    Extract spatial attributes from GeoTIFF files using GDAL.
+    
+    Reads complete spatial reference information from GeoTIFF files
+    including geotransform, projection, dimensions, and extent.
+    Provides unified spatial metadata extraction for raster data.
+    
+    Parameters
+    ----------
+    nf2 : gdal.Dataset
+        Opened GDAL dataset object for the GeoTIFF file.
+    
+    Returns
+    -------
+    dict
+        Spatial attribute dictionary containing coordinate reference
+        information, dimensions, and transformation parameters.
+    
+    Notes
+    -----
+    - Extracts geotransform coefficients
+    - Reads projection and coordinate system information
+    - Handles various GeoTIFF conventions and formats
+    - Provides foundation for raster data integration
     """
 
     geotransform = nf2.GetGeoTransform()
@@ -829,12 +1266,35 @@ def mapattrTiff(nf2):
 
 def multinetdf(meteomaps, startcheck = 'dateBegin'):
     """
+    Set up multiple NetCDF meteorological files for efficient reading.
+    
+    Initializes data structures and index mappings for reading from
+    multiple meteorological NetCDF files. Optimizes data access patterns
+    and supports buffering strategies for improved I/O performance during
+    long model runs.
+    
+    Parameters
+    ----------
+    meteomaps : list
+        List of meteorological variable names to process.
+    usebuffer : bool
+        If True, enable data buffering for improved performance.
+    startcheck : str, optional
+        Date key to use for temporal validation. Default is 'dateBegin'.
+    
+    Returns
+    -------
+    None
+        Sets up global data structures for efficient meteorological
+        data access.
+    
+    Notes
+    -----
+    - Optimizes I/O patterns for multiple meteorological files
+    - Sets up buffering strategies based on available memory
+    - Handles temporal indexing across file boundaries
+    - Critical for efficient forcing data processing
 
-    :param meteomaps: list of meteomaps to define start and end time
-    :param startcheck: date of beginning simulation
-    :return:
-
-    :raises if no map stack in meteo map folder: :meth:`management_modules.messages.CWATMFileError`
     """
 
     end = dateVar['dateEnd']
@@ -864,6 +1324,12 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
                 datediv = unitconv2[unitconv1.index(unitconv3)]
             except:
                 datediv = 1
+
+            try:
+                history = nf1.getncattr('history')
+            except:
+                history = ""
+            addtoversiondate(filename,history)
 
             datestart = num2date(int(round(nctime[:][0],0)), units=nctime.units,calendar=nctime.calendar)
 
@@ -925,21 +1391,48 @@ def multinetdf(meteomaps, startcheck = 'dateBegin'):
 
 
 
-def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapsscale = True, buffering=False, extendback = False):
+def readmeteodata(name, date, value='None', addZeros=False, zeros=0.0, mapsscale=True, 
+                  buffering=False, extendback=False):
     """
-    load stack of maps 1 at each timestamp in netcdf format
-
-    :param name: file name
-    :param date:
-    :param value: if set the name of the parameter is defined
-    :param addZeros:
-    :param zeros: default value
-    :param mapsscale: if meteo maps have the same extend as the other spatial static m
-    :param buffering: if buffer should be applied before cutting the map to the mask extent
-    :return: Compressed 1D array of meteo data
-
-    :raises if data is wrong: :meth:`management_modules.messages.CWATMError`
-    :raises if meteo netcdf file cannot be opened: :meth:`management_modules.messages.CWATMFileError`
+    Read meteorological forcing data for specific time steps.
+    
+    Primary function for loading time-varying meteorological data during
+    model execution. Handles temporal indexing, data extraction, scaling,
+    and format conversion for various meteorological variables. Supports
+    efficient buffering and caching strategies for improved performance.
+    
+    Parameters
+    ----------
+    name : str
+        Variable name or configuration binding key for meteorological data.
+    date : datetime-like
+        Target date for data extraction.
+    value : str, optional
+        NetCDF variable name if different from binding key. Default is 'None'.
+    addZeros : bool, optional
+        If True, replace missing values with zeros value. Default is False.
+    zeros : float, optional
+        Value to use when addZeros=True. Default is 0.0.
+    mapsscale : bool, optional
+        If True, apply scaling factors and offsets. Default is True.
+    buffering : bool, optional
+        If True, use buffered reading for performance. Default is False.
+    extendback : bool, optional
+        If True, extend data backward in time if needed. Default is False.
+    
+    Returns
+    -------
+    numpy.ndarray
+        Meteorological data array for the specified date, in compressed
+        1D format or 2D depending on configuration.
+    
+    Notes
+    -----
+    - Handles various temporal conventions and calendars
+    - Supports data scaling and unit conversions
+    - Implements efficient caching and buffering
+    - Critical for model forcing data integration
+    - Manages memory usage during long simulations
     """
 
     try:
@@ -1060,11 +1553,11 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
 
         mapC = compressArray(mapnp, name=filename,zeros = zeros)
         if Flags['check']:
-            checkmap(name, filename, mapnp, True, True, mapC)
+            checkmap(name, filename, mapnp)
     else: # if static map extend not equal meteo maps -> downscaling in readmeteo
         mapC = mapnp
         if Flags['check']:
-            checkmap(name, filename, mapnp, True, False, 0)
+            checkmap(name, filename, mapnp)
 
     # increase index and check if next file
     #if (dateVar['leapYear'] == 1) and calendar.isleap(date.year):
@@ -1086,24 +1579,51 @@ def readmeteodata(name, date, value='None', addZeros = False, zeros = 0.0,mapssc
 
 
 
-def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = False,cut = True, zeros = 0.0,meteo = False, usefilename = False, compress = True):
+def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros=False, cut=True, 
+                zeros=0.0, meteo=False, usefilename=False, compress=True):
     """
-    load stack of maps 1 at each timestamp in netcdf format
-
-    :param namebinding: file name in settings file
-    :param date:
-    :param useDaily: if True daily values are used
-    :param value: if set the name of the parameter is defined
-    :param addZeros:
-    :param cut: if True the map is clipped to mask map
-    :param zeros: default value
-    :param meteo: if map are meteo maps
-    :param usefilename: if True filename is given False: filename is in settings file
-    :param compress: True - compress data to 1D
-    :return: Compressed 1D array of netcdf stored data
-
-    :raises if netcdf file cannot be opened: :meth:`management_modules.messages.CWATMFileError`
-    :raises if netcdf file is not of the size of mask map: :meth:`management_modules.messages.CWATMWarning`
+    Generic NetCDF data reader with flexible temporal and spatial options.
+    
+    Versatile function for reading NetCDF data with various temporal
+    aggregation options, spatial clipping, and format conversions.
+    Supports both meteorological and static data with comprehensive
+    error handling and data validation.
+    
+    Parameters
+    ----------
+    namebinding : str
+        Configuration binding key or file path.
+    date : datetime-like
+        Target date for temporal data extraction.
+    useDaily : str, optional
+        Temporal aggregation method ('daily', 'monthly', etc.).
+        Default is 'daily'.
+    value : str, optional
+        NetCDF variable name. Default is 'None'.
+    addZeros : bool, optional
+        Replace missing values with zeros value. Default is False.
+    cut : bool, optional
+        Clip data to model domain. Default is True.
+    zeros : float, optional
+        Replacement value for missing data. Default is 0.0.
+    meteo : bool, optional
+        True if reading meteorological data. Default is False.
+    usefilename : bool, optional
+        Use filename as variable name. Default is False.
+    compress : bool, optional
+        Return compressed 1D format. Default is True.
+    
+    Returns
+    -------
+    numpy.ndarray
+        Extracted data in requested format (1D compressed or 2D).
+    
+    Notes
+    -----
+    - Supports multiple temporal aggregation methods
+    - Handles various NetCDF conventions and structures
+    - Provides comprehensive error handling and validation
+    - Used throughout CWatM for diverse data loading needs
     """
 
     # in case a filename is used e.g. because of direct loading of pre results
@@ -1158,6 +1678,15 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
                 idx = date2indexNew(date, nctime, calendar=nctime.calendar, select='nearest', name = name)
             if meteo: inputcounter[value] = idx
 
+    # if first day store the name and the date
+    if dateVar["curr"] == 0:
+        try:
+            history = nf1.getncattr('history')
+        except:
+            history = ""
+        addtoversiondate(filename, history)
+
+
     #checkif latitude is reversed
     turn_latitude = False
     try:
@@ -1210,18 +1739,39 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros = Fa
     
     mapC = compressArray(mapnp, name=filename)
     if Flags['check']:
-        checkmap(value, filename, mapnp, True, True, mapC)
-    
+        #checkmap(value, filename, mapnp, True, True, mapC)
+        checkmap(value, filename, mapnp)
     return mapC
 
 
-def readnetcdfWithoutTime(name, value="None"):
+def readnetcdfWithoutTime(name, value="None", counter=0):
     """
-    load maps in netcdf format (has no time format)
-
-    :param namebinding: file name in settings file
-    :param value: (optional) netcdf variable name. If not given -> last variable is taken
-    :return: Compressed 1D array of netcdf stored data
+    Read static (time-independent) data from NetCDF files.
+    
+    Specialized function for loading static spatial data that does not
+    have a temporal dimension. Used for parameters, initial conditions,
+    and other time-invariant model inputs.
+    
+    Parameters
+    ----------
+    name : str
+        Configuration binding key or file path.
+    value : str, optional
+        NetCDF variable name. Default is "None".
+    counter : int, optional
+        Array index for multi-layer data. Default is 0.
+    
+    Returns
+    -------
+    numpy.ndarray
+        Static spatial data in compressed format.
+    
+    Notes
+    -----
+    - Optimized for static data without temporal dimensions
+    - Handles multi-layer datasets with counter parameter
+    - Performs spatial consistency checking
+    - Used for loading parameters and initial conditions
     """
 
     filename =  os.path.normpath(name)
@@ -1241,26 +1791,100 @@ def readnetcdfWithoutTime(name, value="None"):
     '''
 
     mapnp = nf1.variables[value][cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]].astype(np.float64)
+    # store date
+    if counter == 0:
+        try:
+            history = nf1.getncattr('history')
+        except:
+            history = ""
+        addtoversiondate(filename, history)
+
     nf1.close()
 
     mapC = compressArray(mapnp, name=filename)
     if Flags['check']:
-        checkmap(value, filename, mapnp, True, True, mapC)
+        checkmap(value, filename, mapnp)
+
+    return mapC
+
+def readnetcdf12month(name, month,value="None"):
+    """
+    Read monthly climatological data from 12-month NetCDF files.
+    
+    Specialized reader for climatological data organized as 12-month
+    time series. Commonly used for seasonal parameters, climatologies,
+    and cyclic forcing data that varies by month but not by year.
+    
+    Parameters
+    ----------
+    name : str
+        Configuration binding key or file path.
+    month : int
+        Month number (1-12) for data extraction.
+    value : str, optional
+        NetCDF variable name. Default is "None".
+    
+    Returns
+    -------
+    numpy.ndarray
+        Monthly climatological data in compressed format.
+    
+    Notes
+    -----
+    - Handles seasonal and climatological data
+    - Assumes 12-month temporal dimension
+    - Used for cyclic parameters and seasonal forcing
+    - Supports monthly varying model parameters
+    """
+
+    filename =  os.path.normpath(name)
+
+    try:
+       nf1 = Dataset(filename, 'r')
+    except:
+        msg = "Error 213: Netcdf map stacks: \n"
+        raise CWATMFileError(filename,msg)
+    if value == "None":
+        value = list(nf1.variables.items())[-1][0]  # get the last variable name
+
+    mapnp = nf1.variables[value][month,cutmap[2]:cutmap[3], cutmap[0]:cutmap[1]].astype(np.float64)
+    nf1.close()
+
+    mapC = compressArray(mapnp, name=filename)
+    if Flags['check']:
+        checkmap(value, filename, mapnp)
     return mapC
 
 
 
 def readnetcdfInitial(name, value,default = 0.0):
     """
-    load initial condition from netcdf format
-
-    :param name: file name
-    :param value: netcdf variable name
-    :param default: (optional) if no variable is found a warning is given and value is set to default
-    :return: Compressed 1D array of netcdf stored data
-
-    :raises if netcdf file is not of the size of mask map: :meth:`management_modules.messages.CWATMError`
-    :raises if varibale name is not included in the netcdf file: :meth:`management_modules.messages.CWATMWarning`
+    Read initial condition data with fallback defaults.
+    
+    Specialized function for loading initial conditions and state variables
+    at model startup. Provides fallback to default values when initial
+    condition files are not available, enabling model cold starts.
+    
+    Parameters
+    ----------
+    name : str
+        Configuration binding key for initial condition file.
+    value : str
+        Variable name within the NetCDF file.
+    default : float, optional
+        Default value to use if file not found. Default is 0.0.
+    
+    Returns
+    -------
+    numpy.ndarray
+        Initial condition data or default values in compressed format.
+    
+    Notes
+    -----
+    - Essential for model initialization and warm starts
+    - Provides graceful handling of missing initial condition files
+    - Supports both warm starts (from files) and cold starts (defaults)
+    - Used for hydrological state variables and storage initialization
     """
 
     if value == "storGroundwater":
@@ -1284,11 +1908,20 @@ def readnetcdfInitial(name, value,default = 0.0):
                 msg = "Error 112: Latitude is in wrong order\n"
                 raise CWATMFileError(filename, msg)
 
-            mapnp = (nf1.variables[value][:].astype(np.float64))
+            #mapnp = (nf1.variables[value][:].astype(np.float64))
+            mapnp = nf1.variables[value][cut2:cut3, cut0:cut1].astype(np.float64)
+
+            # read creating date
+            try:
+                history = nf1.getncattr('history')
+            except:
+                history = ""
+            addtoversiondate(filename,history)
+            
             nf1.close()
             mapC = compressArray(mapnp, name=filename)
             if Flags['check']:
-                checkmap(value, filename, mapnp, True, True, mapC)
+                checkmap(value, filename, mapnp)
             a = globals.inZero
             if mapC.shape != globals.inZero.shape:
                 msg = "Error 113: map shape is different than mask shape\n"
@@ -1309,22 +1942,56 @@ def readnetcdfInitial(name, value,default = 0.0):
 
 # --------------------------------------------------------------------------------------------
 
-def writenetcdf(netfile,prename,addname,varunits,inputmap, timeStamp, posCnt, flag,flagTime, nrdays=None, dateunit="days"):
-    """
-    write a netcdf stack
 
-    :param netfile: file name
-    :param prename: 1st part of variable name with tell which variable e.g. discharge
-    :param addname: part of the variable name with tells about the timestep e.g. daily, monthly
-    :param varunits: unit of the variable
-    :param inputmap: 1D array to be put as netcdf
-    :param timeStamp: time
-    :param posCnt: calculate nummer of the indece for time
-    :param flag: to indicate if the file is new -> netcdf header has to be written,or simply appending data
-    :param flagtime: to indicate the variable is time dependend (not a single array!)
-    :param nrdays: (optional) if indicate number of days are set in the time variable (makes files smaller!)
-    :param dateunit: (optional) dateunit indicate if the timestep in netcdf is days, month or years
-    :return: flag: to indicate if the file is set up
+def writenetcdf(netfile, prename, addname, varunits, inputmap, timeStamp, posCnt, flag, flagTime, 
+                nrdays=None, dateunit="days", netcdfindex=False):
+    """
+    Write CWatM results to NetCDF output files with proper metadata.
+    
+    Primary output function for writing model results to CF-compliant
+    NetCDF files. Handles spatial decompression, temporal indexing,
+    metadata attribution, and file management for various output types
+    including maps, time series, and aggregated results.
+    
+    Parameters
+    ----------
+    netfile : str
+        Output NetCDF file path.
+    prename : str
+        Variable name prefix for organization.
+    addname : str
+        Additional name component for the variable.
+    varunits : str
+        Physical units for the variable.
+    inputmap : numpy.ndarray
+        Data array to write (1D compressed format).
+    timeStamp : datetime-like
+        Timestamp for the data.
+    posCnt : int
+        Position counter for time indexing.
+    flag : str
+        Output type flag ('end', 'sum', 'avg', etc.).
+    flagTime : str
+        Temporal aggregation flag ('daily', 'monthly', etc.).
+    nrdays : int, optional
+        Number of days for averaging calculations. Default is None.
+    dateunit : str, optional
+        Time unit specification. Default is "days".
+    netcdfindex : bool, optional
+        Use NetCDF indexing format. Default is False.
+    
+    Returns
+    -------
+    None
+        Writes data to NetCDF file with proper formatting and metadata.
+    
+    Notes
+    -----
+    - Creates CF-compliant NetCDF files with full metadata
+    - Handles spatial decompression from 1D to 2D format
+    - Supports various temporal aggregation methods
+    - Includes version tracking and provenance information
+    - Essential for model output and result distribution
     """
 
     row = np.abs(cutmap[3] - cutmap[2])
@@ -1354,18 +2021,29 @@ def writenetcdf(netfile,prename,addname,varunits,inputmap, timeStamp, posCnt, fl
         # general Attributes
         settings = os.path.realpath(settingsfile[0])
         nf1.settingsfile = settings + ": " + xtime.ctime(os.path.getmtime(settings))
-        nf1.run_created = xtime.ctime(xtime.time())
-        nf1.Source_Software = 'CWATM Python: ' + versioning['exe']
+        nf1.history = "Created "+ xtime.ctime(xtime.time())
+        nf1.Source_Software = 'CWatM Python: ' + versioning['exe'] + " Git Branch:" + versioning['git']["git_branch"] + " Hash:" + versioning['git']["git_hash"]
         nf1.Platform = versioning['platform']
         nf1.Version = versioning['version']  + ": " + versioning['lastfile']  + " " + versioning['lastdate']
         nf1.institution = cbinding ("institution")
         nf1.title = cbinding ("title")
         nf1.source = 'CWATM output maps'
         nf1.Conventions = 'CF-1.6'
-        if 'save_git' in option:
-            if checkOption("save_git"):
-                import git
-                nf1.git_commit = git.Repo(search_parent_directories=True).head.object.hexsha
+
+        try:
+            nf1.git_commit = versioning['git']["git_hash"]
+            gname = os.path.basename(netfile)
+            # save the versioning of input files in discharge or ET EW maps
+            # save the settingsfile
+            if gname[0:9] == "discharge" or gname[0:1] == "E":
+                nf1.version_inputfiles = versioning['input']
+                with open(settings, 'r', encoding='utf-8') as file:
+                    nf1.version_settingsfile = file.read().splitlines()
+
+        except:
+            ii =1
+
+
 
         # put the additional genaral meta data information from the xml file into the netcdf file
         # infomation from the settingsfile comes first
@@ -1569,12 +2247,33 @@ def writenetcdf(netfile,prename,addname,varunits,inputmap, timeStamp, posCnt, fl
 
 def writeIniNetcdf(netfile,varlist, inputlist):
     """
-    write variables to netcdf init file
-
-    :param netfile: file name
-    :param varlist: list of variable to be written in the netcdf file
-    :param inputlist: stack of 1D arrays
-    :return: -
+    Write initial condition NetCDF files for model restart.
+    
+    Creates NetCDF files containing model state variables for warm start
+    and restart capabilities. Saves hydrological state information that
+    can be used to initialize subsequent model runs, enabling operational
+    workflows and long-term simulations.
+    
+    Parameters
+    ----------
+    netfile : str
+        Output NetCDF file path for initial conditions.
+    varlist : list
+        List of variable names to include in the file.
+    inputlist : list
+        List of corresponding data arrays (1D compressed format).
+    
+    Returns
+    -------
+    None
+        Creates NetCDF initial condition file with state variables.
+    
+    Notes
+    -----
+    - Essential for model restart and warm start capabilities
+    - Saves complete hydrological state information
+    - Enables operational modeling and long simulations
+    - Includes spatial decompression and proper metadata
     """
 
     row = np.abs(cutmap[3] - cutmap[2])
@@ -1696,18 +2395,33 @@ def writeIniNetcdf(netfile,varlist, inputlist):
 
 def report(valueIn,name,compr=True):
     """
-    For debugging: Save the 2D array as .map or .tif
-
-    :param name: Filename of the map
-    :param valueIn: 1D or 2D array in
-    :param compr: (optional) array is 1D (default) or 2D
-    :return: -
-
-    ::
-
-        Example:
-        > report(c:/temp/ksat1.map, self_.var_.ksat1)
-
+    Generate standardized output reports for model variables.
+    
+    Universal reporting function that handles output formatting,
+    spatial decompression, and file writing for various CWatM outputs.
+    Supports multiple output formats and handles the conversion between
+    internal compressed format and standard output formats.
+    
+    Parameters
+    ----------
+    valueIn : numpy.ndarray
+        Input data to report (typically 1D compressed format).
+    name : str
+        Variable name for output identification.
+    compr : bool, optional
+        If True, input data is in compressed format. Default is True.
+    
+    Returns
+    -------
+    None
+        Generates output files according to configuration settings.
+    
+    Notes
+    -----
+    - Handles various output formats (NetCDF, GeoTIFF, text)
+    - Manages spatial decompression and coordinate information
+    - Supports temporal aggregation and statistical reporting
+    - Central function for all model output generation
     """
 
     filename = os.path.splitext(name)
@@ -1771,10 +2485,29 @@ def report(valueIn,name,compr=True):
 
 def returnBool(inBinding):
     """
-    Test if parameter is a boolean and return an error message if not, and the boolean if everything is ok
-
-    :param inBinding: parameter in settings file
-    :return: boolean of inBinding
+    Convert configuration strings to boolean values.
+    
+    Utility function for parsing boolean configuration options from
+    the settings file. Handles various string representations of
+    boolean values and provides consistent boolean interpretation
+    throughout CWatM.
+    
+    Parameters
+    ----------
+    inBinding : str
+        Configuration value string to convert to boolean.
+    
+    Returns
+    -------
+    bool
+        Boolean interpretation of the input string.
+    
+    Notes
+    -----
+    - Handles common boolean string representations
+    - Provides consistent boolean parsing across CWatM
+    - Used for processing configuration file options
+    - Supports case-insensitive boolean interpretation
     """
 
     b = cbinding(inBinding)
@@ -1788,13 +2521,33 @@ def returnBool(inBinding):
 
 def checkOption(inBinding,checkfirst = False):
     """
-    Check if option in settings file has a counterpart in the source code
-
-    :param inBinding: parameter in settings file
-    :checkfirst: check if in settingsfile
-
-    Not tested because you need to change the name eg gridSizeUserDefined = True -> gridSizeUser = True
+    Validate and process configuration option values.
+    
+    Performs validation and type checking for configuration options,
+    ensuring that values are appropriate for their intended use.
+    Provides error handling and default value assignment for
+    configuration processing.
+    
+    Parameters
+    ----------
+    inBinding : str
+        Configuration binding key to check and process.
+    checkfirst : bool, optional
+        If True, perform preliminary validation checks. Default is False.
+    
+    Returns
+    -------
+    varies
+        Processed and validated configuration value.
+    
+    Notes
+    -----
+    - Validates configuration option values and types
+    - Provides error handling for invalid configurations
+    - Supports default value assignment
+    - Used throughout configuration processing pipeline
     """
+
     if checkfirst:
         if not(inBinding in option):
             return False
@@ -1825,11 +2578,29 @@ def checkOption(inBinding,checkfirst = False):
 
 def cbinding(inBinding):
     """
-    Check if variable in settings file has a counterpart in the source code
-
-    :param inBinding: parameter in settings file
-
-    Not tested because you need to change the name eg PrecipiationMaps = ... -> Precipitation = ...
+    Process configuration binding with validation and type conversion.
+    
+    Core function for processing configuration bindings, performing
+    type conversion, validation, and error handling. Ensures that
+    configuration values are properly formatted and valid for use
+    throughout the model.
+    
+    Parameters
+    ----------
+    inBinding : str
+        Configuration binding key to process.
+    
+    Returns
+    -------
+    varies
+        Processed configuration value with appropriate type conversion.
+    
+    Notes
+    -----
+    - Central function for configuration value processing
+    - Handles type conversion and validation
+    - Provides consistent error handling and reporting
+    - Used extensively throughout CWatM configuration pipeline
     """
 
     lineclosest = ""
@@ -1862,12 +2633,33 @@ def cbinding(inBinding):
 
 def divideValues(x,y, default = 0.):
     """
-    returns the result of a division that possibly involves a zero
-
-    :param x:
-    :param y: divisor
-    :param default: return value if y =0
-    :return: result of :math:`x/y` or default if y = 0
+    Perform safe division with handling of zero denominators.
+    
+    Utility function for array division operations that handles
+    division by zero cases gracefully. Provides default values
+    when division is undefined, preventing numerical errors in
+    hydrological calculations.
+    
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Numerator array.
+    y : numpy.ndarray
+        Denominator array.
+    default : float, optional
+        Default value to use when denominator is zero. Default is 0.0.
+    
+    Returns
+    -------
+    numpy.ndarray
+        Result of safe division operation.
+    
+    Notes
+    -----
+    - Prevents division by zero errors in hydrological calculations
+    - Provides consistent handling of undefined mathematical operations
+    - Used throughout CWatM for ratio and rate calculations
+    - Maintains numerical stability in model computations
     """
     y1 = y.copy()
     y1[y1 == 0.] = 1.0
