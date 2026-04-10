@@ -786,7 +786,7 @@ class water_demand:
             arr = np.kron(np.arange(rows // inner * cols // inner).reshape((rows // inner, cols // inner)),
                           np.ones((inner, inner)))
             arr = arr[cut2:cut3, cut0:cut1].astype(int)
-            self.var.allocation_zone = compressArray(arr)
+            #self.var.allocation_zone = compressArray(arr)
 
             self.var.modflowPumping = globals.inZero.copy()
             self.var.leakage = globals.inZero.copy()

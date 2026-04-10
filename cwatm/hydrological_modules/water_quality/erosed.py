@@ -242,9 +242,9 @@ class waterquality_erosed(object):
         ### Dummy variables for lakes and reservoir function
         if checkOption('includeWaterBodies'):
             if 'ks_sediment' in binding:
-                self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('ks_sediment') * 1000) # l day-1 -> m3 kg-1
+                self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('ks_sediment')) # day-1 (decay constant)
             else:
-                self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + 184.)  # 0..184 l per day -> m3 per day
+                self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + .184)  # day-1 (decay constant)
 
             if 'd50_sediment' in binding:
                 self.var.d50_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('d50_sediment'))
