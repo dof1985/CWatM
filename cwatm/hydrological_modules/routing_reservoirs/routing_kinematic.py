@@ -852,18 +852,18 @@ class routing_kinematic(object):
                 minMassAllowed = 10**-5 / self.var.dtRouting
                 if self.var.includeErosed:
                     # sediment in channel: input from musle by routing steps minus abstraction
-                    self.var.channel_sed_Dt = np.maximum(self.var.channel_sed_Dt + (self.var.sedToChannel) / self.var.noRoutingSteps  + lakeResOut_sed_Dt - self.var.resLakeInflowTmp[self.var.sed_idx, :] - channel_sed_Abstracted_Dt, 0.)
+                    self.var.channel_sed_Dt = np.maximum(self.var.channel_sed_Dt + (self.var.sedToChannel) / self.var.noRoutingSteps  + lakeResOut_sed_Dt - channel_sed_Abstracted_Dt, 0.)
                     self.var.channel_sed_Dt  = np.where(self.var.channel_sed_Dt <= minMassAllowed, 0., self.var.channel_sed_Dt)
                     massFluxArray[self.var.sed_idx, :] = self.var.channel_sed_Dt
                     
                 if self.var.includePhosphorus: 
 
 
-                    self.var.channel_P_Dt = np.maximum(self.var.channel_P_Dt + runoff_P_Dt + mineralWeat_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - self.var.resLakeInflowTmp[self.var.TDP_idx, :] - channel_P_Abstracted_Dt, 0.)
+                    self.var.channel_P_Dt = np.maximum(self.var.channel_P_Dt + runoff_P_Dt + mineralWeat_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - channel_P_Abstracted_Dt, 0.)
                     self.var.channel_P_Dt = np.where(self.var.channel_P_Dt <= minMassAllowed, 0., self.var.channel_P_Dt)
                     massFluxArray[self.var.TDP_idx, :] = self.var.channel_P_Dt
 
-                    self.var.channel_PP_Dt = np.maximum(self.var.channel_PP_Dt + input_PP_Dt + lakeResOut_PP_Dt- self.var.resLakeInflowTmp[self.var.PP_idx, :] - channel_PP_Abstracted_Dt, 0.)
+                    self.var.channel_PP_Dt = np.maximum(self.var.channel_PP_Dt + input_PP_Dt + lakeResOut_PP_Dt- channel_PP_Abstracted_Dt, 0.)
                     self.var.channel_PP_Dt = np.where(self.var.channel_PP_Dt <= minMassAllowed, 0., self.var.channel_PP_Dt)
                     massFluxArray[self.var.PP_idx, :] = self.var.channel_PP_Dt
                    
