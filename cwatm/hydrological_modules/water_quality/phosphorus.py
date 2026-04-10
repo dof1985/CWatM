@@ -249,9 +249,12 @@ class waterquality_phosphorus(object):
         self.var.sedYieldLand_inactiveP = globals.inZero.copy()
         self.var.mineralWeat_P = globals.inZero.copy()
         
-        # channel phsophorus [kg]
+        # channel phsophorus [kg | kg/s]
+
         self.var.channel_P = self.var.load_initial('channel_P', default = globals.inZero.copy())
+        self.var.channel_P_Dt = self.var.load_initial('channel_P_Dt', default = globals.inZero.copy())
         self.var.channel_PP = self.var.load_initial('channel_PP', default = globals.inZero.copy())
+        self.var.channel_PP_Dt = self.var.load_initial('channel_PP_Dt', default = globals.inZero.copy())
         self.var.channel_PP_deposition = globals.inZero.copy()
         self.var.channel_PP_resuspension = globals.inZero.copy()
         #self.var.channel_inactiveP = self.var.load_initial('channel_inactiveP', default = globals.inZero.copy())
@@ -599,8 +602,8 @@ class waterquality_phosphorus(object):
         # Only with self.var.sectorSourceAbstractionFractions = True
         # channel
         if checkOption('includeWaterDemand'):
-            self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  (self.var.channel_PConc / 10**3), self.var.channel_P), 0.)
-            self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_PPConc / 10**3), self.var.channel_PP), 0.)
+            self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  (self.var.channel_PConc), self.var.channel_P_Dt), 0.)
+            self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_PPConc), self.var.channel_PP_Dt), 0.)
             #self.var.channel_inactiveP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_inactivePConc / 10**3), self.var.channel_inactiveP), 0.)
             self.var.channel_sed_Abstracted = np.maximum(
             np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),

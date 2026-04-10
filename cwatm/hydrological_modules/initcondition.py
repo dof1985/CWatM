@@ -468,15 +468,15 @@ class initcondition(object):
             initCondVarValue.extend(Var2)
             
             if self.var.includeErosed:
-                Var1 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc", "sedStor_gridcell"]
-                Var2 = ["channel_sed", "resLake_sed", "channel_sedConc", "resLake_sedConc", "sedStor_gridcell"]
+                Var1 = ["channel_sed", "channel_sed_dT", "resLake_sed", "channel_sedConc", "resLake_sedConc", "sedStor_gridcell"]
+                Var2 = ["channel_sed", "channel_sed_dT", "resLake_sed", "channel_sedConc", "resLake_sedConc", "sedStor_gridcell"]
                 initCondVar.extend(Var1)
                 initCondVarValue.extend(Var2)
             # Phosphorus
             if self.var.includePhosphorus:
-                Var1 = ["channel_P", "channel_PP", "channel_PConc", "channel_PPConc",\
+                Var1 = ["channel_P", "channel_P_Dt", "channel_PP", "channel_PP_Dt", "channel_PConc", "channel_PPConc",\
                         "resLake_P", "resLake_PP", "resLake_PConc", "resLake_PPConc"]
-                Var2 = ["channel_P", "channel_PP", "channel_PConc", "channel_PPConc",\
+                Var2 = ["channel_P", "channel_P_Dt", "channel_PP", "channel_PP_Dt", "channel_PConc", "channel_PPConc",\
                         "resLake_P", "resLake_PP", "resLake_PConc", "resLake_PPConc"]
                 soil_vars = ["soil_P_inactive1", "soil_P_inactive2", "soil_P_inactive3",\
                              "soil_P_labile1", "soil_P_labile2", "soil_P_labile3", "soil_P_dissolved1", "soil_P_dissolved2", "soil_P_dissolved3"]

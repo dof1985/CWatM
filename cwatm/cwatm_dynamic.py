@@ -256,14 +256,15 @@ class CWATModel_dyn(DynamicModel):
             
             
             if self.var.includeWaterQuality:
+
                 if self.var.includePhosphorus:
-                    self.var.channel_TP = self.var.channel_P + self.var.channel_PP #+ self.var.channel_inactiveP
-                    self.var.resLake_TP = self.var.resLake_P + self.var.resLake_PP #+ self.var.resLake_inactiveP
-                    self.var.channel_TPConc = np.where(self.var.channelStorage > 10, divideValues(self.var.channel_TP, self.var.channelStorage), 0.) * 10**3
-                    self.var.channel_TDPConc = np.where(self.var.channelStorage > 10, divideValues(self.var.channel_P, self.var.channelStorage), 0.) * 10**3
+                    self.var.channel_TP = self.var.channel_P + self.var.channel_PP # kg/s
+                    self.var.resLake_TP = self.var.resLake_P + self.var.resLake_PP # kg/s
+                    self.var.channel_TPConc = np.where(self.var.discharge > 1, divideValues(self.var.channel_TP, self.var.discharge), 0.)
+                    self.var.channel_TDPConc = np.where(self.var.discharge > 1, divideValues(self.var.channel_P, self.var.discharge), 0.)
                     if checkOption('includeWaterBodies'):
-                        self.var.resLake_TPConc = divideValues(self.var.resLake_TP, self.var.lakeResStorage) * 10**3
-                        self.var.resLake_TDPConc = divideValues(self.var.resLake_P, self.var.lakeResStorage) * 10**3
+                        self.var.resLake_TPConc = divideValues(self.var.resLake_TP, self.var.lakeResStorage)
+                        self.var.resLake_TDPConc = divideValues(self.var.resLake_P, self.var.lakeResStorage)
             # *******  Calculate CUMULATIVE MASS BALANCE ERROR  **********
 
 

@@ -59,45 +59,40 @@ class waterquality_erosed(object):
         return(c_fact_out)
         
     
-    def sediments_in_channel(self, channel_sed, channel_sedConc, prf, Q, A, csp, spexp, V, Kch, Cch):
+    def sediments_in_channel(self, channel_sed, channel_sedConc, prf, Q, A, csp, spexp, Kch, Cch, Dt):
         # this function is used for sediment routing sub-steps in the channel
 
         '''
         prf - peak rate factor, atm. to be defined in settingsfile
         Q - discharge [m3/s]
         A - channel crossectional area [m2]
-        qChanPeak - peak channel flow rate [m3s-1]
-        vChanPeak - peak channel flow velocity [ms-1]
-        concSedMax - maximum sediment transport capacity [kg.m-3]
+        qChanPeak - peak channel flow rate [m3/s]
+        vChanPeak - peak channel flow velocity [m/s]
+        concSedMax - maximum sediment transport capacity [kg/m3]
         csp - user defined coefficient
         spexp - user defined exponent, usually between 1-2, set to 1.5 according to original Bagnold stream power equation (Arnold et. al., 1995)
-        sedDep - deposition of sediments in channel [kg]
-        sedDeg - degradation of sediments in channel [kg]
-        channel_sed - sediment in channel [kg]
-        channel_sedConc - sediment concentration in channel [kg.m-3]
+        sedDep - deposition of sediments in channel [kg/s]
+        sedDeg - degradation of sediments in channel [kg/s]
+        channel_sed - sediment flow in channel [kg/s]
+        channel_sedConc - sediment concentration in channel [kg/m3]
         Kch - Channel erodibility factor
         Cch - channel cover factor
+        Dt - Number of routing steps
         '''
-        pre_channel_sed = self.var.channel_sed.copy()
+        #pre_channel_sed = self.var.channel_sed.copy()
         qChanPeak = prf * Q
         vChanPeak = qChanPeak / A #substituted totalCrossArea wth. crossArea calculated in waterquality_vars.py
-        #print('vcahnpeak', np.nanmean(vChanPeak), 'vchanmin' , np.nanmin(vChanPeak), 'vchanmax' ,np.nanmax(vChanPeak))
-        dummyvelocity = divideValues(self.var.travelTime, self.var.chanLength)
-        #print('dVmean', np.nanmean(dummyvelocity), 'dvmin', np.nanmin(dummyvelocity), 'dvmax', np.nanmax(dummyvelocity))
-        #print('Qcahnpeak', np.nanmean(Q))
+        #dummyvelocity = divideValues(self.var.travelTime, self.var.chanLength)
         concSedMax = csp * np.power(vChanPeak, spexp)
-        #print('concsedmaxmean', np.nanmean(concSedMax), 'concsedmaxmin', np.nanmin(concSedMax), 'concsedmaxmax', np.nanmax(concSedMax))
-        sedDep = np.where(channel_sedConc > concSedMax, (channel_sedConc - concSedMax) * V, 0.)
-        #print('Seddep', np.nanmean(sedDep))
-        sedDeg = np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch * V, 0.)
-        #print('SedDeg',np.nanmean(sedDeg))
-        #print('channel_sed',np.nanmean(channel_sed))
-        #dChanSedConc = divideValues(sedDeg - sedDep, V)
-        #channel_sedConc += dChanSedConc
-        dchannelSed = sedDeg - sedDep
-        channel_sed += dchannelSed
-        channel_sedConc = divideValues(channel_sed,V)
-        #print('channel_sedConc',np.nanmean(channel_sedConc))
+        
+        # Deposition and degreadtion is divided by number of routing steps 
+        # sedDt = sedConc * second in time step --> second in day / number of routing time step
+        sedDep = np.where(channel_sedConc > concSedMax, (channel_sedConc - concSedMax) / Dt, 0.) # kg/s : per subtime step
+        sedDeg = np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch / Dt, 0.) # kg/s : per subtime step
+       
+        dchannelSed = sedDeg - sedDep # kg/s
+        channel_sed += dchannelSed  # kg/s
+        channel_sedConc = divideValues(channel_sed, Q)
        
 
         return channel_sed, channel_sedConc, sedDep, sedDeg
@@ -194,6 +189,7 @@ class waterquality_erosed(object):
         
         # channel sediment [kg]
         self.var.channel_sed = self.var.load_initial('channel_sed', default = globals.inZero.copy())
+        self.var.channel_sed_Dt = self.var.load_initial('channel_sed_Dt', default = globals.inZero.copy()) # channel sed timestep
         self.var.channel_sedConc = self.var.load_initial('channel_sedConc', default = globals.inZero.copy())
         self.var.outlet_sed = globals.inZero.copy()
         self.var.channel_sedDep = globals.inZero.copy()
@@ -238,7 +234,12 @@ class waterquality_erosed(object):
         self.var.csp = globals.inZero.copy() + loadmap('csp')
         # spexp
         self.var.spexp = globals.inZero.copy() + loadmap('spexp')
-
+        
+        # sediment delivery ratio
+        self.var.sdr_coeff = globals.inZero.copy() + 0.05
+        if 'sdr_coeff' in binding:
+            self.var.sdr_coeff = globals.inZero.copy() + loadmap('sdr_coeff')
+            
         ### Dummy variables for lakes and reservoir function
         if checkOption('includeWaterBodies'):
             if 'ks_sediment' in binding:
@@ -348,7 +349,14 @@ class waterquality_erosed(object):
         
         # stop sediment yield if frost index > threshold
         self.var.sedYieldLand = np.where(self.var.FrostIndex > self.var.FrostIndexThreshold, 0., self.var.sedYieldLand)
-    
+        
+        # cap sedimentYield based on volumetric ratio - 0.4 is the top ratio - use bulk density of top soil
+        self.var.sedVolumeRatio = globals.inZero.copy() + 0.4
+        sedVol =  divideArrays(self.var.sedYieldLand * 1000, self.var.rho1 * self.var.gCm3TokgM3) # ton soil to m3 soil
+        sedCap = self.var.directRunoff[0:4]  * self.var.cellArea * self.var.sedVolumeRatio
+        sedVolAdj = np.where(sedVol > sedCap, sedCap, sedVol)
+        self.var.sedYieldLand = self.var.rho1 * self.var.gCm3TokgM3 * (sedVolAdj / 1000)
+        
         # calculate depth of soil loss (mm)
         self.var.sedimentLossDepth_mm = divideValues(self.var.sedYieldLand * np.tile(self.var.soildepth[0], (4, 1)), np.tile(self.var.cellArea,  (4, 1)))
         
@@ -373,13 +381,21 @@ class waterquality_erosed(object):
             
             self.var.sedStor_gridcell = self.var.sedStor_gridcell - self.var.sedRunoff_conc[0] + self.var.sedToChannel
             self.var.sedToChannel = self.var.sedRunoff_conc[0, :].copy()
-            
+        
+        # Sediment delivery ratio
+
+        # apply reduction factor (e.g., deposition or sediment trapped by plants, grasses, etc.)
+        # self.var.sdr_coeff  is a calibration factor recommend values are 0.01 - 0.5 (needed to be tested - DF)
+        self.var.sdr =  np.exp(-self.var.sdr_coeff * self.var.sum_tconc)
+        
+        # apply delivery rate
+        self.var.sedToChannel = self.var.sdr * self.var.sedToChannel
+        
         # CHANNEL
         if checkOption('includeWaterDemand'):
             self.var.channel_sed_Abstracted = np.maximum(
-            np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),
+            np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed_Dt),
             0.)
-        
         
         # as an output variable
         self.var.sum_sedYieldLand_tonha = divideValues(self.var.sum_sedYieldLand, self.var.cellArea * 0.0001)
