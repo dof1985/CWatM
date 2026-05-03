@@ -125,8 +125,9 @@ class inflow(object):
 
 
         if checkOption('inflow'):
-
-            localGauges = returnBool('InLocal')
+            localGauges = False
+            if 'InLocal' in binding:
+                localGauges = returnBool('InLocal')
 
             where = "InflowPoints"
             inflowPointsMap = cbinding(where)
@@ -150,7 +151,6 @@ class inflow(object):
 
             inDir = cbinding('In_Dir')
             inflowFile = cbinding('QInTS').split()
-
             inflowNames =[]
             flagFirstTss = True
             for name in inflowFile:
@@ -192,11 +192,76 @@ class inflow(object):
                 # import numpy.lib.recfunctions as rfn
                 # d = rfn.merge_arrays((a,b), flatten=True, usemask=False)
 
-
+            # read in PInTs, PPInTs, SedInTs --> REPLICATE BELOW FOR WQ + DYNAMIC - USED WQ NUMPY 2D STRUCTURE
             self.var.QInM3Old = globals.inZero.copy()
             # Initialising cumulative output variables
             # These are all needed to compute the cumulative mass balance error
             self.var.totalQInM3 = globals.inZero.copy()
+            
+            # Inflow for water quality
+            # use index structure - 
+            if self.var.includeWaterQuality:
+                self.var.iterateIdx = []
+                if self.var.includeErosed or self.var.includePhosphorus:
+                    self.var.iterateIdx.append(self.var.sed_idx)
+                if self.var.includePhosphorus:
+                    self.var.iterateIdx.append(self.var.TDP_idx)
+                    self.var.iterateIdx.append(self.var.PP_idx)
+                #[self.var.sed_idx, self.var.TDP_idx, self.var.PP_idx]
+                self.var.inflowTs_wq = np.empty(self.var.n_fluxes, dtype=object)
+
+                for j in self.var.iterateIdx:
+                    inflow_wq = ['SedInTs', 'PInTs', 'PPInTs'][j]
+                    #print(i)
+                    inflowFile = cbinding(inflow_wq).split()
+                    # read in PInTs, PPInTs, SedInTs --> into array 2D. replicate L154-L195 FOR WQ
+                    inflowNames =[]
+                    flagFirstTss = True
+                    for name in inflowFile:
+                        names =['timestep']
+                        try:
+
+                            filename = os.path.join(inDir,name)
+                            file = open(filename, "r")
+
+                            # read data header
+                            line = file.readline()
+                            no = int(file.readline()) - 1
+                            line = file.readline()
+                            for i in range(no):
+                                line = file.readline().strip('\n')
+                                if line in inflowNames:
+                                    msg = "Error 217:" + line + " in: " + filename + " is used already"
+                                    raise CWATMError(msg)
+
+                                inflowNames.append(line)
+                                names.append(line)
+                            file.close()
+                            skiplines = 3 + no
+                        except:
+                            msg = "Error 218: Mistake reading inflow file\n"
+                            raise CWATMFileError(os.path.join(inDir, name), sname=name)
+
+                        tempTssData = np.genfromtxt(filename, skip_header=skiplines, names=names, 
+                                                    usecols=names[1:], filling_values=0.0)
+
+                        if flagFirstTss:
+                            inflowTs_wq = tempTssData.copy()
+                            flagFirstTss = False
+                            # copy temp data into the inflow data
+                        else:
+                            inflowTs_wq = join_struct_arrays2((inflowTs_wq, tempTssData))
+                            # join this dataset with the ones before
+                    
+                        # import numpy.lib.recfunctions as rfn
+                        # d = rfn.merge_arrays((a,b), flatten=True, usemask=False)
+                        self.var.inflowTs_wq[j] = inflowTs_wq.copy() 
+
+                # read in PInTs, PPInTs, SedInTs --> REPLICATE BELOW FOR WQ + DYNAMIC - USED WQ NUMPY 2D STRUCTURE
+                self.var.WQInKgOld = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                # Initialising cumulative output variables
+                # These are all needed to compute the cumulative mass balance error
+                self.var.WQTotalInKg = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
 
 
 
@@ -228,5 +293,18 @@ class inflow(object):
                 # Convert to [m3] per time step
             self.var.totalQInM3 += self.var.inflowM3
             # Map of total inflow from inflow hydrographs [m3]
+            
+            if self.var.includeWaterQuality:
+                self.var.inflowKg = np.tile(globals.inZero.copy(), (self.var.n_fluxes, 1))
+                for i in self.var.iterateIdx:
+                    inflow_wq = ['SedInTs', 'PInTs', 'PPInTs'][i]
+                    for key in self.var.sampleInflow:
+                        loc = self.var.sampleInflow[key]
+                        index = dateVar['curr'] - 1
+                        # kg/s should be the inflows
+                        # [i][str(key)][index]
 
-
+                        self.var.inflowKg[i, loc] = self.var.inflowTs_wq[i][str(key)][index] * self.var.DtSec
+                        # Convert to [m3] per time step
+                    self.var.WQTotalInKg[i, :] += self.var.inflowKg[i, :]
+                # Map of total inflow from inflow hydrographs [m3]

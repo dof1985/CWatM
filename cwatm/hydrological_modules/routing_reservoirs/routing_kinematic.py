@@ -522,7 +522,9 @@ class routing_kinematic(object):
             self.var.QDelta = (self.var.inflowM3 - self.var.QInM3Old) / self.var.noRoutingSteps
             # difference between old and new inlet flow  per sub step
             # in order to calculate the amount of inlet flow in the routing loop
-
+            if self.var.includeWaterQuality:
+                self.var.QDelta_WQ = (self.var.inflowKg - self.var.WQInKgOld) / self.var.noRoutingSteps
+            
         WDAddM3Dt = 0
         if checkOption('includeWaterDemand'):
             # self.var.act_SurfaceWaterAbstract includes channel abstractions as well as abstractions from lakes and reservoirs
@@ -848,17 +850,24 @@ class routing_kinematic(object):
 
             avgDis = avgDis  + self.var.discharge / self.var.noRoutingSteps
             
+            # Water quality inflow
+            if checkOption('inflow'):
+                self.var.inflowDtWQ = (self.var.WQInKgOld + (subrouting + 1) * self.var.QDelta_WQ) / np.tile(self.var.noRoutingSteps, (self.var.n_fluxes, 1))
+                
             if self.var.includeWaterQuality:
                 minMassAllowed = 10**-5 / self.var.dtRouting
                 if self.var.includeErosed:
                     # sediment in channel: input from musle by routing steps minus abstraction
+                    if checkOption('inflow'):
+                        self.var.channel_sed_Dt  += self.var.inflowDtWQ[self.var.sed_idx, :]
                     self.var.channel_sed_Dt = np.maximum(self.var.channel_sed_Dt + (self.var.sedToChannel) / self.var.noRoutingSteps  + lakeResOut_sed_Dt - channel_sed_Abstracted_Dt, 0.)
                     self.var.channel_sed_Dt  = np.where(self.var.channel_sed_Dt <= minMassAllowed, 0., self.var.channel_sed_Dt)
                     massFluxArray[self.var.sed_idx, :] = self.var.channel_sed_Dt
                     
-                if self.var.includePhosphorus: 
-
-
+                if self.var.includePhosphorus:
+                    if checkOption('inflow'):
+                        self.var.channel_P_Dt  += self.var.inflowDtWQ[self.var.TDP_idx, :]
+                        self.var.channel_PP_Dt  += self.var.inflowDtWQ[self.var.PP_idx, :]
                     self.var.channel_P_Dt = np.maximum(self.var.channel_P_Dt + runoff_P_Dt + mineralWeat_P_Dt + lakeResOut_P_Dt + returnflowIrr_P_Dt - channel_P_Abstracted_Dt, 0.)
                     self.var.channel_P_Dt = np.where(self.var.channel_P_Dt <= minMassAllowed, 0., self.var.channel_P_Dt)
                     massFluxArray[self.var.TDP_idx, :] = self.var.channel_P_Dt
