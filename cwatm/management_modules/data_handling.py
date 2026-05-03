@@ -1911,6 +1911,8 @@ def readnetcdfInitial(name, value,default = 0.0):
                 maskmapAttr['coordx'] = 'x'
                 maskmapAttr['coordy'] = 'y'
 
+            cut0, cut1, cut2, cut3 = mapattrNetCDF(filename, check=False)
+
             if (nf1.variables[maskmapAttr['coordy']][0] - nf1.variables[maskmapAttr['coordy']][-1]) < 0:
                 msg = "Error 112: Latitude is in wrong order\n"
                 raise CWATMFileError(filename, msg)
