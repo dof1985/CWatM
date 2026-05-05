@@ -284,7 +284,10 @@ class landcoverType(object):
         self.var.leakageIntoGw = globals.inZero.copy()
         self.var.leakageIntoRunoff = globals.inZero.copy()
         self.var.availableArableLand = globals.inZero.copy()
-
+        
+        # correction for gwRecharge when ModFlow coupling
+        self.var.sum_gwRecharge_actualM  = globals.inZero.copy()
+        
         # make land cover change from year to year or fix it to 1 year
         if returnBool('dynamicLandcover'):
             self.var.dynamicLandcover = True
