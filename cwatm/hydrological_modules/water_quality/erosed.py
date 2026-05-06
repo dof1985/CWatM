@@ -71,28 +71,29 @@ class waterquality_erosed(object):
         concSedMax - maximum sediment transport capacity [kg/m3]
         csp - user defined coefficient
         spexp - user defined exponent, usually between 1-2, set to 1.5 according to original Bagnold stream power equation (Arnold et. al., 1995)
-        sedDep - deposition of sediments in channel [kg/s]
-        sedDeg - degradation of sediments in channel [kg/s]
-        channel_sed - sediment flow in channel [kg/s]
+        sedDep - deposition of sediments in channel [kg/sub time step]
+        sedDeg - degradation of sediments in channel [kg/sub time step]
+        channel_sed - sediment flow in channel [kg/sub time step]
         channel_sedConc - sediment concentration in channel [kg/m3]
         Kch - Channel erodibility factor
         Cch - channel cover factor
-        Dt - Number of routing steps
+        Dt - Number of seconds per routing step
         '''
         #pre_channel_sed = self.var.channel_sed.copy()
         qChanPeak = prf * Q
         vChanPeak = qChanPeak / A #substituted totalCrossArea wth. crossArea calculated in waterquality_vars.py
         #dummyvelocity = divideValues(self.var.travelTime, self.var.chanLength)
         concSedMax = csp * np.power(vChanPeak, spexp)
-        
+    
+
         # Deposition and degreadtion is divided by number of routing steps 
         # sedDt = sedConc * second in time step --> second in day / number of routing time step
-        sedDep = np.where(channel_sedConc > concSedMax, (channel_sedConc - concSedMax) / Dt, 0.) # kg/s : per subtime step
-        sedDeg = np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch / Dt, 0.) # kg/s : per subtime step
+        sedDep = Dt * Q * np.where(channel_sedConc > concSedMax, (channel_sedConc - concSedMax), 0.) # kg/m3 -> kg/s -> kg/subtime step
+        sedDeg = Dt * Q * np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch, 0.) # kg/subtime step
        
-        dchannelSed = sedDeg - sedDep # kg/s
-        channel_sed += dchannelSed  # kg/s
-        channel_sedConc = divideValues(channel_sed, Q)
+        dchannelSed = sedDeg - sedDep # kg/subtime step
+        channel_sed += dchannelSed  # kg/subtime step
+        channel_sedConc = divideValues(channel_sed, Dt * Q)
        
 
         return channel_sed, channel_sedConc, sedDep, sedDeg

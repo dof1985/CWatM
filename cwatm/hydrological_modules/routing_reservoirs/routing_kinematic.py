@@ -957,7 +957,7 @@ class routing_kinematic(object):
                     self.var.channel_sed_Dt, self.var.channel_sedConc, sed_dep_dt, sed_deg_dt = self.model.waterquality_module.erosed.sediments_in_channel(
                         channel_sed = self.var.channel_sed_Dt, channel_sedConc = self.var.channel_sedConc, prf=self.var.prf, \
                         Q=self.var.discharge, A=self.var.crossArea, csp=self.var.csp, spexp=self.var.spexp,
-                        Kch=self.var.Kch, Cch = self.var.Cch, Dt = self.var.noRoutingSteps)
+                        Kch=self.var.Kch, Cch = self.var.Cch, Dt = self.var.dtRouting)
                     self.var.channel_sedDep += sed_dep_dt
                     self.var.channel_sedDeg += sed_deg_dt
                     
