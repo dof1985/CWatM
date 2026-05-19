@@ -139,16 +139,17 @@ class ModFlowSimulation:
             )
 
             # MODIFIED DOR FRIDMAN - Currently only allowed to have one mask for all layers
-            basin_map = np.where(self.basin[0], self.basin[0], False)
+            #basin_map = np.where(self.basin[0], self.basin[0], False)
+            basin_map = self.basin.copy()
             #basin_map = np.where(self.basin[0], self.basin[0], np.where(self.basin[1], self.basin[1], False))
             #print(basin_map.shape)
             recharge = np.zeros((basin_map.sum(), 4), dtype=np.int32)
             recharge_locations = np.where(basin_map == True)  # only set wells where basin is True
             
             # 0: layer, 1: y-idx, 2: x-idx, 3: rate
-            recharge[:, 0] = 0
-            recharge[:, 1] = recharge_locations[0]
-            recharge[:, 2] = recharge_locations[1]
+            recharge[:, 0] = recharge_locations[0]
+            recharge[:, 1] = recharge_locations[1]
+            recharge[:, 2] = recharge_locations[2]
 
             recharge = recharge.tolist()
 
