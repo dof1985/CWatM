@@ -122,7 +122,7 @@ class ModFlowSimulation:
             # if vertical is assigned -> use K33 
             #node_property_flow = flopy.mf6.ModflowGwfnpf(gwf, save_flows=True, icelltype=confined_only, k=permeability*timestep, k33=permeability_vertical*timestep)
             node_property_flow = flopy.mf6.ModflowGwfnpf(gwf, save_flows=True, icelltype=confined_only,
-                                                         k=permeability * timestep) #,
+                                                         k=permeability * timestep, k33=permeability_vertical*timestep) #,
                                                          #wetdry=0)
             # MODIF LUCA
             output_control = flopy.mf6.ModflowGwfoc(gwf, head_filerecord=f'{self.name}.hds',

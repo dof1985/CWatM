@@ -368,7 +368,6 @@ class groundwater_modflow:
             # mult =  24 * 3600 / self.coefficient; change from m/s-1 to m/day-1
 
             self.permeability = load_aquifer_coeff(self, var = 'permeability', nlay = nlay,  mult =  24 * 3600 / self.coefficient)
-            
             if 'permeability_vertical' in binding:
                 self.permeability_v = load_aquifer_coeff(self, var = 'permeability_vertical', nlay = nlay,  mult =  24 * 3600 / self.coefficient)
             else:
