@@ -57,10 +57,12 @@ class water_quality(object):
             
             # create water quality variables
             waterQualityVars = ['pre_w1', 'pre_w2', 'pre_w3', 'naturalLandFrac', 'onlyIrr', 'onlyIrrPaddy']
-            for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))            
-            self.var.soilTemp1 = self.var.load_initial('soilTemp1', default = globals.inZero.copy())
-            self.var.soilTemp2 = self.var.load_initial('soilTemp2', default = globals.inZero.copy())
-            self.var.soilTemp3 = self.var.load_initial('soilTemp3', default = globals.inZero.copy())
+            for variable in waterQualityVars: vars(self.var)[variable] = np.tile(globals.inZero,(4,1))
+
+            if self.var.calcSoilTemp:
+                self.var.soilTemp1 = self.var.load_initial('soilTemp1', default = globals.inZero.copy())
+                self.var.soilTemp2 = self.var.load_initial('soilTemp2', default = globals.inZero.copy())
+                self.var.soilTemp3 = self.var.load_initial('soilTemp3', default = globals.inZero.copy())
 
             # Create sub-modules variables
            
@@ -147,9 +149,24 @@ class water_quality(object):
             # Load managed grassland fraction ###
          
             self.var.fracManagedGrassland  = globals.inZero.copy()
+            self.var.fracPasture  = globals.inZero.copy()
+            self.var.fracRainfed_Rice  = globals.inZero.copy()
+            self.var.fracRainfed_Other  = globals.inZero.copy()
+            
+                
             if 'fracManagedGrassland' in binding:
-                self.var.fracManagedGrassland = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='mngdGrass')
+                # share of grid cell area - that is managed grassland
+                self.var.fracPasture = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='frac_grazing')
+                self.var.fracRainfed_Rice = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='frac_rf_rice')
+                self.var.fracRainfed_Other = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='frac_rf_other')
+                
+                self.var.fracManagedGrassland = self.var.fracPasture + self.var.fracRainfed_Rice + self.var.fracRainfed_Other
                
+                # rescale
+                self.var.fracPasture = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracPasture, self.var.fracManagedGrassland), self.var.fracPasture)
+                self.var.fracRainfed_Rice = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Rice, self.var.fracManagedGrassland), self.var.fracRainfed_Rice)
+                self.var.fracRainfed_Other = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Other, self.var.fracManagedGrassland), self.var.fracRainfed_Other)
+            
             # multidimensional array of ones with  managed grasslands as feractions and forest land as 0.
             self.var.naturalLandFrac[1] += 1.#self.var.managedGrassland 
             self.var.naturalLandFrac[2:4] += 1.
@@ -170,15 +187,16 @@ class water_quality(object):
                 
                 # Initital sub-compartments storage water [m3]                
             
-            # Initiate soil temperature data
-            # https://zenodo.org/records/7134169
-            self.var.soilTempAnnualAvg = globals.inZero.copy() + 11.9
-            if 'soilTempAvg' in binding:
-                self.var.soilTempAnnualAvg = globals.inZero.copy() + loadmap('soilTempAvg')
-            
-            self.var.soilTemp_lambda = globals.inZero.copy() + 0.8
-            if 'soilTemp_lambda' in binding:
-                self.var.soilTemp_lambda = loadmap('soilTemp_lambda')
+            if self.var.calcSoilTemp:
+                # Initiate soil temperature data
+                # https://zenodo.org/records/7134169
+                self.var.soilTempAnnualAvg = globals.inZero.copy() + 11.9
+                if 'soilTempAvg' in binding:
+                    self.var.soilTempAnnualAvg = globals.inZero.copy() + loadmap('soilTempAvg')
+                
+                self.var.soilTemp_lambda = globals.inZero.copy() + 0.8
+                if 'soilTemp_lambda' in binding:
+                    self.var.soilTemp_lambda = loadmap('soilTemp_lambda')
                 
             # Run initial sub-modules
             if self.var.includePhosphorus:
@@ -199,22 +217,22 @@ class water_quality(object):
 
     def dynamic(self): 
         
-        
-        # calcualte soil temperature
-        if returnBool('albedo'):
-            albedo_ = self.var.albedoLand
-        else: 
-            albedo_ = self.var.AlbedoCanopy
+        if self.var.calcSoilTemp:
+            # calcualte soil temperature
+            if returnBool('albedo'):
+                albedo_ = self.var.albedoLand
+            else: 
+                albedo_ = self.var.AlbedoCanopy
             
-        # lyr 1
-        self.var.soilTemp1 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp1, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w1, lambda_ = self.var.soilTemp_lambda, soil_lyr = 1)
-        
-        # lyr 2
-        self.var.soilTemp2 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp2, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w2, lambda_ = self.var.soilTemp_lambda, soil_lyr = 2)
-        
-        # lyr 3
-        self.var.soilTemp3 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp3, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w3, lambda_ = self.var.soilTemp_lambda, soil_lyr = 3)
-        
+            # lyr 1
+            self.var.soilTemp1 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp1, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w1, lambda_ = self.var.soilTemp_lambda, soil_lyr = 1)
+            
+            # lyr 2
+            self.var.soilTemp2 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp2, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w2, lambda_ = self.var.soilTemp_lambda, soil_lyr = 2)
+            
+            # lyr 3
+            self.var.soilTemp3 = self.waterquality_vars.soilTemperature(tmp_soil = self.var.soilTemp3, solar_rad = self.var.Rsds, t_soilAvg = self.var.soilTempAnnualAvg , t_avg = self.var.Tavg, t_min = self.var.TMin, t_max = self.var.TMax, bulk_density = self.var.gCm3TomgM3 * self.var.rho1, soil_depth = self.var.soildepth, albedo = albedo_, soil_water = self.var.sum_w3, lambda_ = self.var.soilTemp_lambda, soil_lyr = 3)
+            
         # landcover transitions
         if self.var.includePhosphorus:
                 #self.var.soil_P_inactive_urbanLoss = globals.inZero.copy()
@@ -247,9 +265,20 @@ class water_quality(object):
         if dateVar['newStart'] or dateVar['newYear']:
             current_year = globals.dateVar['currDate']
             if 'fracManagedGrassland' in binding:
-                self.var.fracManagedGrassland = readnetcdf2('fracManagedGrassland', current_year, useDaily='yearly', value='mngdGrass')
-
-         
+                # share of grid cell area - that is managed grassland
+                self.var.fracPasture = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='frac_grazing')
+                self.var.fracRainfed_Rice = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='frac_rf_rice')
+                self.var.fracRainfed_Other = readnetcdf2('fracManagedGrassland', dateVar['dateStart'], useDaily='yearly', value='frac_rf_other')
+                
+                self.var.fracManagedGrassland = self.var.fracPasture + self.var.fracRainfed_Rice + self.var.fracRainfed_Other
+               
+                # rescale
+                self.var.fracPasture = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracPasture, self.var.fracManagedGrassland), self.var.fracPasture)
+                self.var.fracRainfed_Rice = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Rice, self.var.fracManagedGrassland), self.var.fracRainfed_Rice)
+                self.var.fracRainfed_Other = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Other, self.var.fracManagedGrassland), self.var.fracRainfed_Other)
+        
+                # rescale fracManagedGrassland
+                self.var.fracManagedGrassland = self.var.fracPasture + self.var.fracRainfed_Rice + self.var.fracRainfed_Other
         # Erosion and Sediment Yield (EroSed) dynamic part
 
         
