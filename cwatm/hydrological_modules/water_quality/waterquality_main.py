@@ -167,6 +167,9 @@ class water_quality(object):
                 self.var.fracRainfed_Rice = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Rice, self.var.fracManagedGrassland), self.var.fracRainfed_Rice)
                 self.var.fracRainfed_Other = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Other, self.var.fracManagedGrassland), self.var.fracRainfed_Other)
             
+                # rescale fracManagedGrassland
+                self.var.fracManagedGrassland = self.var.fracPasture + self.var.fracRainfed_Rice + self.var.fracRainfed_Other
+
             # multidimensional array of ones with  managed grasslands as feractions and forest land as 0.
             self.var.naturalLandFrac[1] += 1.#self.var.managedGrassland 
             self.var.naturalLandFrac[2:4] += 1.
@@ -276,9 +279,6 @@ class water_quality(object):
                 self.var.fracPasture = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracPasture, self.var.fracManagedGrassland), self.var.fracPasture)
                 self.var.fracRainfed_Rice = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Rice, self.var.fracManagedGrassland), self.var.fracRainfed_Rice)
                 self.var.fracRainfed_Other = np.where(self.var.fracManagedGrassland > 1, divideValues(self.var.fracRainfed_Other, self.var.fracManagedGrassland), self.var.fracRainfed_Other)
-        
-                # rescale fracManagedGrassland
-                self.var.fracManagedGrassland = self.var.fracPasture + self.var.fracRainfed_Rice + self.var.fracRainfed_Other
         # Erosion and Sediment Yield (EroSed) dynamic part
 
         

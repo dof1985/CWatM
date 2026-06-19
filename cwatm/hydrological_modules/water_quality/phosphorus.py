@@ -114,9 +114,9 @@ class waterquality_phosphorus(object):
         self.var.soil_P_fracInactive_managed = globals.inZero.copy() + 0.75
         self.var.soil_P_fracInactive_natural = globals.inZero.copy() + 0.9
         if 'fractionInactiveManaged_P' in binding:
-            self.var.soil_P_fracInactive_managed = loadmap('fractionInactiveManaged_P') # [fraction of TP that is inactive]
+            self.var.soil_P_fracInactive_managed = globals.inZero.copy() + loadmap('fractionInactiveManaged_P') # [fraction of TP that is inactive]
         if 'fractionInactiveNatural_P' in binding:
-            self.var.soil_P_fracInactive_natural = loadmap('fractionInactiveNatural_P') # [fraction of TP that is inactive]
+            self.var.soil_P_fracInactive_natural = globals.inZero.copy() + loadmap('fractionInactiveNatural_P') # [fraction of TP that is inactive]
         
         # load soil absorption coefficient Kf | from mm kgsoil-1 to m kgsoil-1
         self.var.Kf = loadmap('Kf') / 1000 
@@ -194,26 +194,26 @@ class waterquality_phosphorus(object):
         
         self.var.background_P_mineral = globals.inZero.copy()
         if 'background_P_mineral' in binding:
-            self.var.background_P_mineral = loadmap('background_P_mineral')
+            self.var.background_P_mineral = globals.inZero.copy() + loadmap('background_P_mineral')
                
         self.var.soil_shielding = globals.inZero.copy() + 1.
         if 'soil_shielding' in binding:
-            self.var.soil_shielding = loadmap('soil_shielding')
+            self.var.soil_shielding = globals.inZero.copy() + loadmap('soil_shielding')
         
         self.var.activation_energy = globals.inZero.copy()
         if 'activation_energy' in binding:
-            self.var.activation_energy = loadmap('activation_energy')
+            self.var.activation_energy = globals.inZero.copy() + loadmap('activation_energy')
         
         
         # load groundwater P concentration [kg / m3]
         self.var.GW_P_Conc = globals.inZero.copy()
         if 'GW_P_Conc' in binding:
-            self.var.GW_P_Conc = loadmap('GW_P_Conc') * 10 ** 3 
+            self.var.GW_P_Conc = globals.inZero.copy() + loadmap('GW_P_Conc') * 10 ** 3 
         
         self.var.atm_P_deposition_rate = globals.inZero.copy()
         if 'p_atm_deposition' in binding:
             # [gram m-2 year -1] -> [kg year-1]
-            self.var.atm_P_deposition_rate = loadmap('p_atm_deposition') * self.var.cellArea / 1000
+            self.var.atm_P_deposition_rate = globals.inZero.copy() + loadmap('p_atm_deposition') * self.var.cellArea / 1000
         
         # load calibration parameter for resuspension
         self.var.resuspension_P_cal = globals.inZero.copy() + 1.
@@ -223,7 +223,7 @@ class waterquality_phosphorus(object):
         # load runoff P adjustment coefficient
         self.var.runoff_Padj = globals.inZero.copy() + 1.
         if 'runoff_Padj' in binding:
-            self.var.runoff_Padj = loadmap('runoff_Padj')
+            self.var.runoff_Padj = globals.inZero.copy() + loadmap('runoff_Padj')
         
         # Pasture manure dynamics (fraction of active P in manure; fraction of pasture manure in channels)
         #self.var.manure_activeFrac = 0.75
@@ -312,7 +312,7 @@ class waterquality_phosphorus(object):
         # In stream/lake sorption/de-sorption
         self.var.n_water = globals.inZero.copy() + 1.
         if 'n_water' in binding:
-            self.var.n_water = loadmap('n_water')
+            self.var.n_water = globals.inZero.copy() + loadmap('n_water')
         
         # 1.612 - m3/kg <--> 1612 l/kg
         self.var.kf_water = globals.inZero.copy() + 1.612 # [l/kg]
@@ -323,7 +323,7 @@ class waterquality_phosphorus(object):
 
         self.var.P_mobility_in_soil = globals.inZero.copy() + 1.
         if 'p_soil_mobility' in binding:
-            self.var.P_mobility_in_soil = loadmap('p_soil_mobility')
+            self.var.P_mobility_in_soil = globals.inZero.copy() + loadmap('p_soil_mobility')
         ## initiate all phosphrous stocks -> soil, channel, lakes/reservoirs, groundwater
         ## calculate all conversion factors
         
@@ -339,8 +339,6 @@ class waterquality_phosphorus(object):
         ################################
     
     # P retention from IMG-GNM accounts for both uptake and deposition - replaced by proportional deposition to SS
-    
-    # Simplicity is valueable - including a lumped DOP (+ BIOMASS) <-> DIP  https://www.sciencedirect.com/science/article/pii/S136481521400022X#abs0015
     '''
     def dynamic_P_retention(self):
         
@@ -414,7 +412,7 @@ class waterquality_phosphorus(object):
         soil_depthRatio1 = divideValues(self.var.soildepth[0], self.var.soildepth[0] + np.minimum(self.var.soildepth[1], max_depth_of_input - self.var.soildepth[0]))
         
         # Load input to soil: manure grassland, manure cropland, fertilzer cropland, export cropland - kg P ha-1 year-1
-        # Load monthly weights (LGP)
+
         
         if globals.dateVar['newStart'] or globals.dateVar['newYear']:
 
@@ -452,6 +450,7 @@ class waterquality_phosphorus(object):
         self.var.cropland_rf_export_day = globals.inZero.copy()
         self.var.grasslandInputManure_current_day = globals.inZero.copy()
         
+        # Load monthly weights (LGP)
         if globals.dateVar['newStart'] or globals.dateVar['newYear']:
             self.var.lgp_weights_rainfed = readnetcdf2('monthly_lgp_weights', wd_date, useDaily='monthly', value='rainfed')
             self.var.lgp_weights_irrigated = readnetcdf2('monthly_lgp_weights', wd_date, useDaily='monthly', value='irrigated')
