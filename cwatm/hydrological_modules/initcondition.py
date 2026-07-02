@@ -318,12 +318,16 @@ class initcondition(object):
             # Phosphorus, EroSed
             self.var.includePhosphorus = False
             self.var.includeErosed = False
+            self.var.calcSoilTemp = False
             
             if 'includePhosphorus' in binding:
                 self.var.includePhosphorus = returnBool('includePhosphorus')
 
             if 'includeErosed' in binding:
                 self.var.includeErosed = returnBool('includeErosed')
+                
+            if 'calcSoilTemp' in binding:
+                self.var.calcSoilTemp = returnBool('calcSoilTemp')
                 
         # list all initiatial variables
         # Snow & Frost

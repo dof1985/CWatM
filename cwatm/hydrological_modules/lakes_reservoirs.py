@@ -1256,7 +1256,8 @@ class lakes_reservoirs(object):
 
         typLake = np.where((self.var.waterBodyTypCTemp == 1) | (self.var.waterBodyTypCTemp == 6), True, False)
         outflowC = np.where(self.var.waterBodyTypCTemp == 0, outflow0C, np.where(typLake, outflowLakesC, outflowResC))
-
+        
+        self.var.lakeResOutflow_timestep =  outflowC.copy() # m3
         # outflowC =  outflowLakesC        # only lakes
         # outflowC = outflowResC
         # outflowC = inflowC.copy() - self.var.evapWaterBodyC

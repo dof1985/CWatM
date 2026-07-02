@@ -70,6 +70,7 @@ class waterquality_phosphorus(object):
         
         
         # calculate fluxes (in kg)
+        #P_Qr = np.nan_to_num((Qr * (divideArrays(prePlab, Vs))) * 0.2 * runoff_adj, 0.) # calibration parameter runoff_adj > 0 
         P_Qr = np.nan_to_num((Qr * (divideArrays(preTDP, Vs))) * runoff_adj, 0.) # calibration parameter runoff_adj > 0 
         P_Qi = np.nan_to_num(Qi * divideArrays(preTDP, Vs), 0.)
         P_Qp = np.nan_to_num(Qp * divideArrays(preTDP, Vs), 0.)
@@ -257,14 +258,17 @@ class waterquality_phosphorus(object):
         self.var.mineralWeat_P = globals.inZero.copy()
         
         # channel phsophorus [kg | kg/s]
+        # PP concentration over the last  60 days for resuspension 
+        self.var.channel_PPConc_lt = np.tile(globals.inZero.copy(), (60, 1))
 
+        
         self.var.channel_P = self.var.load_initial('channel_P', default = globals.inZero.copy())
         self.var.channel_P_Dt = self.var.load_initial('channel_P_Dt', default = globals.inZero.copy())
         self.var.channel_PP = self.var.load_initial('channel_PP', default = globals.inZero.copy())
         self.var.channel_PP_Dt = self.var.load_initial('channel_PP_Dt', default = globals.inZero.copy())
         self.var.channel_PP_deposition = globals.inZero.copy()
         self.var.channel_PP_resuspension = globals.inZero.copy()
-        self.var.channel_orgPP = self.var.load_initial('channel_orgP', default = globals.inZero.copy())
+        self.var.channel_orgP = self.var.load_initial('channel_orgP', default = globals.inZero.copy())
         self.var.channel_orgP_Dt = self.var.load_initial('channel_orgP_Dt', default = globals.inZero.copy())
         self.var.channel_orgP_uptake = globals.inZero.copy()
         self.var.channel_orgP_mineralization = globals.inZero.copy()
@@ -325,17 +329,18 @@ class waterquality_phosphorus(object):
         
         # Uptake rate kg day-1 P
         self.var.max_uptake_rate = globals.inZero.copy() + 1.
-        if 'max_uptake_rate_P' in 'binding':
+        if 'max_uptake_rate_P' in binding:
             self.var.max_uptake_rate = globals.inZero.copy() + loadmap('max_uptake_rate_P')
-        
+
+
         # Mineralization rate kg day-1 P
-        self.var.orgP_mineralRate = globals.inZero.copy() + 0.2
-        if 'mineralization_rate_P' in 'binding':
+        self.var.orgP_mineralRate = globals.inZero.copy() + 0.15
+        if 'mineralization_rate_P' in binding:
             self.var.orgP_mineralRate = globals.inZero.copy() + loadmap('mineralization_rate_P')
         
         # Michaelis-Menton half-saturation constant for phosphorus
-        self.var.michalis_k_p = globals.inZero.copy() + 0.01
-        if 'michalis_k_p' in 'binding':
+        self.var.michalis_k_p = globals.inZero.copy() + 0.05
+        if 'michalis_k_p' in binding:
             self.var.michalis_k_p = globals.inZero.copy() + loadmap('michalis_k_p')
             
         # In stream/lake sorption/de-sorption
@@ -367,8 +372,11 @@ class waterquality_phosphorus(object):
         #create for each soil layer soilmass1 =  bulkdensity1 * cellarea * (thickness of the layer)
         ################################
     
-    def dynamic_P_orgP_transformation(self, p_org_max, p_conc, org_to_pMineral, k_p, t_water):
+    def dynamic_P_orgP_transformation(self, p_org_max, p_conc, org_to_pMineral, k_p, t_water, q, noRoutingSteps):
         '''
+        Calculate areal uptake rate (kg m-2 s-1): https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2005JG000114
+        U [mass length−2 time−1] = Vf × C = h × C × Kc = h ×C × u ÷ Sw
+        Vf -> vertical velocity of nutrient molecules through the water column towards the benthos ; calculated as Vf_p = 44.5 / (356 * no_routingsteps)) * 1.06 ** (t-20) * (t-20) based on IMAGE-GNM
         Review of aquatic system P modeling: https://www.sciencedirect.com/science/article/pii/S136481521400022X#sec4
         Simplified lump organic P is simulated including both P in biomass (e.g., algea), and suspended organic in debris (detrital) 
         # Dissolved mineral P is uptaken by biomass, e.g., algea/phytoplankton (and lumped into orgP compartment together with the detrital component)
@@ -379,14 +387,45 @@ class waterquality_phosphorus(object):
         # k_p is the Michaelis-Menton half-saturation constant for phosphorus
         
         # kg day-1
+        #p_org_max_abs = p_org_max * q * 86400 / noRoutingSteps
+        p_org_max = (0.1219178 * 1.06 ** (self.var.waterTemperature - 20)) * (self.var.waterTemperature - 20)
+        p_org_max = 0 # cancel organig phosphorus
         pot_org_p = p_org_max * divideValues(p_conc, p_conc + k_p)
-        d_p_org = pot_org_p * 1.047 ** (t_water - 20)
         
+        d_p_org = pot_org_p * p_conc
         d_org_p = org_to_pMineral * 1.047 ** (t_water - 20)
         
         return d_org_p, d_p_org
         
-       
+    # P retention from IMG-GNM accounts for both uptake and deposition - replaced by proportional deposition to SS
+    '''
+    def dynamic_P_retention(self):
+        
+        #    Retention is applied as a fraction proportionally to PP, TDP and inactive P in channels, reservoirs and lakes/reservoirs
+            
+        #    R = 1 - exp(-(Vf/Hl))
+            
+        #    where R is retention fraction, Vf is nutrient uptake velocity  and Hl is hydrological loading
+        
+        
+        # calculate water bodies volume (live storage) and depth
+        if checkOption('includeWaterBodies'):
+            wb_volume = np.where(self.var.waterBodyTypTemp > 0, self.var.lakeResStorage, self.var.substepChannelStorage)
+            wb_depth = np.where(self.var.waterBodyTypTemp > 0, divideValues(self.var.lakeResStorage , self.var.lakeArea), self.var.waterLevel)
+        else:
+            wb_volume = self.var.substepChannelStorage.copy()
+            wb_depth = self.var.waterLevel.copy()
+            
+        # calculate residence time
+        r_t = divideValues(wb_volume, self.var.discharge)
+        hl = divideValues(wb_depth, r_t)
+        vf = 1.411E-06 * 1.06 ** (self.var.waterTemperature - 20)
+        
+        r_f = 1 - np.exp(-1 * (divideValues(vf, hl)))
+        r_f = np.where(self.var.discharge < 0.01, 0., r_f)
+        return(r_f)
+    '''
+    
     def dynamic_channel_sorption(self, TDP, PP, Mss, Kf_w, n_w, v, t):
         # function goes here - to be used in routing sub-steps
         '''
@@ -409,10 +448,8 @@ class waterquality_phosphorus(object):
         EPC0_w = np.where(Kf_w <= 0, TDPc, EPC0_w)
        
         dPP = Kf_w * (TDPc ** (1 / n_w) - EPC0_w ** (1 / n_w)) * v
-        
         # restrict by availability of TDP/PP and calculate per sub-timestep
         dPPt = np.where(dPP < 0, -1 * np.minimum(np.abs(dPP / t), PP / t), np.minimum(dPP / t, TDP / t))
-        
 
         # update TDP and PP & return TDP, PP & EPC0_w
         PP += dPPt
@@ -427,8 +464,8 @@ class waterquality_phosphorus(object):
         
         # soil depth ratio - layer 0 out of 0 + 1 : to split P inputs
         
-        # Maximum depth of input of matter into the soil is set to 30 cm
-        max_depth_of_input = 0.3
+        # Maximum depth of input of matter into the soil is set to 10 cm
+        max_depth_of_input = 0.1
         soil_depthRatio1 = divideValues(self.var.soildepth[0], self.var.soildepth[0] + np.minimum(self.var.soildepth[1], max_depth_of_input - self.var.soildepth[0]))
         
         # Load input to soil: manure grassland, manure cropland, fertilzer cropland, export cropland - kg P ha-1 year-1
@@ -438,16 +475,16 @@ class waterquality_phosphorus(object):
 
             # Every year - load p soil budget components as kg year-1
            
-            # cropland
-            self.var.croplandInputFert = readnetcdf2('P_fertilizer_cropland', wd_date, useDaily='yearly', value='fert_p_input') * self.var.perha_to_pergrid
-            croplandInputManure = readnetcdf2('P_manure_cropland', wd_date, useDaily='yearly', value='manure_p_CroplandInput') * self.var.perha_to_pergrid
-            self.var.croplandExportTotal = readnetcdf2('P_export_cropland', wd_date, useDaily='yearly', value='export_P_total') * self.var.perha_to_pergrid
+            # cropland (fertilizer + manure - export) | kgP ha-1 year-1 | being temporaly downscaled by Length Growing Period (lgp)
+            self.var.croplandInputFert = readnetcdf2('P_fertilizer_cropland', wd_date, useDaily='yearly', value='fert_p_input') * self.var.perha_to_pergrid 
+            croplandInputManure = readnetcdf2('P_manure_cropland', wd_date, useDaily='yearly', value='manure_p_CroplandInput') * self.var.perha_to_pergrid 
+            self.var.croplandExportTotal = readnetcdf2('P_export_cropland', wd_date, useDaily='yearly', value='export_P_total') * self.var.perha_to_pergrid 
             
             self.var.croplandInputManure_current = 0.7 * croplandInputManure + self.var.croplandInputManure_last
             self.var.croplandInputManure_last = 0.1 * croplandInputManure
             
-            # grassland - only to managed grassland
-            grasslandInputManure = readnetcdf2('P_manure_grassland', wd_date, useDaily='yearly', value='manure_p_GrasslandInput') * self.var.perha_to_pergrid * self.var.fracPasture
+            # grassland - only to managed grassland - kg ha-1 year-1
+            grasslandInputManure = readnetcdf2('P_manure_grassland', wd_date, useDaily='yearly', value='manure_p_GrasslandInput') * self.var.perha_to_pergrid * self.var.fracPasture / dateVar['daysInYear']
             
             self.var.grasslandInputManure_current = 0.7 * grasslandInputManure + self.var.grasslandInputManure_last
             self.var.grasslandInputManure_last = 0.1 * grasslandInputManure
@@ -625,7 +662,7 @@ class waterquality_phosphorus(object):
         
         # Enrichment factors based on finer soil praticles
 
-        E_pp = np.where(self.var.sedToChannel > 0.1, np.exp(2.00 - 0.16 * np.log(self.var.sedToChannel * 0.1)), 1.) # sedYieldLand * 1000 (to kg) / 10000 (per ha)
+        E_pp = np.where(self.var.sedToChannel > 1, np.exp(2.00 - 0.16 * np.log(self.var.sedToChannel)), 0.) # sedYieldLand * 1000 (to kg) / 10000 (per ha)
         
         # Calculate soil availabile for degredation - NOT BEING USED - TO CHECK / CANCEL  - DF
         
@@ -677,13 +714,13 @@ class waterquality_phosphorus(object):
                 # Water demand ### lift, reservoir type4 is currently excluded
         # Only with self.var.sectorSourceAbstractionFractions = True
         # channel
-        if checkOption('includeWaterDemand'):
-            self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  (self.var.channel_PConc), self.var.channel_P_Dt), 0.)
-            self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_PPConc), self.var.channel_PP_Dt), 0.)
-            #self.var.channel_inactiveP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_inactivePConc / 10**3), self.var.channel_inactiveP), 0.)
-            self.var.channel_sed_Abstracted = np.maximum(
-            np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),
-            0.)
+        #if checkOption('includeWaterDemand'):
+           # self.var.channel_P_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea *  (self.var.channel_PConc), self.var.channel_P_Dt), 0.)
+           # self.var.channel_PP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_PPConc), self.var.channel_PP_Dt), 0.)
+           # #self.var.channel_inactiveP_Abstracted = np.maximum(np.minimum(self.var.act_channelAbst * self.var.cellArea * (self.var.channel_inactivePConc / 10**3), self.var.channel_inactiveP), 0.)
+           # self.var.channel_sed_Abstracted = np.maximum(
+           # np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed),
+           # 0.)
         '''
         # lake/reservoir
         if checkOption('includeWaterBodies'):   

@@ -1673,7 +1673,7 @@ def readnetcdf2(namebinding, date, useDaily='daily', value='None', addZeros=Fals
 
             # A netCDF time variable object  - time index (in the netCDF file)
             nctime = nf1.variables['time']
-
+            
             if nctime.calendar in ['noleap', '365_day']:
                 dateVar['leapYear'] = 1
                 idx = date2indexNew(date, nctime, calendar=nctime.calendar, select='nearest', name = name)

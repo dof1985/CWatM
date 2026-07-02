@@ -163,7 +163,8 @@ class miscInitial(object):
 
         self.var.twothird = 2.0 / 3.0
 
-
+        # Discharge threshold (m3/s) to avoid extreme values - WATER QUALITY
+        self.var.minDischarge = 0.05
 
 
 

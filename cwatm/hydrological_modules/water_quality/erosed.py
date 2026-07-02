@@ -97,7 +97,7 @@ class waterquality_erosed(object):
        
 
         return channel_sed, channel_sedConc, sedDep, sedDeg
-        
+    '''    
     def sediments_in_lakes_reservoirs(self, conc_i, conc_eq, ks, d_50, V, t):
         """
         conc_eq ... equilibrium conc. of suspended solids in waterbody (kg/m3)
@@ -117,6 +117,37 @@ class waterquality_erosed(object):
         mass_f = conc_f * V
        
         return mass_f, sed_stl
+    '''
+    
+    def sediments_in_lakes_reservoirs(self, q0, s_area, v_setl, res_sed, t):
+        """
+        CALCULATE SEDIMENTATION USING A MODIFIED OVERFLOW RATE MODEL FOLLOWING SWAT
+        Returns up-dated res/lake sediments, and sediments settled per sub-time step, and trapping efficiency
+        q0 - outflow [m3 / subtimestep]
+        s_area - water body surface area in m2
+        vsetl - users defined settling velocity [m day-1]
+        res_sed - sediments loadings in res/lake [kg/sub timestep]
+        t - number of sub-daily timesteps
+        conc_eq ... equilibrium conc. of suspended solids in waterbody (kg/m3)
+
+        sed_setl ... amount of sediments settled in a subtime step (kg)
+        """
+        
+        # TRAPPING EFFICIENCY(TE) = v_setl/v_ovflw [day-1]
+        
+        v_ovflw = divideValues(q0 * t, s_area) # [m]
+        # calculate te and restrict between 0 to 1
+        te = divideValues(v_setl, v_ovflw) # [day-1]
+        te = np.minimum(np.maximum(te, 0), 1)
+        
+        # Sediment trapping per sub-timestep
+        sed_setl = (res_sed * te) / t
+        sed_setl = np.where(sed_setl > res_sed, res_sed, sed_setl)
+
+        res_sed -= sed_setl
+
+       
+        return res_sed, sed_setl, te
 
     def initial(self):
         """
@@ -243,6 +274,11 @@ class waterquality_erosed(object):
             
         ### Dummy variables for lakes and reservoir function
         if checkOption('includeWaterBodies'):
+            self.var.resLakeSedSetlVelocity = np.compress(self.var.compress_LR, globals.inZero.copy() + 0.01)
+            
+            if 'res_setlVelocity' in binding:
+                self.var.resLakeSedSetlVelocity  = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('res_setlVelocity'))
+            '''    
             if 'ks_sediment' in binding:
                 self.var.ks_sed = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('ks_sediment')) # day-1 (decay constant)
             else:
@@ -257,7 +293,7 @@ class waterquality_erosed(object):
                 self.var.conc_sed_eq = np.compress(self.var.compress_LR, globals.inZero.copy() + loadmap('eq_conc_sediment') / 1000) # mg per l to kg per m3
             else:
                 self.var.conc_sed_eq = np.compress(self.var.compress_LR, globals.inZero.copy() + 15) / 1000  # mg per l to kg per m3
-
+            '''
 
 
 
@@ -391,12 +427,6 @@ class waterquality_erosed(object):
         
         # apply delivery rate
         self.var.sedToChannel = self.var.sdr * self.var.sedToChannel
-        
-        # CHANNEL
-        if checkOption('includeWaterDemand'):
-            self.var.channel_sed_Abstracted = np.maximum(
-            np.minimum(self.var.act_channelAbst * self.var.cellArea * self.var.channel_sedConc, self.var.channel_sed_Dt),
-            0.)
         
         # as an output variable
         self.var.sum_sedYieldLand_tonha = divideValues(self.var.sum_sedYieldLand, self.var.cellArea * 0.0001)

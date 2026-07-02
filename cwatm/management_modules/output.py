@@ -480,7 +480,6 @@ class outputTssMap(object):
             :param daymonthyear: day =0 , month =1 , year =2
             :return: expression
             """
-
             #if dateVar['checked'][dateVar['currwrite'] - 1] >= daymonthyear:
             # using a list with is 1 for monthend and 2 for year end to check for execution
             value = []
@@ -539,7 +538,6 @@ class outputTssMap(object):
             """
 
             outputFilename = expression[0]
-
             if expression[2]:
                 writeFileHeader(outputFilename,expression)
                 outputFile = open(outputFilename, "a")
@@ -945,7 +943,6 @@ class outputTssMap(object):
                         varname = outTss[tss][i][1]
                         varnameCollect.append(varname)
                         what = 'self.var.' + outTss[tss][i][1]
-
                     if tss[-5:] == "daily":
                         # what = 'self.var.' + reportTimeSerieAct[tss]['outputVar'][0]
                         # how = reportTimeSerieAct[outTss[tss][0][0]]['operation'][0]
