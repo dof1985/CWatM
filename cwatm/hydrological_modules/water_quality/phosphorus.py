@@ -264,51 +264,80 @@ class waterquality_phosphorus(object):
         self.var.channel_PP_Dt = self.var.load_initial('channel_PP_Dt', default = globals.inZero.copy())
         self.var.channel_PP_deposition = globals.inZero.copy()
         self.var.channel_PP_resuspension = globals.inZero.copy()
-        #self.var.channel_inactiveP = self.var.load_initial('channel_inactiveP', default = globals.inZero.copy())
+        self.var.channel_orgPP = self.var.load_initial('channel_orgP', default = globals.inZero.copy())
+        self.var.channel_orgP_Dt = self.var.load_initial('channel_orgP_Dt', default = globals.inZero.copy())
+        self.var.channel_orgP_uptake = globals.inZero.copy()
+        self.var.channel_orgP_mineralization = globals.inZero.copy()
+        self.var.channel_orgP_deposition = globals.inZero.copy()
+        
         self.var.channel_PConc = self.var.load_initial('channel_PConc', default = globals.inZero.copy())
         self.var.channel_PPConc = self.var.load_initial('channel_PPConc', default = globals.inZero.copy())
-        #self.var.channel_inactivePConc = self.var.load_initial('channel_inactivePConc', default = globals.inZero.copy())
+        self.var.channel_orgPConc = self.var.load_initial('channel_PPConc', default = globals.inZero.copy())
+
         self.var.outlet_P = globals.inZero.copy()
         self.var.outlet_PP = globals.inZero.copy()
-        #self.var.outlet_inactiveP = globals.inZero.copy()
+        self.var.outlet_orgP = globals.inZero.copy()
         
         # lake reservoirs [kg]
         self.var.resLakeInflow_P = globals.inZero.copy()
         self.var.resLakeInflow_PP = globals.inZero.copy()
-        #self.var.resLakeInflow_inactiveP = globals.inZero.copy()
+        self.var.resLakeInflow_orgP = globals.inZero.copy()
+
         self.var.resLakeOutflow_P = globals.inZero.copy()
         self.var.resLakeOutflow_PP = globals.inZero.copy()
-        #self.var.resLakeOutflow_inactiveP = globals.inZero.copy()
+        self.var.resLakeOutflow_orgP = globals.inZero.copy()
+
         self.var.resLake_P = self.var.load_initial('resLake_P', default = globals.inZero.copy())
         self.var.resLake_PP = self.var.load_initial('resLake_PP', default = globals.inZero.copy())
         self.var.resLake_PP_deposition = globals.inZero.copy()
-        #self.var.resLake_inactiveP = self.var.load_initial('resLake_inactiveP', default = globals.inZero.copy())
+        self.var.resLake_orgP = self.var.load_initial('resLake_orgP', default = globals.inZero.copy())
+        self.var.resLake_orgP_deposition = globals.inZero.copy()
+
         self.var.resLake_PConc = self.var.load_initial('resLake_PConc', default = globals.inZero.copy())
         self.var.resLake_PPConc = self.var.load_initial('resLake_PPConc', default = globals.inZero.copy())
-        #self.var.resLake_inactivePConc = self.var.load_initial('resLake_inactivePConc', default = globals.inZero.copy())
+        self.var.resLake_orgPConc = self.var.load_initial('resLake_orgPConc', default = globals.inZero.copy())
+
         self.var.resLake_TPConc = globals.inZero.copy()
         self.var.resLake_TDPConc = globals.inZero.copy()
-        #### Is there anyway to check for initial balance - i.e. so all soil_P in kg at time step = 0 == self.var.soil_PConc_total
 
         # abstraction [kg]
         self.var.channel_P_Abstracted = globals.inZero.copy()
         self.var.channel_PP_Abstracted = globals.inZero.copy()
-        #self.var.channel_inactiveP_Abstracted = globals.inZero.copy()
+        # orgP - abstracted with PP
         self.var.resLake_P_Abstracted = globals.inZero.copy()
         self.var.resLake_PP_Abstracted = globals.inZero.copy()
+        # orgP - abstracted with PP
+        
         #self.var.resLake_inactiveP_Abstracted = globals.inZero.copy()
         self.var.groundwater_P_Abstracted = globals.inZero.copy()
         self.var.domestic_P_Abstracted = globals.inZero.copy()
         self.var.livestock_P_Abstracted = globals.inZero.copy()
         self.var.industry_P_Abstracted = globals.inZero.copy()
         self.var.irrigation_P_Abstracted = globals.inZero.copy()
-        #self.var.irrigation_inactiveP_Abstracted = globals.inZero.copy()
+        self.var.irrigation_PP_Abstracted = globals.inZero.copy()
         self.var.returnflowIrr_P = globals.inZero.copy()
         
         # P retention [fraction]
-        self.var.channelLake_P_retention = globals.inZero.copy()
-        self.var.avg_channelLake_P_retention = globals.inZero.copy()
+        #self.var.channelLake_P_retention = globals.inZero.copy()
+        #self.var.avg_channelLake_P_retention = globals.inZero.copy()
         
+        # organic <-> mineralization 
+        
+        # Uptake rate kg day-1 P
+        self.var.max_uptake_rate = globals.inZero.copy() + 1.
+        if 'max_uptake_rate_P' in 'binding':
+            self.var.max_uptake_rate = globals.inZero.copy() + loadmap('max_uptake_rate_P')
+        
+        # Mineralization rate kg day-1 P
+        self.var.orgP_mineralRate = globals.inZero.copy() + 0.2
+        if 'mineralization_rate_P' in 'binding':
+            self.var.orgP_mineralRate = globals.inZero.copy() + loadmap('mineralization_rate_P')
+        
+        # Michaelis-Menton half-saturation constant for phosphorus
+        self.var.michalis_k_p = globals.inZero.copy() + 0.01
+        if 'michalis_k_p' in 'binding':
+            self.var.michalis_k_p = globals.inZero.copy() + loadmap('michalis_k_p')
+            
         # In stream/lake sorption/de-sorption
         self.var.n_water = globals.inZero.copy() + 1.
         if 'n_water' in binding:
@@ -338,35 +367,26 @@ class waterquality_phosphorus(object):
         #create for each soil layer soilmass1 =  bulkdensity1 * cellarea * (thickness of the layer)
         ################################
     
-    # P retention from IMG-GNM accounts for both uptake and deposition - replaced by proportional deposition to SS
-    '''
-    def dynamic_P_retention(self):
+    def dynamic_P_orgP_transformation(self, p_org_max, p_conc, org_to_pMineral, k_p, t_water):
+        '''
+        Review of aquatic system P modeling: https://www.sciencedirect.com/science/article/pii/S136481521400022X#sec4
+        Simplified lump organic P is simulated including both P in biomass (e.g., algea), and suspended organic in debris (detrital) 
+        # Dissolved mineral P is uptaken by biomass, e.g., algea/phytoplankton (and lumped into orgP compartment together with the detrital component)
+        P Uptake is limited by available DIP (Michalis-Menten kinetics) and goverened by temperature. Linear mineralization is governed by temperature
+        following the approach taken by SWAT: Mineralization_rate = Mineratlization_20deg * 1.047 ** (T_water - 20) ; kg day-1
+        '''
+        # p_conc: kg /m3 <-> mg / L
+        # k_p is the Michaelis-Menton half-saturation constant for phosphorus
         
-        #    Retention is applied as a fraction proportionally to PP, TDP and inactive P in channels, reservoirs and lakes/reservoirs
-            
-        #    R = 1 - exp(-(Vf/Hl))
-            
-        #    where R is retention fraction, Vf is nutrient uptake velocity  and Hl is hydrological loading
+        # kg day-1
+        pot_org_p = p_org_max * divideValues(p_conc, p_conc + k_p)
+        d_p_org = pot_org_p * 1.047 ** (t_water - 20)
         
+        d_org_p = org_to_pMineral * 1.047 ** (t_water - 20)
         
-        # calculate water bodies volume (live storage) and depth
-        if checkOption('includeWaterBodies'):
-            wb_volume = np.where(self.var.waterBodyTypTemp > 0, self.var.lakeResStorage, self.var.substepChannelStorage)
-            wb_depth = np.where(self.var.waterBodyTypTemp > 0, divideValues(self.var.lakeResStorage , self.var.lakeArea), self.var.waterLevel)
-        else:
-            wb_volume = self.var.substepChannelStorage.copy()
-            wb_depth = self.var.waterLevel.copy()
-            
-        # calculate residence time
-        r_t = divideValues(wb_volume, self.var.discharge)
-        hl = divideValues(wb_depth, r_t)
-        vf = 1.411E-06 * 1.06 ** (self.var.waterTemperature - 20)
+        return d_org_p, d_p_org
         
-        r_f = 1 - np.exp(-1 * (divideValues(vf, hl)))
-        r_f = np.where(self.var.discharge < 0.01, 0., r_f)
-        return(r_f)
-    '''
-    
+       
     def dynamic_channel_sorption(self, TDP, PP, Mss, Kf_w, n_w, v, t):
         # function goes here - to be used in routing sub-steps
         '''
