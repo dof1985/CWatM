@@ -245,7 +245,7 @@ def run_standalone_steady_state(
     np.save(export_save_path, stable_heads)
 
     print("\n" + "="*60)
-    print("  ✔ SUCCESS: EQUILIBRIUM SOLVED FROM LONG-TERM DRIVERS")
+    print("  SUCCESS: EQUILIBRIUM SOLVED FROM LONG-TERM DRIVERS")
     print(f"  Target File Saved: {export_save_path}")
     print("  Forcing system process shutdown. Preventing CWatM dynamic loops.")
     print("="*60 + "\n")
