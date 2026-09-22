@@ -59,12 +59,13 @@ class waterquality_erosed(object):
         return(c_fact_out)
         
     
-    def sediments_in_channel(self, channel_sed, channel_sedConc, prf, Q, A, csp, spexp, Kch, Cch, Dt):
+    def sediments_in_channel(self, channel_sed, channel_sedConc, prf, Q, A, v, csp, spexp, Kch, Cch, Dt):
         # this function is used for sediment routing sub-steps in the channel
 
         '''
         prf - peak rate factor, atm. to be defined in settingsfile
         Q - discharge [m3/s]
+        v - substep channel storage [m3]
         A - channel crossectional area [m2]
         qChanPeak - peak channel flow rate [m3/s]
         vChanPeak - peak channel flow velocity [m/s]
@@ -84,17 +85,19 @@ class waterquality_erosed(object):
         vChanPeak = qChanPeak / A #substituted totalCrossArea wth. crossArea calculated in waterquality_vars.py
         #dummyvelocity = divideValues(self.var.travelTime, self.var.chanLength)
         concSedMax = csp * np.power(vChanPeak, spexp)
-    
 
         # Deposition and degreadtion is divided by number of routing steps 
         # sedDt = sedConc * second in time step --> second in day / number of routing time step
-        sedDep = Dt * Q * np.where(channel_sedConc > concSedMax, (channel_sedConc - concSedMax), 0.) # kg/m3 -> kg/s -> kg/subtime step
-        sedDeg = Dt * Q * np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch, 0.) # kg/subtime step
-       
+        sedDep = np.where(channel_sedConc > concSedMax, np.maximum(channel_sedConc - concSedMax, 0.01 / 1000), 0.) * v # kg/m3 -> kg/s -> kg/subtime step
+        sedDeg = np.where(channel_sedConc <= concSedMax, (concSedMax - channel_sedConc) * Kch * Cch, 0.) * v # kg/subtime step
+       #Dt * Q *  
+        # 0.01 mgL-1 as a minimum allowed concentration
+        #sedDep = np.where(sedDep >= channel_sedConc, channel_sedConc - (0.01 / 1000) *  Q * Dt, sedDep)
+        sedDep = np.where(sedDep < 0, 0, sedDep)
+
         dchannelSed = sedDeg - sedDep # kg/subtime step
         channel_sed += dchannelSed  # kg/subtime step
-        channel_sedConc = divideValues(channel_sed, Dt * Q)
-       
+        channel_sedConc = divideValues(channel_sed, v)#Dt * Q)
 
         return channel_sed, channel_sedConc, sedDep, sedDeg
     '''    
@@ -401,6 +404,8 @@ class waterquality_erosed(object):
         # self.var.sedYieldLand_sum = np.nansum(self.var.fracVegCover[0:4]*self.var.sedYieldLand, axis=0)
         #erosedVarsSum = ['sedYieldLand', 'channel_sed', 'channel_sedConc']
         erosedVarsSum = ['sedYieldLand', 'qpeak', 'tconc', 'sedimentLossDepth_mm', 'runoffm3s', 'tov', 'tch', 'directRunoff_mm']
+        if 'cfactor_from_kc' in binding  and returnBool('cfactor_from_kc') == True:
+            erosedVarsSum = ['sedYieldLand', 'qpeak', 'tconc', 'sedimentLossDepth_mm', 'runoffm3s', 'tov', 'tch', 'directRunoff_mm', 'cfactor_arr']
         for variable in erosedVarsSum:
             vars(self.var)["sum_" + variable] = np.nansum(vars(self.var)[variable] * self.var.fracVegCover[0:4], axis=0)
         

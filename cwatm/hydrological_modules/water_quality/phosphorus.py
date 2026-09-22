@@ -71,13 +71,23 @@ class waterquality_phosphorus(object):
         
         # calculate fluxes (in kg)
         #P_Qr = np.nan_to_num((Qr * (divideArrays(prePlab, Vs))) * 0.2 * runoff_adj, 0.) # calibration parameter runoff_adj > 0 
-        P_Qr = np.nan_to_num((Qr * (divideArrays(preTDP, Vs))) * runoff_adj, 0.) # calibration parameter runoff_adj > 0 
+        P_Qr = np.nan_to_num((Qr * (divideArrays(preTDP, Vs))) * 0.2 * runoff_adj, 0.) # calibration parameter runoff_adj > 0 
         P_Qi = np.nan_to_num(Qi * divideArrays(preTDP, Vs), 0.)
         P_Qp = np.nan_to_num(Qp * divideArrays(preTDP, Vs), 0.)
         
         # Add balance term to Plab
         b_in = P_in
-        b_out = P_Qr + P_Qi + P_Qp
+        b_out = b_out0 = P_Qr + P_Qi + P_Qp
+        
+        # restrict output TDP by current storage
+        b_out = np.where(b_out > preTDP, preTDP, b_out)
+        
+        
+        # recalc outflows
+        P_Qr = b_out * divideArrays(P_Qr, b_out0)
+        P_Qi = b_out * divideArrays(P_Qi, b_out0)
+        P_Qp = b_out * divideArrays(P_Qp, b_out0)
+        
         b_sto = Plab - prePlab + TDP - preTDP
        
 
@@ -108,8 +118,8 @@ class waterquality_phosphorus(object):
             * Paddy irrigation No.2 (cropland)
             * non-Paddy irrigation No.3 (cropland)
         '''
-        # Multiply by cellarea * 10000 to convert per ha to absolute (per grid) values
-        self.var.perha_to_pergrid = self.var.cellArea * 10000
+        # Multiply by cellarea / 10000 to convert per ha to absolute (per grid) values
+        self.var.perha_to_pergrid = self.var.cellArea / 10000
         
         # load initial inactive soil p as a fraction of TP; default - 0.85
         self.var.soil_P_fracInactive_managed = globals.inZero.copy() + 0.75
@@ -428,6 +438,7 @@ class waterquality_phosphorus(object):
     
     def dynamic_channel_sorption(self, TDP, PP, Mss, Kf_w, n_w, v, t):
         # function goes here - to be used in routing sub-steps
+        # Inspired by INCA-P: http://dx.doi.org/10.1016/j.envsoft.2016.05.022
         '''
         dPP - Sorption/de-soprtion flux [kg / subtimestep]
         TDP - Total dissolved P in channel/lake [kg]
@@ -464,8 +475,8 @@ class waterquality_phosphorus(object):
         
         # soil depth ratio - layer 0 out of 0 + 1 : to split P inputs
         
-        # Maximum depth of input of matter into the soil is set to 10 cm
-        max_depth_of_input = 0.1
+        # Maximum depth of input of matter into the soil is set to 20 cm
+        max_depth_of_input = 0.2
         soil_depthRatio1 = divideValues(self.var.soildepth[0], self.var.soildepth[0] + np.minimum(self.var.soildepth[1], max_depth_of_input - self.var.soildepth[0]))
         
         # Load input to soil: manure grassland, manure cropland, fertilzer cropland, export cropland - kg P ha-1 year-1
@@ -474,18 +485,33 @@ class waterquality_phosphorus(object):
         if globals.dateVar['newStart'] or globals.dateVar['newYear']:
 
             # Every year - load p soil budget components as kg year-1
-           
             # cropland (fertilizer + manure - export) | kgP ha-1 year-1 | being temporaly downscaled by Length Growing Period (lgp)
-            self.var.croplandInputFert = readnetcdf2('P_fertilizer_cropland', wd_date, useDaily='yearly', value='fert_p_input') * self.var.perha_to_pergrid 
-            croplandInputManure = readnetcdf2('P_manure_cropland', wd_date, useDaily='yearly', value='manure_p_CroplandInput') * self.var.perha_to_pergrid 
-            self.var.croplandExportTotal = readnetcdf2('P_export_cropland', wd_date, useDaily='yearly', value='export_P_total') * self.var.perha_to_pergrid 
+            if isinstance(safeFloat(cbinding('P_fertilizer_cropland')), float):
+                self.var.croplandInputFert = globals.inZero.copy() + loadmap('P_fertilizer_cropland') * self.var.perha_to_pergrid 
+            else:
+                self.var.croplandInputFert = readnetcdf2('P_fertilizer_cropland', wd_date, useDaily='yearly', value='fert_p_input') * self.var.perha_to_pergrid 
+
+            if isinstance(safeFloat(cbinding('P_manure_cropland')), float):
+                croplandInputManure = globals.inZero.copy() + loadmap('P_manure_cropland') * self.var.perha_to_pergrid 
+            else:
+                croplandInputManure = readnetcdf2('P_manure_cropland', wd_date, useDaily='yearly', value='manure_p_CroplandInput') * self.var.perha_to_pergrid 
+                        
+            if isinstance(safeFloat(cbinding('P_export_cropland')), float):
+                self.var.croplandExportTotal = globals.inZero.copy() + loadmap('P_export_cropland') * self.var.perha_to_pergrid 
+            else:
+                self.var.croplandExportTotal = readnetcdf2('P_export_cropland', wd_date, useDaily='yearly', value='export_P_total') * self.var.perha_to_pergrid 
+                                    
             
             self.var.croplandInputManure_current = 0.7 * croplandInputManure + self.var.croplandInputManure_last
             self.var.croplandInputManure_last = 0.1 * croplandInputManure
             
             # grassland - only to managed grassland - kg ha-1 year-1
-            grasslandInputManure = readnetcdf2('P_manure_grassland', wd_date, useDaily='yearly', value='manure_p_GrasslandInput') * self.var.perha_to_pergrid * self.var.fracPasture / dateVar['daysInYear']
-            
+            if isinstance(safeFloat(cbinding('P_manure_grassland')), float):
+                grasslandInputManure = globals.inZero.copy() + loadmap('P_manure_grassland') * self.var.perha_to_pergrid 
+            else:
+                grasslandInputManure = readnetcdf2('P_manure_grassland', wd_date, useDaily='yearly', value='manure_p_GrasslandInput') * self.var.perha_to_pergrid * self.var.fracPasture / dateVar['daysInYear']
+                                    
+                                    
             self.var.grasslandInputManure_current = 0.7 * grasslandInputManure + self.var.grasslandInputManure_last
             self.var.grasslandInputManure_last = 0.1 * grasslandInputManure
 
@@ -529,6 +555,7 @@ class waterquality_phosphorus(object):
         
         # Prepare inputs to soil
         cropLandIrr_day = self.var.croplandInputFert_day + self.var.croplandInputManure_current_day - self.var.croplandExportTotal_day
+        
         self.var.cropLandIrr_day_top = cropLandIrr_day * soil_depthRatio1
         self.var.cropLandIrr_day_bot = cropLandIrr_day * (1 - soil_depthRatio1)
         
@@ -539,8 +566,14 @@ class waterquality_phosphorus(object):
         # ADD SOURCE POINT RIVER AND SOIL - UPDATE READ FILES BELOW!
         
         # read point source net P loadings - daily; kg day-1
-        self.var.source_point_stream = readnetcdf2('pointSource_P', wd_date, useDaily='yearly', value='pntSource_river')
-        self.var.source_point_soil = readnetcdf2('pointSource_P', wd_date, useDaily='yearly', value='pntSource_soil')
+        if isinstance(safeFloat(cbinding('pointSource_P')), float):
+            self.var.source_point_stream = globals.inZero.copy() + loadmap('pointSource_P') * self.var.perha_to_pergrid 
+            self.var.source_point_soil = globals.inZero.copy() + loadmap('pointSource_P') * self.var.perha_to_pergrid 
+        else:
+            self.var.source_point_stream = readnetcdf2('pointSource_P', wd_date, useDaily='yearly', value='pntSource_river')
+            self.var.source_point_soil = readnetcdf2('pointSource_P', wd_date, useDaily='yearly', value='pntSource_soil')                        
+                                    
+        
 
         # pit latrines detpth (meters)
         pitLatrinesDepth = 3
@@ -574,9 +607,13 @@ class waterquality_phosphorus(object):
         self.var.soil_P_input1[2:4] = self.var.cropLandIrr_day_top
         self.var.soil_P_input2[2:4] = self.var.cropLandIrr_day_bot
         
+        self.var.cropland_p_input = np.nansum((self.var.soil_P_input1[2:4] + self.var.soil_P_input2[2:4]) * self.var.fracVegCover[2:4], axis = 0)
+        
         # Update soil inputs - managed lands
         self.var.soil_P_input1[1] = self.var.grassland_day_top
         self.var.soil_P_input2[1] = self.var.grassland_day_bot
+        
+        self.var.grassland_p_input = (self.var.soil_P_input1[1] + self.var.soil_P_input2[1]) * self.var.fracVegCover[1]
 
         # add irrigation to TDP & inactive to inactive
         self.var.soil_P_input1[3] += self.var.sum_irrigation_P_Applied
@@ -666,8 +703,8 @@ class waterquality_phosphorus(object):
         
         # Calculate soil availabile for degredation - NOT BEING USED - TO CHECK / CANCEL  - DF
         
-        top_lyr_prop = (2 * self.var.P_mobility_in_soil) / (1 + self.var.P_mobility_in_soil)
-        Avl_P_for_erosion = self.var.soil_P_labile1 / 3 * top_lyr_prop
+        #top_lyr_prop = (2 * self.var.P_mobility_in_soil) / (1 + self.var.P_mobility_in_soil)
+        #Avl_P_for_erosion = self.var.soil_P_labile1 / 3 * top_lyr_prop
         
         sedYieldLand_PP = np.maximum(np.minimum(E_pp * self.var.sedToChannel * divideArrays(self.var.soil_P_labile1, self.var.soilM1), self.var.soil_P_labile1) , 0.)
         
@@ -685,8 +722,10 @@ class waterquality_phosphorus(object):
         self.var.interflow_P = np.nansum((interflow2_P + interflow3_P) * self.var.fracVegCover[0:4], axis = 0)
         self.var.baseflow_P = self.var.baseflow * self.var.cellArea * self.var.GW_P_Conc 
         
-        # wastewater to channel [kg]
-        self.var.returnflowNonIrr_P = np.where(self.var.returnflowNonIrr > 0, self.var.source_point_stream, 0.)
+        # wastewater to channel [kg] - added directly so are not dependent upon returnflow non-irrigation
+        # to prevent cases where input data, w.g., water withdrawal and source_point do not align
+        self.var.returnflowNonIrr_P = self.var.source_point_stream.copy()
+        #np.where(self.var.returnflowNonIrr > 0, , 0.)
         
         # to runoff [kg] 
         self.var.runoff_P = self.var.directRunoff_P +  self.var.interflow_P + self.var.baseflow_P + self.var.returnflowNonIrr_P

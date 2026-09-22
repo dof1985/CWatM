@@ -125,8 +125,8 @@ class waterquality_vars(object):
 
 
         #flowVelocity = np.minimum(self.var.discharge /self.var.totalCrossSectionArea, 0.36*self.var.discharge**0.24)
-        flowVelocity = np.minimum(self.var.discharge / self.var.crossArea,0.36 * dis ** 0.24)
-        flowVelocity = np.maximum(flowVelocity, 10.*0.0011575)
+        flowVelocity = np.minimum(self.var.discharge / self.var.crossArea, 0.36 * dis ** 0.24)
+        flowVelocity = np.maximum(flowVelocity, 10.* 0.0011575)
         self.var.flowVelocity = flowVelocity.copy()
            # Channel velocity (m/s); dividing Q (m3/s) by CrossSectionArea (m2)
            # avoid extreme velocities by using the Wollheim 2006 equation
